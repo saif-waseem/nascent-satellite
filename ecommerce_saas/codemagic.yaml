@@ -1,0 +1,196 @@
+workflows:
+  # ============================================================
+  # User App - Aniqa Madinati (iOS IPA)
+  # ============================================================
+  user-app-aniqa-ios:
+    name: "User App - Aniqa Madinati (iOS)"
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.27.4
+      xcode: latest
+      cocoapods: default
+      vars:
+        TENANT_ID: "anegmadenty"
+        BUNDLE_ID: "com.nascent.anegmadenty"
+        APP_NAME: "أنيقة مدينتي"
+      # ⚠️ أضف هذه المتغيرات في لوحة تحكم Codemagic (encrypted)
+      # APP_STORE_CONNECT_KEY_IDENTIFIER: ...
+      # APP_STORE_CONNECT_ISSUER_ID: ...
+      # APP_STORE_CONNECT_PRIVATE_KEY: ...
+      # CERTIFICATE_PRIVATE_KEY: ...
+
+    scripts:
+      - name: Set up local packages
+        script: |
+          cd ecommerce_saas
+          # لا يوجد pub workspace، الباكدجات المحلية موجودة في packages/
+          echo "Local packages ready"
+
+      - name: Update App Config (Tenant ID)
+        script: |
+          cd ecommerce_saas/apps/user_app
+          # تحديث app_config.dart
+          cat > lib/core/config/app_config.dart << 'EOF'
+          class AppConfig {
+            static const String tenantId = '$TENANT_ID';
+            static const int? defaultRegistrationPoints = null;
+          }
+          EOF
+
+      - name: Update iOS Bundle ID & Display Name
+        script: |
+          cd ecommerce_saas/apps/user_app/ios
+          # تحديث Info.plist - اسم التطبيق
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $APP_NAME" Runner/Info.plist
+          # تحديث project.pbxproj - Bundle ID
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = com.saas.ecommerce.userApp;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" Runner.xcodeproj/project.pbxproj
+
+      - name: Install Flutter dependencies
+        script: |
+          cd ecommerce_saas/packages/shared_models && flutter pub get
+          cd ../../packages/shared_ui && flutter pub get
+          cd ../../apps/user_app && flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ecommerce_saas/apps/user_app/ios
+          pod install
+
+      - name: Build iOS IPA
+        script: |
+          cd ecommerce_saas/apps/user_app
+          flutter build ipa --release \
+            --no-tree-shake-icons \
+            --export-options-plist=ios/ExportOptions.plist
+
+    artifacts:
+      - ecommerce_saas/apps/user_app/build/ios/ipa/*.ipa
+
+    publishing:
+      # اختياري: نشر على TestFlight تلقائياً
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
+      email:
+        recipients:
+          - your-email@example.com # ← غيّر هذا لبريدك
+        notify:
+          success: true
+          failure: true
+
+  # ============================================================
+  # User App - Dar London (iOS IPA)
+  # ============================================================
+  user-app-london-ios:
+    name: "User App - Dar London (iOS)"
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.27.4
+      xcode: latest
+      cocoapods: default
+      vars:
+        TENANT_ID: "landan"
+        BUNDLE_ID: "com.nascent.darlandan"
+        APP_NAME: "دار لندن"
+
+    scripts:
+      - name: Update App Config (Tenant ID)
+        script: |
+          cd ecommerce_saas/apps/user_app
+          cat > lib/core/config/app_config.dart << 'EOF'
+          class AppConfig {
+            static const String tenantId = '$TENANT_ID';
+            static const int? defaultRegistrationPoints = null;
+          }
+          EOF
+
+      - name: Update iOS Bundle ID & Display Name
+        script: |
+          cd ecommerce_saas/apps/user_app/ios
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $APP_NAME" Runner/Info.plist
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = com.saas.ecommerce.userApp;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" Runner.xcodeproj/project.pbxproj
+
+      - name: Install Flutter dependencies
+        script: |
+          cd ecommerce_saas/packages/shared_models && flutter pub get
+          cd ../../packages/shared_ui && flutter pub get
+          cd ../../apps/user_app && flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ecommerce_saas/apps/user_app/ios
+          pod install
+
+      - name: Build iOS IPA
+        script: |
+          cd ecommerce_saas/apps/user_app
+          flutter build ipa --release \
+            --no-tree-shake-icons \
+            --export-options-plist=ios/ExportOptions.plist
+
+    artifacts:
+      - ecommerce_saas/apps/user_app/build/ios/ipa/*.ipa
+
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com # ← غيّر هذا لبريدك
+        notify:
+          success: true
+          failure: true
+
+  # ============================================================
+  # Store Admin (iOS IPA)
+  # ============================================================
+  store-admin-ios:
+    name: "Store Admin (iOS)"
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.27.4
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.saas.ecommerce.store_admin"
+        APP_NAME: "Store Admin"
+
+    scripts:
+      - name: Update iOS Bundle ID & Display Name
+        script: |
+          cd ecommerce_saas/apps/store_admin/ios
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $APP_NAME" Runner/Info.plist
+          # Bundle ID لـ Store Admin ثابت - لا يحتاج تغيير
+
+      - name: Install Flutter dependencies
+        script: |
+          cd ecommerce_saas/packages/shared_models && flutter pub get
+          cd ../../packages/shared_ui && flutter pub get
+          cd ../../apps/store_admin && flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ecommerce_saas/apps/store_admin/ios
+          pod install
+
+      - name: Build iOS IPA
+        script: |
+          cd ecommerce_saas/apps/store_admin
+          flutter build ipa --release \
+            --no-tree-shake-icons \
+            --export-options-plist=ios/ExportOptions.plist
+
+    artifacts:
+      - ecommerce_saas/apps/store_admin/build/ios/ipa/*.ipa
+
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com # ← غيّر هذا لبريدك
+        notify:
+          success: true
+          failure: true

@@ -1,0 +1,39 @@
+﻿Analyzing pos_app...                                            
+
+   info - Don't invoke 'print' in production code - lib\core\services\storage_service.dart:24:7 - avoid_print
+   info - Use 'const' with the constructor to improve performance - lib\features\common\presentation\screens\dashboard_screen.dart:104:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\common\presentation\screens\settings_screen.dart:30:15 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\common\presentation\screens\settings_screen.dart:31:21 - prefer_const_literals_to_create_immutables
+   info - The local variable '_saveSettings' starts with an underscore - lib\features\common\presentation\widgets\customization_tab.dart:30:18 - no_leading_underscores_for_local_identifiers
+   info - Don't use 'BuildContext's across async gaps - lib\features\common\presentation\widgets\devices_tab.dart:88:37 - use_build_context_synchronously
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\common\presentation\widgets\staff_roles_tab.dart:126:15 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\customers\presentation\screens\customer_list_screen.dart:172:22 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\customers\presentation\screens\customer_list_screen.dart:174:41 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\expenses\presentation\screens\expense_list_screen.dart:79:19 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\expenses\presentation\screens\expense_list_screen.dart:81:20 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\features\expenses\presentation\screens\expense_list_screen.dart:81:21 - prefer_const_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\products\presentation\screens\inventory_management_screen.dart:70:30 - deprecated_member_use
+   info - The local variable '_checkBarcode' starts with an underscore - lib\features\products\presentation\screens\product_form_screen.dart:40:18 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_generateBarcode' starts with an underscore - lib\features\products\presentation\screens\product_form_screen.dart:49:10 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_printBarcode' starts with an underscore - lib\features\products\presentation\screens\product_form_screen.dart:56:10 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_pickAndUploadImage' starts with an underscore - lib\features\products\presentation\screens\product_form_screen.dart:72:18 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_handleSave' starts with an underscore - lib\features\products\presentation\screens\product_form_screen.dart:85:10 - no_leading_underscores_for_local_identifiers
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\products\presentation\screens\product_form_screen.dart:167:17 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\products\presentation\screens\product_form_screen.dart:177:17 - deprecated_member_use
+warning - The value of the local variable 'searchQuery' isn't used - lib\features\products\presentation\screens\product_list_screen.dart:14:11 - unused_local_variable
+   info - Don't invoke 'print' in production code - lib\features\reports\data\report_repository.dart:92:7 - avoid_print
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\reports\presentation\screens\reports_screen.dart:120:32 - deprecated_member_use
+   info - The parameter name 'sum' matches a visible type name - lib\features\sales\data\sales_repository.dart:73:55 - avoid_types_as_parameter_names
+   info - The parameter name 'sum' matches a visible type name - lib\features\sales\data\sales_repository.dart:92:37 - avoid_types_as_parameter_names
+   info - Use 'const' with the constructor to improve performance - lib\features\sales\presentation\screens\sales_management_screen.dart:99:31 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\sales\presentation\screens\sales_management_screen.dart:449:19 - prefer_const_constructors
+   info - Don't use 'BuildContext's across async gaps - lib\features\sales\presentation\screens\sales_search_screen.dart:28:30 - use_build_context_synchronously
+warning - The value of the local variable 'normalizedQuery' isn't used - lib\features\suppliers\data\product_repository.dart:24:11 - unused_local_variable
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\suppliers\presentation\screens\purchase_invoice_screen.dart:60:26 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\suppliers\presentation\screens\purchase_invoice_screen.dart:228:26 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\suppliers\presentation\screens\purchase_invoice_screen.dart:381:19 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\suppliers\presentation\screens\purchase_invoice_screen.dart:383:20 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\features\suppliers\presentation\screens\purchase_invoice_screen.dart:383:21 - prefer_const_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\suppliers\presentation\screens\supplier_detail_screen.dart:53:26 - deprecated_member_use
+warning - The value of the local variable 'tenantId' isn't used - lib\features\suppliers\presentation\screens\supplier_detail_screen.dart:79:11 - unused_local_variable
+

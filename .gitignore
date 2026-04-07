@@ -1,0 +1,60 @@
+# IDEs and Editors
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.history/
+
+# Flutter/Dart
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/pubspec.lock
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/android/key.properties
+**/android/app/local.properties
+**/.pub-cache/
+
+# Node/Firebase
+**/node_modules/
+**/functions/lib/
+**/functions/node_modules/
+.firebase/
+core.*
+
+# Python
+**/__pycache__/
+*.pyc
+
+# Logs and databases
+*.log
+*.sqlite
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+
+# Large Files & Backups
+*.zip
+*.rar
+*.7z
+*.exe
+*.msi
+*.pkg
+*.dmg
+ios_backup/
+github-pages/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets (DANGEROUS)
+.env
+*.pem
+*.jks
+google-services.json
+GoogleService-Info.plist

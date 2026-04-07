@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.superAdmin == true;
+    }
+
+    function isTenantUser() {
+      return isAuthenticated();
+    }
+
+    // --- Core Tenant Settings ---
+    match /tenants/{tenantId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuthenticated();
+    }
+
+    // --- Unified Root Collections ---
+    // All these collections use a 'tenantId' field for multi-tenancy.
+    
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+      
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isTenantUser();
+    }
+
+    match /orders/{orderId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      
+      match /daily_stats/{date} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    match /customers/{customerId} {
+      allow read, write: if isTenantUser();
+      match /transactions/{transId} {
+        allow read, write: if isTenantUser();
+      }
+    }
+
+    match /suppliers/{supplierId} {
+      allow read, write: if isTenantUser();
+      match /transactions/{transId} {
+        allow read, write: if isTenantUser();
+      }
+    }
+
+    match /purchase_invoices/{invoiceId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /sales/{saleId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /sales_invoices/{invoiceId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /expenses/{expenseId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /staff/{staffId} {
+      allow read: if true;
+      allow write: if isTenantUser();
+    }
+
+    match /roles/{roleId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isTenantUser();
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /marketing_notifications/{notifId} {
+      allow read: if true;
+      allow write: if isTenantUser();
+    }
+
+    match /app_updates/{appId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /shared_carts/{shareId} {
+      allow read, create: if true;
+      allow update, delete: if isAuthenticated();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /activation_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuthenticated();
+    }
+
+    match /system_config/{configId} {
+      allow read: if isAuthenticated();
+    }
+  }
+}

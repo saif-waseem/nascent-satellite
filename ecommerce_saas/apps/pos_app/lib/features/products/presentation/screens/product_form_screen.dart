@@ -9,6 +9,7 @@ import '../../../../core/providers/tenant_provider.dart';
 import '../providers/category_provider.dart';
 import '../../../../core/services/storage_service.dart';
 import '../providers/product_settings_provider.dart';
+import '../../../../core/utils/printing_service.dart';
 
 class ProductFormScreen extends HookConsumerWidget {
   final ProductModel? product;
@@ -53,10 +54,18 @@ class ProductFormScreen extends HookConsumerWidget {
     final minStockController = useTextEditingController(text: product?.minStockLevel?.toString() ?? '5');
     final unitController = useTextEditingController(text: product?.unit ?? 'قطعة');
     final categoryController = useTextEditingController(text: product?.category ?? 'عام');
+    final descriptionController = useTextEditingController(text: product?.description ?? '');
     
     final expiryDate = useState<DateTime?>(product?.expiryDate);
     final images = useState<List<String>>(product?.images ?? []);
     final supplierId = useState<String?>(product?.lastSupplierId);
+    final sizes = useState<List<String>>(product?.sizes ?? []);
+    final colors = useState<List<String>>(product?.colors ?? []);
+    final variants = useState<List<ProductVariant>>(product?.variants ?? []);
+    
+    final isOffer = useState(product?.isOffer ?? false);
+    final isFeaturedDeal = useState(product?.isFeaturedDeal ?? false);
+    final isDailyStarred = useState(product?.isDailyStarred ?? false);
 
     final suppliersAsync = ref.watch(suppliersListProvider(tenantId));
     final categoriesAsync = ref.watch(categoriesListProvider);
@@ -99,6 +108,7 @@ class ProductFormScreen extends HookConsumerWidget {
         id: '', tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
       )).copyWith(
         name: nameController.text.trim(),
+        description: descriptionController.text.trim(),
         barcode: barcodeController.text.trim(),
         purchasePrice: double.tryParse(purchasePriceController.text) ?? 0.0,
         price: double.tryParse(retailPriceController.text) ?? 0.0,
@@ -109,6 +119,12 @@ class ProductFormScreen extends HookConsumerWidget {
         category: categoryController.text.trim(),
         expiryDate: expiryDate.value,
         images: images.value,
+        sizes: sizes.value,
+        colors: colors.value,
+        variants: variants.value,
+        isOffer: isOffer.value,
+        isFeaturedDeal: isFeaturedDeal.value,
+        isDailyStarred: isDailyStarred.value,
         lastSupplierId: supplierId.value,
         isArchived: false,
       );
@@ -169,20 +185,41 @@ class ProductFormScreen extends HookConsumerWidget {
                             Expanded(
                               child: TextField(
                                 controller: barcodeController,
-                                decoration: _inputDecoration('الباركود / Barcode', suffixIcon: const Icon(Icons.qr_code)),
+                                decoration: _inputDecoration('الباركود / Barcode', 
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.refresh, color: Colors.blue),
+                                        tooltip: 'توليد باركود تلقائي',
+                                        onPressed: () {
+                                          barcodeController.text = DateTime.now().millisecondsSinceEpoch.toString();
+                                        },
+                                      ),
+                                      if (isEditing)
+                                        IconButton(
+                                          icon: const Icon(Icons.print, color: Colors.grey),
+                                          tooltip: 'طباعة الباركود',
+                                          onPressed: () {
+                                             ref.read(printingServiceProvider).printBarcodeLabel(
+                                              name: nameController.text,
+                                              barcode: barcodeController.text,
+                                              price: double.tryParse(retailPriceController.text) ?? 0.0,
+                                              currency: 'IQD',
+                                              category: categoryController.text,
+                                            );
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
-                              child: suppliersAsync.when(
-                                data: (list) => DropdownButtonFormField<String>(
-                                  value: supplierId.value,
-                                  decoration: _inputDecoration('المورد'),
-                                  items: list.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
-                                  onChanged: (val) => supplierId.value = val,
-                                ),
-                                loading: () => const SizedBox(),
-                                error: (_, __) => const SizedBox(),
+                              child: TextField(
+                                controller: descriptionController,
+                                decoration: _inputDecoration('وصف المنتج'),
                               ),
                             ),
                           ],
@@ -195,13 +232,17 @@ class ProductFormScreen extends HookConsumerWidget {
                           children: [
                             Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: TextInputType.number)),
                             const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: TextInputType.number)),
+                            Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع (مفرد)'), keyboardType: TextInputType.number)),
+                            const SizedBox(width: 16),
+                            Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: TextInputType.number)),
                           ],
                         ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(child: TextField(controller: stockController, decoration: _inputDecoration('الكمية الحالية'), keyboardType: TextInputType.number)),
+                            const SizedBox(width: 16),
+                            Expanded(child: TextField(controller: minStockController, decoration: _inputDecoration('الحد الأدنى للمخزون'), keyboardType: TextInputType.number)),
                             const SizedBox(width: 16),
                             Expanded(
                               child: InkWell(
@@ -241,14 +282,38 @@ class ProductFormScreen extends HookConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: unitController, decoration: _inputDecoration('الوحدة (قطعة، كرتون...)'))),
+                            Expanded(
+                              child: suppliersAsync.when(
+                                data: (list) => DropdownButtonFormField<String>(
+                                  value: supplierId.value,
+                                  decoration: _inputDecoration('المورد'),
+                                  items: list.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                                  onChanged: (val) => supplierId.value = val,
+                                ),
+                                loading: () => const SizedBox(),
+                                error: (_, __) => const SizedBox(),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(child: TextField(controller: unitController, decoration: _inputDecoration('الوحدة'))),
                           ],
                         ),
+                        const SizedBox(height: 32),
+                        
+                        _buildSectionHeader('الأحجام والألوان (الأنواع)', Icons.style_outlined),
+                        const SizedBox(height: 16),
+                        _buildVariantsSection(context, sizes, colors, variants, retailPriceController),
+                        const SizedBox(height: 32),
                         const SizedBox(height: 32),
 
                         _buildSectionHeader('الصور', Icons.image_outlined),
                         const SizedBox(height: 16),
                         _buildImageGrid(images, tenantId, ref),
+                        const SizedBox(height: 32),
+
+                        _buildSectionHeader('خيارات متقدمة', Icons.settings_outlined),
+                        const SizedBox(height: 16),
+                        _buildAdvancedOptions(isOffer, isFeaturedDeal, isDailyStarred),
                       ],
                     ),
                   ),
@@ -286,6 +351,187 @@ class ProductFormScreen extends HookConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildVariantsSection(
+    BuildContext context, 
+    ValueNotifier<List<String>> sizes, 
+    ValueNotifier<List<String>> colors, 
+    ValueNotifier<List<ProductVariant>> variants,
+    TextEditingController priceController,
+  ) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildChipList(
+                context, 
+                'الأحجام المتوفرة (M, XL...)', 
+                sizes, 
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildChipList(
+                context, 
+                'الألوان المتوفرة (أحمر، أزرق...)', 
+                colors, 
+                Colors.blue,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (sizes.value.isNotEmpty || colors.value.isNotEmpty)
+          OutlinedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('إضافة نوع (Variant) بسعر مخصص'),
+            onPressed: () => _showAddVariantDialog(context, sizes.value, colors.value, variants, priceController),
+          ),
+        if (variants.value.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: variants.value.asMap().entries.map((entry) {
+              final v = entry.value;
+              return Chip(
+                label: Text('${v.size ?? ''} - ${v.color ?? ''} : ${v.price ?? 'سعر افتراضي'}'),
+                onDeleted: () => variants.value = List.from(variants.value)..removeAt(entry.key),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildChipList(BuildContext context, String label, ValueNotifier<List<String>> list, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 4,
+          children: [
+            ...list.value.asMap().entries.map((entry) => Chip(
+              label: Text(entry.value, style: const TextStyle(fontSize: 10)),
+              backgroundColor: color.withOpacity(0.1),
+              onDeleted: () => list.value = List.from(list.value)..removeAt(entry.key),
+            )),
+            ActionChip(
+              label: const Icon(Icons.add, size: 14),
+              onPressed: () => _showAddChipDialog(context, label, list),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showAddChipDialog(BuildContext context, String title, ValueNotifier<List<String>> list) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('إضافة $title'),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          TextButton(onPressed: () {
+            if (controller.text.isNotEmpty) list.value = [...list.value, controller.text.trim()];
+            Navigator.pop(ctx);
+          }, child: const Text('إضافة')),
+        ],
+      ),
+    );
+  }
+
+  void _showAddVariantDialog(
+    BuildContext context, 
+    List<String> sizes, 
+    List<String> colors, 
+    ValueNotifier<List<ProductVariant>> variants,
+    TextEditingController priceController,
+  ) {
+    String? selectedSize = sizes.isNotEmpty ? sizes.first : null;
+    String? selectedColor = colors.isNotEmpty ? colors.first : null;
+    final pController = TextEditingController(text: priceController.text);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('إضافة نوع مخصص'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (sizes.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  value: selectedSize,
+                  items: sizes.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  onChanged: (v) => setState(() => selectedSize = v),
+                  decoration: const InputDecoration(labelText: 'الحجم'),
+                ),
+              if (colors.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  value: selectedColor,
+                  items: colors.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setState(() => selectedColor = v),
+                  decoration: const InputDecoration(labelText: 'اللون'),
+                ),
+              TextField(controller: pController, decoration: const InputDecoration(labelText: 'السعر لهذا النوع'), keyboardType: TextInputType.number),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            TextButton(onPressed: () {
+              variants.value = [...variants.value, ProductVariant(
+                size: selectedSize ?? 'Default',
+                color: selectedColor ?? 'Default',
+                price: double.tryParse(pController.text),
+                stock: 0,
+              )];
+              Navigator.pop(ctx);
+            }, child: const Text('إضافة')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdvancedOptions(
+    ValueNotifier<bool> isOffer, 
+    ValueNotifier<bool> isFeaturedDeal, 
+    ValueNotifier<bool> isDailyStarred,
+  ) {
+    return Column(
+      children: [
+        SwitchListTile(
+          title: const Text('تمييز كعرض (Special Offer)'),
+          subtitle: const Text('سيظهر المنتج في قسم العروض'),
+          value: isOffer.value,
+          onChanged: (v) => isOffer.value = v,
+          secondary: Icon(Icons.local_offer, color: Colors.orange.shade400),
+        ),
+        SwitchListTile(
+          title: const Text('منتج مميز (Featured Deal)'),
+          subtitle: const Text('سيظهر في الشريط العلوي المميز'),
+          value: isFeaturedDeal.value,
+          onChanged: (v) => isFeaturedDeal.value = v,
+          secondary: Icon(Icons.star, color: Colors.yellow.shade700),
+        ),
+        SwitchListTile(
+          title: const Text('منتج يومي (Daily Starred)'),
+          subtitle: const Text('تفعيل ميزة النجوم اليومية'),
+          value: isDailyStarred.value,
+          onChanged: (v) => isDailyStarred.value = v,
+          secondary: Icon(Icons.calendar_today, color: Colors.purple.shade400),
+        ),
+      ],
     );
   }
 

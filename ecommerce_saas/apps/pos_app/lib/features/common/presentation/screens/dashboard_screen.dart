@@ -24,8 +24,6 @@ import '../../../staff/providers/salary_providers.dart';
 import '../../../../core/services/media_sync_service.dart';
 import '../../../sales/presentation/screens/return_exchange_screen.dart';
 import '../../../staff/data/attendance_repository.dart';
-import '../../../../core/providers/ui_style_provider.dart';
-import '../../../../core/theme/modern_theme.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -59,10 +57,8 @@ class DashboardScreen extends ConsumerWidget {
       }
     });
 
-    final style = ref.watch(uiStyleProvider);
-
     return Scaffold(
-      appBar: style == UIStyle.modern ? null : AppBar(
+      appBar: AppBar(
         title: const Text('نظام المبيعات POS'),
         actions: [
           staffAsync.when(
@@ -94,9 +90,7 @@ class DashboardScreen extends ConsumerWidget {
           const SizedBox(width: 16),
         ],
       ),
-      body: style == UIStyle.modern 
-        ? _ModernDashboard(currentStaff: currentStaff, staffAsync: staffAsync)
-        : _StandardDashboard(currentStaff: currentStaff, staffAsync: staffAsync),
+      body: _StandardDashboard(currentStaff: currentStaff, staffAsync: staffAsync),
     );
   }
 
@@ -189,6 +183,54 @@ class _StandardDashboard extends ConsumerWidget {
                 color: Colors.red,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebtManagementScreen())),
               ),
+            if (ref.hasPermission(PosPermission.viewProductStock))
+              _DashboardItem(
+                title: 'إدارة المخزون',
+                icon: Icons.inventory_outlined,
+                color: Colors.orange,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryManagementScreen())),
+              ),
+            if (ref.hasPermission(PosPermission.viewSuppliers))
+              _DashboardItem(
+                title: 'المشتريات',
+                icon: Icons.shopping_cart_checkout,
+                color: Colors.brown,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PurchaseHistoryScreen())),
+              ),
+            if (ref.hasPermission(PosPermission.viewExpenses))
+               _DashboardItem(
+                title: 'المصاريف',
+                icon: Icons.money_off_csred_outlined,
+                color: Colors.redAccent,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpenseListScreen())),
+              ),
+            if (ref.hasPermission(PosPermission.manageProducts))
+               _DashboardItem(
+                title: 'إدارة الأصناف',
+                icon: Icons.category_outlined,
+                color: Colors.indigo,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryManagementScreen())),
+              ),
+             _DashboardItem(
+                title: 'المرتجعات',
+                icon: Icons.assignment_return_outlined,
+                color: Colors.deepOrange,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReturnExchangeScreen())),
+              ),
+            if (ref.hasPermission(PosPermission.manageOnlineOrders))
+               _DashboardItem(
+                title: 'طلبات الأونلاين',
+                icon: Icons.online_prediction_outlined,
+                color: Colors.green,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OnlineOrdersScreen())),
+              ),
+            if (ref.hasPermission(PosPermission.manageProducts))
+              _DashboardItem(
+                title: 'الأرشيف',
+                icon: Icons.archive_outlined,
+                color: Colors.blueGrey,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListScreen())),
+              ),
              _DashboardItem(
               title: 'حضور الموظفين',
               icon: Icons.fingerprint,
@@ -211,175 +253,6 @@ class _StandardDashboard extends ConsumerWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _ModernDashboard extends ConsumerWidget {
-  final StaffMemberModel? currentStaff;
-  final AsyncValue<List<StaffMemberModel>> staffAsync;
-
-  const _ModernDashboard({required this.currentStaff, required this.staffAsync});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(gradient: ModernTheme.dashboardGradient),
-      child: currentStaff == null 
-        ? _buildLoginView(context)
-        : _buildMainView(context, ref),
-    );
-  }
-
-  Widget _buildLoginView(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(32),
-        padding: const EdgeInsets.all(32),
-        decoration: ModernTheme.glassDecoration(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.lock_outline, size: 64, color: ModernTheme.neonCyan),
-            const SizedBox(height: 24),
-            const Text(
-              'نظام المبيعات POS',
-              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            const Text('يرجى اختيار الموظف (يرجى التبديل للنمط التقليدي للاختيار حالياً)', style: TextStyle(color: Colors.white70, fontSize: 12)),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-              child: const Text('الإعدادات لتبديل النمط'),
-            ),
-          ],
-        ),
-      ).withGlassBlur(),
-    );
-  }
-
-  Widget _buildMainView(BuildContext context, WidgetRef ref) {
-    return Column(
-      children: [
-        // Modern Header
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: ModernTheme.accentIndigo,
-                child: Text(currentStaff!.name.substring(0, 1), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('مرحباً، ${currentStaff!.name}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                    Text(currentStaff!.roleName, style: const TextStyle(color: ModernTheme.neonCyan, fontSize: 14)),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white70, size: 28),
-                onPressed: () => ref.read(currentStaffProvider.notifier).set(null),
-              ),
-            ],
-          ),
-        ),
-        // Grid Area
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = constraints.maxWidth > 800 ? 5 : (constraints.maxWidth > 500 ? 4 : 2);
-              return GridView.count(
-                padding: const EdgeInsets.all(24),
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 24,
-                mainAxisSpacing: 24,
-                children: [
-                  if (ref.hasPermission(PosPermission.manageSales))
-                    _ModernDashboardItem(
-                      title: 'نقطة البيع (POS)',
-                      icon: Icons.point_of_sale,
-                      color: Colors.purpleAccent,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalesManagementScreen())),
-                    ),
-                  if (ref.hasPermission(PosPermission.viewProductStock))
-                    _ModernDashboardItem(
-                      title: 'المنتجات',
-                      icon: Icons.inventory_2_outlined,
-                      color: ModernTheme.neonCyan,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductListScreen())),
-                    ),
-                  if (ref.hasPermission(PosPermission.viewSuppliers))
-                    _ModernDashboardItem(
-                      title: 'الموردين',
-                      icon: Icons.people_outline,
-                      color: Colors.lightBlueAccent,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupplierListScreen())),
-                    ),
-                  if (ref.hasPermission(PosPermission.viewReports))
-                    _ModernDashboardItem(
-                      title: 'التقارير',
-                      icon: Icons.analytics_outlined,
-                      color: Colors.greenAccent,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
-                    ),
-                   _ModernDashboardItem(
-                      title: 'حضور الموظفين',
-                      icon: Icons.fingerprint,
-                      color: Colors.blueAccent,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceScreen())),
-                    ),
-                   _ModernDashboardItem(
-                    title: 'الإعدادات',
-                    icon: Icons.settings_outlined,
-                    color: Colors.blueGrey.shade100,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ModernDashboardItem extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ModernDashboardItem({required this.title, required this.icon, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        decoration: ModernTheme.glassDecoration(borderRadius: BorderRadius.circular(24)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
-              child: Icon(icon, size: 38, color: color),
-            ),
-            const SizedBox(height: 16),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-          ],
-        ),
-      ).withGlassBlur(),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -57,10 +58,21 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'POS System',
       debugShowCheckedModeBanner: false,
+      // دعم اللغة العربية
+      locale: const Locale('ar', 'IQ'),
+      supportedLocales: const [
+        Locale('ar', 'IQ'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
-        fontFamily: 'Roboto', 
+        fontFamily: 'Cairo',
       ),
       home: tenantId.isEmpty 
           ? const ActivationScreen()

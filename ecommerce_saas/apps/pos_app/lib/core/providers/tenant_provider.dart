@@ -11,7 +11,7 @@ class TenantIdNotifier extends Notifier<String> {
   @override
   String build() {
     final prefs = ref.watch(sharedPreferencesProvider);
-    return prefs.getString('tenant_id') ?? 'landan';
+    return prefs.getString('tenant_id') ?? '';
   }
 
   Future<void> setTenantId(String id) async {

@@ -187,6 +187,9 @@ class PrintingService {
                           if (item.variantColor != null || item.variantSize != null) {
                             itemName += ' (${item.variantColor ?? ''} ${item.variantSize ?? ''})';
                           }
+                          if (item.discount > 0) {
+                            itemName += '\n(خصم: ${_formatPrice(item.discount)})';
+                          }
                           return pw.TableRow(
                             children: [
                               pw.Padding(padding: const pw.EdgeInsets.all(2), child: pw.Text(itemName, style: pw.TextStyle(fontSize: isA4 ? 11 : 9))),

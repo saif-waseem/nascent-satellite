@@ -629,6 +629,13 @@ class _POSCartPanel extends StatelessWidget {
                       icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
                       onPressed: () => manager.removeItemFromActive(index),
                     ),
+                    IconButton(
+                      icon: Icon(Icons.local_offer_outlined, 
+                        color: item.discount > 0 ? Colors.red : Colors.grey, 
+                        size: 18),
+                      tooltip: 'خصم للمنتج',
+                      onPressed: () => _showItemDiscountDialog(context, manager, index, item),
+                    ),
                   ],
                 ),
               );
@@ -637,6 +644,37 @@ class _POSCartPanel extends StatelessWidget {
         ),
         _CartFooter(activeInvoice: activeInvoice, isMobile: isMobile),
       ],
+    );
+  }
+
+  void _showItemDiscountDialog(BuildContext context, SalesSessionManager manager, int index, sm.SalesItem item) {
+    final controller = TextEditingController(text: item.discount.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('خصم لمنتج: ${item.productName}'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'قيمة الخصم (المبلغ)', 
+            border: OutlineInputBorder(),
+            suffixText: 'IQD',
+          ),
+          keyboardType: TextInputType.number,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+          ElevatedButton(
+            onPressed: () {
+              final discount = double.tryParse(controller.text) ?? 0.0;
+              manager.updateItemDiscount(index, discount);
+              Navigator.pop(ctx);
+            },
+            child: const Text('تطبيق الخصم'),
+          ),
+        ],
+      ),
     );
   }
 

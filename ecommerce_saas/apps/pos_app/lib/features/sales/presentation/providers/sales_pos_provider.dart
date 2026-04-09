@@ -110,6 +110,28 @@ class SalesSessionManager extends Notifier<SalesSessionState> {
     updateActiveInvoice(invoice.copyWith(items: newItems, totalAmount: newTotal));
   }
 
+  void updateItemDiscount(int index, double discountAmount) {
+    final invoice = state.activeInvoice;
+    if (index < 0 || index >= invoice.items.length) return;
+
+    final newItems = [...invoice.items];
+    final item = newItems[index];
+
+    newItems[index] = SalesItem(
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      discount: discountAmount,
+      category: item.category,
+      variantColor: item.variantColor,
+      variantSize: item.variantSize,
+    );
+
+    final newTotal = newItems.fold(0.0, (sum, i) => sum + i.totalPrice);
+    updateActiveInvoice(invoice.copyWith(items: newItems, totalAmount: newTotal));
+  }
+
   void removeItemFromActive(int index) {
     final invoice = state.activeInvoice;
     final newItems = [...invoice.items]..removeAt(index);

@@ -42,59 +42,113 @@ class _StaffManagementView extends ConsumerWidget {
     final staffAsync = ref.watch(staffListProvider(tenantId));
 
     final currentStaff = ref.watch(currentStaffProvider);
-    // Allow seeing all staff if no one is logged in (owner mode) or if managerial
-    final isManagerial = currentStaff == null || 
-                         currentStaff.roleName.toLowerCase() == 'admin' || 
+    final isManagerial = currentStaff == null ||
+                         currentStaff.roleName.toLowerCase() == 'admin' ||
                          currentStaff.roleName.toLowerCase() == 'manager';
 
     return Scaffold(
-      body: staffAsync.when(
-        data: (staffList) {
-          // Filter: Admin/Manager see all, others see only themselves
-          final visibleStaff = isManagerial 
-              ? staffList 
-              : staffList.where((s) => s.id == currentStaff.id).toList();
+      body: Column(
+        children: [
+          // Diagnostic bar
+          Container(
+            width: double.infinity,
+            color: Colors.blue.shade50,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: Colors.blue.shade700),
+                const SizedBox(width: 6),
+                Text('معرّف المتجر: $tenantId',
+                     style: TextStyle(fontSize: 11, color: Colors.blue.shade700)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: staffAsync.when(
+              data: (staffList) {
+                final visibleStaff = isManagerial
+                    ? staffList
+                    : staffList.where((s) => s.id == currentStaff!.id).toList();
 
-          if (visibleStaff.isEmpty) {
-             return const Center(child: Text('لا يوجد موظفون متاحون للعرض'));
-          }
+                if (visibleStaff.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        const Text('لا يوجد موظفون بعد',
+                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text('المتجر: $tenantId',
+                             style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'اضغط على الزر بالأسفل لإضافة أول موظف',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: visibleStaff.length,
-            itemBuilder: (context, index) {
-              final staff = visibleStaff[index];
-              return Card(
-                child: ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.person),
-                  ),
-                  title: Text(staff.name),
-                  subtitle: Text('الدور: ${staff.roleName} | شفتات: ${staff.dailyShiftCount}'),
-                  trailing: isManagerial ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => _showStaffDialog(context, ref, tenantId, staff: staff),
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: visibleStaff.length,
+                  itemBuilder: (context, index) {
+                    final staff = visibleStaff[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(
+                            staff.name.isNotEmpty ? staff.name[0].toUpperCase() : '?',
+                            style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        title: Text(staff.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('الدور: ${staff.roleName} | الراتب: ${staff.salaryAmount.toStringAsFixed(0)}'),
+                        trailing: isManagerial ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => _showStaffDialog(context, ref, tenantId, staff: staff),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _confirmDeleteStaff(context, ref, tenantId, staff),
+                            ),
+                          ],
+                        ) : null,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () => _confirmDeleteStaff(context, ref, tenantId, staff),
-                      ),
-                    ],
-                  ) : null,
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text('خطأ: $e', textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => ref.invalidate(staffListProvider(tenantId)),
+                      child: const Text('إعادة المحاولة'),
+                    ),
+                  ],
                 ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showStaffDialog(context, ref, tenantId),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.person_add),
         label: const Text('إضافة موظف'),
       ),
     );

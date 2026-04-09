@@ -41,7 +41,9 @@ final rolesProvider = StreamProvider((ref) {
 
 final permissionsProvider = Provider<Set<PosPermission>>((ref) {
   final staff = ref.watch(currentStaffProvider);
-  if (staff == null) return <PosPermission>{};
+  
+  // If no staff selected → Owner mode → ALL permissions
+  if (staff == null) return PosPermission.values.toSet();
 
   // 1. Try to find the role in custom roles
   final rolesAsync = ref.watch(rolesProvider);
@@ -50,7 +52,7 @@ final permissionsProvider = Provider<Set<PosPermission>>((ref) {
   final customRole = customRoles.where((r) => r.name.toLowerCase() == staff.roleName.toLowerCase()).firstOrNull;
   if (customRole != null) {
     return customRole.permissions
-        .map((p) => PosPermission.values.firstWhere((e) => e.name == p))
+        .map((p) => PosPermission.values.firstWhere((e) => e.name == p, orElse: () => PosPermission.viewSales))
         .toSet();
   }
 

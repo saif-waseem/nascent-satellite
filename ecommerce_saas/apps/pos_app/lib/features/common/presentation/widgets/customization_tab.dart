@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../data/app_settings_repository.dart';
-import '../../../../core/providers/ui_style_provider.dart';
 import '../../../products/presentation/providers/product_settings_provider.dart';
 
 class CustomizationTab extends HookConsumerWidget {
@@ -53,20 +52,7 @@ class CustomizationTab extends HookConsumerWidget {
             children: [
               const Text('تخصيص القوالب والمزامنة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
-              
-              _buildSectionTitle('شكل واجهة البرنامج'),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('النمط العصري (Modern Indigo)'),
-                subtitle: const Text('تبديل شكل الأزرار والألوان للنمط المظلم العصري'),
-                trailing: Switch(
-                  value: ref.watch(uiStyleProvider) == UIStyle.modern,
-                  onChanged: (val) {
-                    ref.read(uiStyleProvider.notifier).setStyle(val ? UIStyle.modern : UIStyle.standard);
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
+
 
               _buildSectionTitle('تخصيص الباركود'),
               _buildDropdownOption(

@@ -1,0 +1,7 @@
+How to run the POS Application:
+
+1. Extract the contents of this ZIP folder.
+2. If this is the first time running the app on this computer, run 'vc_redist.x64.exe' and follow the prompts to install the Microsoft Visual C++ Redistributable.
+3. Once the installation is complete, run 'pos_app.exe' to start the application.
+
+Note: You do not need to install Flutter or any other development tools.

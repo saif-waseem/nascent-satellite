@@ -55,22 +55,29 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
           }
           final estimatedCash = totalOpeningToday + report.totalSales - report.totalExpenses - report.totalPurchases;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildMainTreasuryCard(context, report, estimatedCash),
-                const SizedBox(height: 24),
-                _buildSectionHeader('توزيع السيولة حسب الأقسام (الشفتات)', Icons.account_tree_outlined),
-                const SizedBox(height: 12),
-                _buildShiftsBreakdown(context, shiftsAsync),
-                const SizedBox(height: 24),
-                _buildSectionHeader('ملخص حركة الصندوق اليوم', Icons.history),
-                const SizedBox(height: 12),
-                _buildTransactionSummary(report),
-              ],
-            ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 600;
+              final horizontalPadding = isMobile ? 16.0 : (constraints.maxWidth - 900).clamp(16.0, 500.0);
+
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildMainTreasuryCard(context, report, estimatedCash),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('توزيع السيولة حسب الأقسام (الشفتات)', Icons.account_tree_outlined),
+                    const SizedBox(height: 12),
+                    _buildShiftsBreakdown(context, shiftsAsync),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader('ملخص حركة الصندوق اليوم', Icons.history),
+                    const SizedBox(height: 12),
+                    _buildTransactionSummary(report),
+                  ],
+                ),
+              );
+            },
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

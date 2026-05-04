@@ -70,6 +70,14 @@ service cloud.firestore {
       allow read, write: if isTenantUser();
     }
 
+    match /shift_sessions/{sessionId} {
+      allow read, write: if isTenantUser();
+    }
+
+    match /audit_logs/{logId} {
+      allow read, write: if isTenantUser();
+    }
+
     match /sales/{saleId} {
       allow read, write: if isTenantUser();
     }

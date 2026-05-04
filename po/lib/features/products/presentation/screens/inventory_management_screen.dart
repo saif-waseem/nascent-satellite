@@ -117,29 +117,36 @@ class InventoryManagementScreen extends HookConsumerWidget {
           ),
         ),
       ),
-      body: products.isEmpty && pagedState.isLoadingMore 
-        ? const Center(child: CircularProgressIndicator())
-        : filtered.isEmpty && !pagedState.isLoadingMore
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade400),
-                  const SizedBox(height: 12),
-                  Text(
-                    activeFilter.value == InventoryFilter.lowStock
-                      ? 'لا توجد منتجات بمخزون منخفض 🎉'
-                        : activeFilter.value == InventoryFilter.nearExpiry
-                          ? 'لا توجد منتجات قرب انتهاء الصلاحية 🎉'
-                          : activeFilter.value == InventoryFilter.slowMoving
-                            ? 'لا توجد بضائع راكدة، المستودع نشط! 🚀'
-                            : 'المستودع متوازن، لا توجد بضاعة مكدسة ⚖️',
-                    style: const TextStyle(color: Colors.grey, fontSize: 16),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final horizontalPadding = isMobile ? 0.0 : (constraints.maxWidth - 900).clamp(16.0, 500.0);
+
+          return products.isEmpty && pagedState.isLoadingMore 
+            ? const Center(child: CircularProgressIndicator())
+            : filtered.isEmpty && !pagedState.isLoadingMore
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        activeFilter.value == InventoryFilter.lowStock
+                          ? 'لا توجد منتجات بمخزون منخفض 🎉'
+                            : activeFilter.value == InventoryFilter.nearExpiry
+                              ? 'لا توجد منتجات قرب انتهاء الصلاحية 🎉'
+                              : activeFilter.value == InventoryFilter.slowMoving
+                                ? 'لا توجد بضائع راكدة، المستودع نشط! 🚀'
+                                : 'المستودع متوازن، لا توجد بضاعة مكدسة ⚖️',
+                        style: const TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            )
-          : ListView.separated(
+                )
+              : Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: ListView.separated(
               controller: scrollController,
               padding: const EdgeInsets.all(16),
               itemCount: filtered.length + (pagedState.hasMore ? 1 : 0),
@@ -154,6 +161,9 @@ class InventoryManagementScreen extends HookConsumerWidget {
                 return _InventoryItemTile(product: product, tenantId: tenantId, insight: insight);
               },
             ),
+          );
+        },
+      ),
       floatingActionButton: ref.hasPermission(PosPermission.manageProducts)
           ? FloatingActionButton.extended(
               onPressed: () => Navigator.push(

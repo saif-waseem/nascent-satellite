@@ -239,44 +239,56 @@ class ProductFormScreen extends HookConsumerWidget {
              ),
         ],
       ),
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 950),
-          margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _windowControl(Icons.remove, Colors.grey, () => Navigator.pop(context)),
-                      const SizedBox(width: 12),
-                      _windowControl(Icons.crop_square, Colors.grey, () {}),
-                      const SizedBox(width: 12),
-                      _windowControl(Icons.close, Colors.red, () => Navigator.pop(context)),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionHeader('المعلومات الأساسية', Icons.info_outline),
-                        const SizedBox(height: 16),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 650;
+          final isTablet = constraints.maxWidth >= 650 && constraints.maxWidth < 1024;
+          
+          return Center(
+            child: Container(
+              constraints: BoxConstraints(maxWidth: isMobile ? double.infinity : 950),
+              margin: isMobile ? EdgeInsets.zero : EdgeInsets.symmetric(
+                vertical: isTablet ? 12 : 24, 
+                horizontal: isTablet ? 8 : 16
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: isMobile ? BorderRadius.zero : BorderRadius.circular(20),
+                boxShadow: isMobile ? [] : [
+                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: isMobile ? BorderRadius.zero : BorderRadius.circular(20),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+                      ),
+                      child: Row(
+                        children: [
+                          if (isMobile) 
+                            IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+                          const Spacer(),
+                          _windowControl(Icons.remove, Colors.grey, () => Navigator.pop(context)),
+                          const SizedBox(width: 12),
+                          _windowControl(Icons.crop_square, Colors.grey, () {}),
+                          const SizedBox(width: 12),
+                          _windowControl(Icons.close, Colors.red, () => Navigator.pop(context)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(isMobile ? 16 : 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionHeader('المعلومات الأساسية', Icons.info_outline),
+                            const SizedBox(height: 16),
                         TextField(
                           controller: nameController,
                           decoration: _inputDecoration('اسم المنتج'),
@@ -409,9 +421,11 @@ class ProductFormScreen extends HookConsumerWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   Widget _buildVariantsSection(
     BuildContext context, 

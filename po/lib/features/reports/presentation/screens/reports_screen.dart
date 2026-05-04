@@ -182,67 +182,73 @@ class ReportsScreen extends HookConsumerWidget {
             child: reportAsync.when(
               data: (report) => RefreshIndicator(
                 onRefresh: () async => ref.invalidate(financialReportProvider(params)),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (showSales.value) ...[
-                        _buildTreasuryQuickAccess(context, report),
-                        const SizedBox(height: 16),
-                        _buildSummaryGrid(report, isAdmin),
-                        const SizedBox(height: 24),
-                        if (isAdmin) ...[
-                          FinancialCharts(report: report),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobile = constraints.maxWidth < 600;
+                    final horizontalPadding = isMobile ? 16.0 : (constraints.maxWidth - 1000).clamp(16.0, 500.0);
+                    
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (showSales.value) ...[
+                            _buildTreasuryQuickAccess(context, report),
+                            const SizedBox(height: 16),
+                            _buildSummaryGrid(report, isAdmin),
+                            const SizedBox(height: 24),
+                            if (isAdmin) ...[
+                              FinancialCharts(report: report),
+                              const SizedBox(height: 32),
+                            ],
+                          ],
+
+                          // --- Online Store Section ---
+                          if (showOnline.value && report.onlineSales > 0) ...[
+                            _buildSectionHeader('أرباح المتجر الإلكتروني', Icons.store, Colors.purple),
+                            const SizedBox(height: 8),
+                            _buildOnlineStoreCard(report),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // --- Staff Performance Section ---
+                          if (showStaff.value && report.salesByStaff.isNotEmpty) ...[
+                            _buildSectionHeader('أداء الموظفين', Icons.people, Colors.blueGrey),
+                            const SizedBox(height: 12),
+                            ..._buildStaffList(report),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // --- Category Sales Section ---
+                          if (showCategory.value && report.salesByCategory.isNotEmpty) ...[
+                            _buildSectionHeader('المبيعات حسب التصنيف', Icons.category, Colors.blueGrey),
+                            const SizedBox(height: 12),
+                            ..._buildCategoryList(report, isAdmin),
+                            const SizedBox(height: 24),
+                          ],
+
+                          // --- Product Performance Section ---
+                          if (showProducts.value && report.salesByProduct.isNotEmpty) ...[
+                            _buildSectionHeader('أداء المنتجات', Icons.inventory_2_outlined, Colors.teal),
+                            ..._buildProductList(report, isAdmin),
+                            const SizedBox(height: 24),
+                          ],
+
                           const SizedBox(height: 32),
+                          if (showSales.value) ...[
+                            _buildDetailTile('إجمالي المبيعات', report.totalSales, Icons.trending_up, Colors.green),
+                            if (isAdmin) ...[
+                              _buildDetailTile('إجمالي المشتريات', report.totalPurchases, Icons.shopping_cart, Colors.orange),
+                              _buildDetailTile('إجمالي المصاريف', report.totalExpenses, Icons.money_off, Colors.red),
+                              const Divider(height: 32),
+                              _buildDetailTile('صافي الربح', report.netProfit, Icons.account_balance_wallet, report.netProfit >= 0 ? Colors.teal : Colors.red, isBold: true),
+                            ],
+                          ],
+                          const SizedBox(height: 40),
                         ],
-                      ],
-
-                      // --- Online Store Section ---
-                      if (showOnline.value && report.onlineSales > 0) ...[
-                        _buildSectionHeader('أرباح المتجر الإلكتروني', Icons.store, Colors.purple),
-                        const SizedBox(height: 8),
-                        _buildOnlineStoreCard(report),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // --- Staff Performance Section ---
-                      if (showStaff.value && report.salesByStaff.isNotEmpty) ...[
-                        _buildSectionHeader('أداء الموظفين', Icons.people, Colors.blueGrey),
-                        const SizedBox(height: 12),
-                        ..._buildStaffList(report),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // --- Category Sales Section ---
-                      if (showCategory.value && report.salesByCategory.isNotEmpty) ...[
-                        _buildSectionHeader('المبيعات حسب التصنيف', Icons.category, Colors.blueGrey),
-                        const SizedBox(height: 12),
-                        ..._buildCategoryList(report, isAdmin),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // --- Product Performance Section ---
-                      if (showProducts.value && report.salesByProduct.isNotEmpty) ...[
-                        _buildSectionHeader('أداء المنتجات', Icons.inventory_2_outlined, Colors.teal),
-                        const SizedBox(height: 12),
-                        ..._buildProductList(report, isAdmin),
-                        const SizedBox(height: 24),
-                      ],
-
-                      const SizedBox(height: 32),
-                      if (showSales.value) ...[
-                        _buildDetailTile('إجمالي المبيعات', report.totalSales, Icons.trending_up, Colors.green),
-                        if (isAdmin) ...[
-                          _buildDetailTile('إجمالي المشتريات', report.totalPurchases, Icons.shopping_cart, Colors.orange),
-                          _buildDetailTile('إجمالي المصاريف', report.totalExpenses, Icons.money_off, Colors.red),
-                          const Divider(height: 32),
-                          _buildDetailTile('صافي الربح', report.netProfit, Icons.account_balance_wallet, report.netProfit >= 0 ? Colors.teal : Colors.red, isBold: true),
-                        ],
-                      ],
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
               loading: () => const Center(child: CircularProgressIndicator()),

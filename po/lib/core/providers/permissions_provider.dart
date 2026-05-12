@@ -29,6 +29,7 @@ enum PosPermission {
   manageOnlineOrders,
   viewAuditLogs,
   viewShifts,
+  viewCustomers,
 }
 
 // Stream of custom roles defined for the tenant
@@ -85,6 +86,7 @@ final permissionsProvider = Provider<Set<PosPermission>>((ref) {
         PosPermission.viewReports,
         PosPermission.viewAuditLogs,
         PosPermission.viewShifts,
+        PosPermission.viewCustomers,
       };
     case 'cashier':
     default:
@@ -94,6 +96,7 @@ final permissionsProvider = Provider<Set<PosPermission>>((ref) {
         PosPermission.viewProductStock,
         PosPermission.viewSuppliers,
         PosPermission.viewShifts,
+        PosPermission.viewCustomers,
       };
   }
 });

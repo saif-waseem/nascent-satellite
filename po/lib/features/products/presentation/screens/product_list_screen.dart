@@ -266,44 +266,56 @@ class _ProductListTile extends ConsumerWidget {
                 ),
               )
             : Container(width: 50, height: 50, color: Colors.grey[200], child: const Icon(Icons.image_not_supported)),
-        title: Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(product.name, 
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(product.name, 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            ref.watch(categoriesListProvider).when(
+              data: (categories) {
+                final cat = categories.where((c) => c.id == product.category || c.name == product.category).firstOrNull;
+                return Text('القسم: ${cat?.name ?? product.category}', 
+                  style: const TextStyle(fontSize: 10, color: Colors.blueGrey, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
+              loading: () => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis),
+              error: (_, __) => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(height: 2),
+            Text('الكمية: ${product.stockQuantity} ${product.unit ?? ""}', 
+                style: TextStyle(color: isLowStock ? Colors.red : Colors.black, fontSize: 11),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              ref.watch(categoriesListProvider).when(
-                data: (categories) {
-                  final cat = categories.where((c) => c.id == product.category || c.name == product.category).firstOrNull;
-                  return Text('القسم: ${cat?.name ?? product.category}', 
-                    style: const TextStyle(fontSize: 10, color: Colors.blueGrey, fontWeight: FontWeight.bold));
-                },
-                loading: () => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
-                error: (_, __) => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
-              ),
-              const SizedBox(height: 2),
-              Text('الكمية: ${product.stockQuantity} ${product.unit ?? ""}', 
-                  style: TextStyle(color: isLowStock ? Colors.red : Colors.black, fontSize: 11)),
-              if (product.variants.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    product.variants.map((v) => '${v.color}/${v.size}: ${v.stock}').join(' | '),
-                    style: const TextStyle(fontSize: 9, color: Colors.blue, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            ),
+            if (product.variants.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  product.variants.map((v) => '${v.color}/${v.size}: ${v.stock}').join(' | '),
+                  style: const TextStyle(fontSize: 9, color: Colors.blue, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              Text('الباركود: ${product.barcode ?? "---"}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              if (product.expiryDate != null)
-                Text('الصلاحية: ${DateFormat('yyyy-MM-dd').format(product.expiryDate!)}',
-                    style: TextStyle(color: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.black), fontSize: 10)),
-            ],
-          ),
+              ),
+            Text('الباركود: ${product.barcode ?? "---"}', 
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (product.expiryDate != null)
+              Text('الصلاحية: ${DateFormat('yyyy-MM-dd').format(product.expiryDate!)}',
+                  style: TextStyle(color: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.black), fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+              ),
+          ],
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,

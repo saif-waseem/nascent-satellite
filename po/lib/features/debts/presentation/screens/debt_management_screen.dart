@@ -298,17 +298,29 @@ void _showPaymentDialog(BuildContext context, WidgetRef ref, {CustomerModel? cus
                 ),
                 const SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                      onPressed: () => _handleAction(context, ref, true, isCustomer, localCustomer, localSupplier, amountController.text, noteController.text),
-                      child: const Text('تسديد مبلغ (خصم)'),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green, 
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => _handleAction(context, ref, true, isCustomer, localCustomer, localSupplier, amountController.text, noteController.text),
+                        child: const Text('تسديد مبلغ (خصم)', textAlign: TextAlign.center, style: TextStyle(fontSize: 13)),
+                      ),
                     ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                      onPressed: () => _handleAction(context, ref, false, isCustomer, localCustomer, localSupplier, amountController.text, noteController.text),
-                      child: const Text('إضافة دين'),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red, 
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => _handleAction(context, ref, false, isCustomer, localCustomer, localSupplier, amountController.text, noteController.text),
+                        child: const Text('إضافة دين', textAlign: TextAlign.center, style: TextStyle(fontSize: 13)),
+                      ),
                     ),
                   ],
                 )

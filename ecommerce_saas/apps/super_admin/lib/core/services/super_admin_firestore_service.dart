@@ -7,14 +7,20 @@ class SuperAdminFirestoreService {
   // --- Tenants Management ---
   Stream<List<TenantModel>> getTenants() {
     return _db.collection('tenants').snapshots().map((snapshot) {
-      print('DEBUG SUPER_ADMIN: Fetched ${snapshot.docs.length} tenants from Firestore');
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        final tenant = TenantModel.fromJson(data);
-        print('DEBUG SUPER_ADMIN: Tenant ${tenant.id} - isActive: ${tenant.isActive}, expiry: ${tenant.expiryDate}');
-        return tenant;
-      }).toList();
+      print('DEBUG SUPER_ADMIN: Fetched ${snapshot.docs.length} tenant docs');
+      final tenants = <TenantModel>[];
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          data['id'] = doc.id;
+          print('DEBUG SUPER_ADMIN: Parsing tenant ${doc.id}');
+          final tenant = TenantModel.fromJson(data);
+          tenants.add(tenant);
+        } catch (e) {
+          print('DEBUG SUPER_ADMIN: FAILED to parse tenant ${doc.id}: $e');
+        }
+      }
+      return tenants;
     });
   }
 

@@ -7,6 +7,9 @@ class DefaultFirebaseOptions {
     if (kIsWeb) {
       return web;
     }
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      return windows;
+    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
@@ -15,11 +18,6 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.linux:
@@ -33,6 +31,15 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws',
+    appId: '1:1031487835291:web:f4e2721771a01e7be58a3e',
+    messagingSenderId: '1031487835291',
+    projectId: 'my-store-b0723',
+    authDomain: 'my-store-b0723.firebaseapp.com',
+    storageBucket: 'my-store-b0723.firebasestorage.app',
+  );
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws',

@@ -18,9 +18,16 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionState = ref.watch(purchaseSessionProvider);
     final sessionManager = ref.read(purchaseSessionProvider.notifier);
-    final activeInvoice = sessionState.activeInvoice;
     final tenantId = ref.watch(tenantIdProvider);
-    final suppliersAsync = ref.watch(suppliersFutureProvider);
+
+    useEffect(() {
+      if (initialSupplier != null) {
+        Future.microtask(() {
+          ref.read(purchaseSessionProvider.notifier).updateActiveSupplier(initialSupplier!.id, initialSupplier!.name);
+        });
+      }
+      return null;
+    }, [initialSupplier]);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,20 +44,40 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
           child: _buildSessionTabs(context, ref, sessionState, sessionManager),
         ),
       ),
-      body: Row(
-        children: [
-          // Left Side: Product Selection & Scanning
-          Expanded(
-            flex: 2,
-            child: _buildProductSelection(context, ref, activeInvoice),
-          ),
-          const VerticalDivider(width: 1),
-          // Right Side: Current Invoice Items & Summary
-          Expanded(
-            flex: 3,
-            child: _buildInvoiceEditor(context, ref, activeInvoice, sessionManager, suppliersAsync),
-          ),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 750;
+          
+          if (isMobile) {
+            return Column(
+              children: [
+                Flexible(
+                  flex: 3,
+                  child: _ProductSelectionSection(),
+                ),
+                const Divider(height: 1, thickness: 1, color: Colors.blue),
+                Expanded(
+                  flex: 4,
+                  child: _InvoiceEditorSection(),
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: _ProductSelectionSection(),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                flex: 3,
+                child: _InvoiceEditorSection(),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -104,110 +131,6 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildProductSelection(BuildContext context, WidgetRef ref, PurchaseInvoiceModel invoice) {
-    final searchController = useTextEditingController();
-    final searchResults = useState<List<ProductModel>>([]);
-    final initialProducts = useState<List<ProductModel>>([]);
-    final isLoading = useState(false);
-    final error = useState<String?>(null);
-    final tenantId = ref.watch(tenantIdProvider);
-
-    // Initial load of products (Future-based for stability)
-    useEffect(() {
-      Future<void> loadInitial() async {
-        isLoading.value = true;
-        try {
-          final repo = ref.read(pos_prod.productRepositoryProvider);
-          final products = await repo.getProducts(tenantId);
-          initialProducts.value = products;
-        } catch (e) {
-          error.value = 'فشل تحميل المنتجات: $e';
-        } finally {
-          isLoading.value = false;
-        }
-      }
-      loadInitial();
-      
-      // If initialSupplier is provided, set it in the session
-      if (initialSupplier != null) {
-        Future.microtask(() {
-          ref.read(purchaseSessionProvider.notifier).updateActiveSupplier(initialSupplier!.id, initialSupplier!.name);
-        });
-      }
-      return null;
-    }, [tenantId, initialSupplier]);
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          TextField(
-            controller: searchController,
-            onChanged: (v) async {
-              if (v.length > 1) {
-                isLoading.value = true;
-                error.value = null;
-                try {
-                  searchResults.value = await ref.read(pos_prod.productRepositoryProvider).searchProducts(tenantId, v);
-                } catch (e) {
-                  error.value = 'فشل البحث: $e';
-                } finally {
-                  isLoading.value = false;
-                }
-              } else {
-                searchResults.value = [];
-                isLoading.value = false;
-              }
-            },
-            decoration: InputDecoration(
-              hintText: 'ابحث عن منتج أو امسح الباركود...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (searchController.text.isNotEmpty)
-                    IconButton(icon: const Icon(Icons.clear), onPressed: () {
-                      searchController.clear();
-                      searchResults.value = [];
-                    }),
-                  IconButton(
-                    icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () => _openScanner(context, ref, tenantId),
-                  ),
-                ],
-              ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: isLoading.value && initialProducts.value.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : error.value != null
-                    ? Center(child: Text(error.value!, style: const TextStyle(color: Colors.red)))
-                    : (searchController.text.length > 1 && searchResults.value.isEmpty && !isLoading.value)
-                        ? const Center(child: Text('لا توجد نتائج بحث مطابقة'))
-                        : ListView.builder(
-                            itemCount: searchController.text.length > 1 ? searchResults.value.length : initialProducts.value.length,
-                            itemBuilder: (context, index) {
-                              final product = searchController.text.length > 1 ? searchResults.value[index] : initialProducts.value[index];
-                              return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text('باركود: ${product.barcode ?? 'N/A'} | الكمية الحالية: ${product.stockQuantity}'),
-                              trailing: Text('${product.price} IQD', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                              onTap: () => _showAddItemDialog(context, ref, product),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showAddItemDialog(BuildContext context, WidgetRef ref, ProductModel product) {
     showDialog(
       context: context,
@@ -228,7 +151,7 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
               final product = await ref.read(pos_prod.productRepositoryProvider).getProductByBarcode(tenantId, barcode);
               if (product != null) {
                 if (context.mounted) {
-                  Navigator.pop(context); // Close scanner
+                  Navigator.pop(context); 
                   _showAddItemDialog(context, ref, product);
                 }
               } else {
@@ -248,19 +171,6 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildInvoiceEditor(BuildContext context, WidgetRef ref, PurchaseInvoiceModel invoice, PurchaseSessionManager manager, AsyncValue<List<SupplierModel>> suppliersAsync) {
-    return Column(
-      children: [
-        _buildSupplierHeader(context, ref, invoice, manager, suppliersAsync),
-        const Divider(height: 1),
-        Expanded(
-          child: _buildItemsTable(context, invoice, manager),
-        ),
-        _buildInvoiceFooter(context, ref, invoice, manager),
-      ],
     );
   }
 
@@ -452,16 +362,137 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
       await ref.read(purchaseRepositoryProvider).saveInvoice(tenantId, finalizedInvoice);
       
       if (context.mounted) {
-        Navigator.pop(context); // Pop loading
+        Navigator.pop(context); 
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إتمام عملية الشراء وتحديث المخزون بنجاح')));
         manager.resetActive();
-        Navigator.pop(context); // Return to history/supplier screen if desired
+        Navigator.pop(context); 
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Pop loading
+        Navigator.pop(context); 
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     }
+  }
+}
+
+class _ProductSelectionSection extends HookConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final searchController = useTextEditingController();
+    final searchResults = useState<List<ProductModel>>([]);
+    final initialProducts = useState<List<ProductModel>>([]);
+    final isLoading = useState(false);
+    final error = useState<String?>(null);
+    final tenantId = ref.watch(tenantIdProvider);
+
+    useEffect(() {
+      Future<void> loadInitial() async {
+        isLoading.value = true;
+        try {
+          final repo = ref.read(pos_prod.productRepositoryProvider);
+          final products = await repo.getProducts(tenantId);
+          initialProducts.value = products;
+        } catch (e) {
+          error.value = 'فشل تحميل المنتجات: $e';
+        } finally {
+          isLoading.value = false;
+        }
+      }
+      loadInitial();
+      return null;
+    }, [tenantId]);
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: searchController,
+            onChanged: (v) async {
+              if (v.length > 1) {
+                isLoading.value = true;
+                error.value = null;
+                try {
+                  searchResults.value = await ref.read(pos_prod.productRepositoryProvider).searchProducts(tenantId, v);
+                } catch (e) {
+                  error.value = 'فشل البحث: $e';
+                } finally {
+                  isLoading.value = false;
+                }
+              } else {
+                searchResults.value = [];
+                isLoading.value = false;
+              }
+            },
+            decoration: InputDecoration(
+              hintText: 'ابحث عن منتج أو امسح الباركود...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (searchController.text.isNotEmpty)
+                    IconButton(icon: const Icon(Icons.clear), onPressed: () {
+                      searchController.clear();
+                      searchResults.value = [];
+                    }),
+                  IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () => (context.findAncestorWidgetOfExactType<PurchaseInvoiceScreen>() as PurchaseInvoiceScreen)._openScanner(context, ref, tenantId),
+                  ),
+                ],
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: isLoading.value && initialProducts.value.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : error.value != null
+                    ? Center(child: Text(error.value!, style: const TextStyle(color: Colors.red)))
+                    : (searchController.text.length > 1 && searchResults.value.isEmpty && !isLoading.value)
+                        ? const Center(child: Text('لا توجد نتائج بحث مطابقة'))
+                        : ListView.builder(
+                            itemCount: searchController.text.length > 1 ? searchResults.value.length : initialProducts.value.length,
+                            itemBuilder: (context, index) {
+                              final product = searchController.text.length > 1 ? searchResults.value[index] : initialProducts.value[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text('باركود: ${product.barcode ?? 'N/A'} | الكمية الحالية: ${product.stockQuantity}'),
+                                  trailing: Text('${product.price} IQD', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                                  onTap: () => (context.findAncestorWidgetOfExactType<PurchaseInvoiceScreen>() as PurchaseInvoiceScreen)._showAddItemDialog(context, ref, product),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InvoiceEditorSection extends HookConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionState = ref.watch(purchaseSessionProvider);
+    final sessionManager = ref.read(purchaseSessionProvider.notifier);
+    final activeInvoice = sessionState.activeInvoice;
+    final suppliersAsync = ref.watch(suppliersFutureProvider);
+    final parent = context.findAncestorWidgetOfExactType<PurchaseInvoiceScreen>() as PurchaseInvoiceScreen;
+
+    return Column(
+      children: [
+        parent._buildSupplierHeader(context, ref, activeInvoice, sessionManager, suppliersAsync),
+        const Divider(height: 1),
+        Expanded(
+          child: parent._buildItemsTable(context, activeInvoice, sessionManager),
+        ),
+        parent._buildInvoiceFooter(context, ref, activeInvoice, sessionManager),
+      ],
+    );
   }
 }

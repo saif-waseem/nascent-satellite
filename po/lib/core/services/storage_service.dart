@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'media_service.dart';
 import 'service_config_service.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -13,20 +15,33 @@ class StorageService {
 
   Future<String?> pickAndUploadImage({required String tenantId, String folder = 'products'}) async {
     try {
-      if (config.imageService == 'imgbb' && config.imageApiKey.isNotEmpty) {
-        final image = await mediaService.pickImage();
-        if (image == null) return null;
-        final url = await _uploadToImgBB(image);
-        if (url == null) print('STORAGE WARNING: ImgBB returned null for $folder upload');
-        return url;
+      final image = await mediaService.pickImage();
+      if (image == null) return null;
+
+      // 1. Try Online Upload
+      try {
+        if (config.imageService == 'imgbb' && config.imageApiKey.isNotEmpty) {
+          final url = await _uploadToImgBB(image);
+          if (url != null) return url;
+        } else {
+          final url = await mediaService.uploadFile(image, tenantId, folder);
+          if (url != null) return url;
+        }
+      } catch (e) {
+        print('OFFLINE MODE: Falling back to local storage for image');
       }
 
-      // Fallback to Firebase Storage if ImgBB is not configured
-      final url = await mediaService.pickAndUploadImage(tenantId, folder);
-      if (url == null) {
-        print('STORAGE WARNING: MediaService returned null for $folder upload');
-      }
-      return url;
+      // 2. Offline Fallback: Copy to local permanent directory
+      final appDir = await getApplicationDocumentsDirectory();
+      final targetDir = Directory('${appDir.path}/product_images');
+      if (!await targetDir.exists()) await targetDir.create(recursive: true);
+      
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
+      final localFile = File('${targetDir.path}/$fileName');
+      await File(image.path).copy(localFile.path);
+      
+      print('SUCCESS: Image saved locally at ${localFile.path}');
+      return localFile.path;
     } catch (e) {
       print('CRITICAL STORAGE ERROR in $folder: $e');
       return null;

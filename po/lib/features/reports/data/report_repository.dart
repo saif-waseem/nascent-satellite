@@ -86,9 +86,9 @@ class ReportRepository {
       final productsBox = LocalDbService.getBox<ProductModel>('products');
       final categoriesBox = LocalDbService.getBox<CategoryModel>('categories');
 
-      final salesList = salesBox.values.where((s) => s.tenantId == tenantId).toList();
-      final expensesList = expensesBox.values.where((e) => e.tenantId == tenantId).toList();
-      final purchasesList = purchasesBox.values.where((p) => p.tenantId == tenantId).toList();
+      final salesList = salesBox.values.where((s) => s.tenantId == tenantId || (tenantId.isEmpty && s.tenantId == 'local_default')).toList();
+      final expensesList = expensesBox.values.where((e) => e.tenantId == tenantId || (tenantId.isEmpty && e.tenantId == 'local_default')).toList();
+      final purchasesList = purchasesBox.values.where((p) => p.tenantId == tenantId || (tenantId.isEmpty && p.tenantId == 'local_default')).toList();
 
       final categoryNames = {for (var c in categoriesBox.values) c.id: c.name};
       final productCosts = {for (var p in productsBox.values) p.id: p.purchasePrice};
@@ -132,11 +132,20 @@ class ReportRepository {
           
           double invoiceProfit = 0;
           for (final item in invoice.items) {
-            // Robust category name resolution: Check if item.category is an ID or already a name
-            final cName = categoryNames[item.category];
-            final categoryKey = (cName != null && cName.isNotEmpty) 
-                ? cName 
-                : ((item.category != null && item.category!.isNotEmpty) ? item.category! : 'غير مصنف');
+            // Robust category name resolution
+            String categoryKey = 'غير مصنف';
+            if (item.category != null && item.category!.isNotEmpty) {
+              final cName = categoryNames[item.category];
+              if (cName != null && cName.isNotEmpty) {
+                categoryKey = cName;
+              } else {
+                // If it doesn't look like a Firestore ID (has spaces or is short), it might be a name already
+                final isLikelyId = item.category!.length > 15 && !item.category!.contains(' ');
+                if (!isLikelyId) {
+                  categoryKey = item.category!;
+                }
+              }
+            }
             
             salesByCategory[categoryKey] = (salesByCategory[categoryKey] ?? 0) + item.totalPrice;
             salesByProduct[item.productName] = (salesByProduct[item.productName] ?? 0) + item.quantity.toInt();

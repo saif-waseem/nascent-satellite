@@ -16,12 +16,11 @@ class TenantsScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // For now mocking lang as 'ar' or 'en' based on system or simple toggle
+    // For now mocking lang.value as 'ar' or 'en' based on system or simple toggle
     final lang = useState('ar');
     final tenants = ref.watch(filteredTenantsProvider);
 
     useEffect(() {
-      // Refresh subscriber counts on load to ensure accuracy
       Future.microtask(() => ref.read(superAdminFirestoreServiceProvider).refreshSubscriberCounts());
       return null;
     }, []);

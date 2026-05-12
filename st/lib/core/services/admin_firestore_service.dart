@@ -64,6 +64,20 @@ class AdminFirestoreService {
     });
   }
 
+  Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {
+    final snapshot = await _db
+        .collection('products')
+        .where('tenantId', isEqualTo: tenantId)
+        .where('barcode', isEqualTo: barcode)
+        .limit(1)
+        .get();
+    
+    if (snapshot.docs.isEmpty) return null;
+    final data = snapshot.docs.first.data();
+    data['id'] = snapshot.docs.first.id;
+    return ProductModel.fromJson(data);
+  }
+
   Future<void> addProduct(ProductModel product, String tenantId) async {
     final docRef = _db.collection('products').doc();
     final newProduct = product.toJson();

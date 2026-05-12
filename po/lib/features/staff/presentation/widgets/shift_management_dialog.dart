@@ -68,6 +68,7 @@ class _StartShiftDialog extends HookConsumerWidget {
     final amountController = useTextEditingController(text: '0');
 
     return AlertDialog(
+      scrollable: true,
       title: const Text('بدء شفت جديد (Open Shift)'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -150,6 +151,7 @@ class _CloseShiftDialog extends HookConsumerWidget {
       }
 
       return AlertDialog(
+        scrollable: true,
         title: const Text('ملخص إغلاق الشفت (Manager View)'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -232,6 +234,7 @@ class _CloseShiftDialog extends HookConsumerWidget {
     }
 
     return AlertDialog(
+      scrollable: true,
       title: const Text('إغلاق الشفت (Blind Close)'),
       content: Column(
         mainAxisSize: MainAxisSize.min,

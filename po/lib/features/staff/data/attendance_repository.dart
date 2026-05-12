@@ -1,11 +1,19 @@
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/services/firestore_rest_service.dart';
+import '../../../core/services/local_db_service.dart';
+import '../../../core/models/sync_queue_item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/providers/tenant_provider.dart';
+import 'dart:convert';
 
 class AttendanceRepository {
   final FirestoreRestService _restService;
+  final SharedPreferences _prefs;
 
-  AttendanceRepository(this._restService);
+  AttendanceRepository(this._restService, this._prefs);
+
+  static const String _activeAttendanceKey = 'active_attendance_record';
 
   Future<List<AttendanceModel>> getDailyAttendance(String tenantId, DateTime date) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
@@ -21,13 +29,17 @@ class AttendanceRepository {
       }
     };
     
-    final results = await _restService.runQuery('attendance', query);
-    final list = results.map((data) => AttendanceModel.fromJson(data)).where((record) {
-      return record.checkIn.isAfter(startOfDay) && record.checkIn.isBefore(endOfDay);
-    }).toList();
-    
-    list.sort((a, b) => b.checkIn.compareTo(a.checkIn));
-    return list;
+    try {
+      final results = await _restService.runQuery('attendance', query);
+      final list = results.map((data) => AttendanceModel.fromJson(data)).where((record) {
+        return record.checkIn.isAfter(startOfDay) && record.checkIn.isBefore(endOfDay);
+      }).toList();
+      
+      list.sort((a, b) => b.checkIn.compareTo(a.checkIn));
+      return list;
+    } catch (_) {
+      return []; // Return empty list if offline and no specific daily cache
+    }
   }
 
   Future<List<AttendanceModel>> getAttendanceHistory(String tenantId, String? staffId) async {
@@ -61,59 +73,111 @@ class AttendanceRepository {
       'limit': 100
     };
 
-    final results = await _restService.runQuery('attendance', query);
-    final list = results.map((data) => AttendanceModel.fromJson(data)).toList();
-    list.sort((a, b) => b.checkIn.compareTo(a.checkIn));
-    return list;
+    try {
+      final results = await _restService.runQuery('attendance', query);
+      final list = results.map((data) => AttendanceModel.fromJson(data)).toList();
+      list.sort((a, b) => b.checkIn.compareTo(a.checkIn));
+      return list;
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> checkIn(AttendanceModel attendance) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    await _restService.setDocument('attendance/$id', attendance.copyWith(id: id).toJson());
+    final newRecord = attendance.copyWith(id: id);
+    final data = newRecord.toJson()..['id'] = id;
+
+    try {
+      await _restService.setDocument('attendance/$id', data);
+    } catch (e) {
+      await LocalDbService.addToSyncQueue(
+        collectionPath: 'attendance/$id',
+        data: data,
+        action: SyncAction.create,
+      );
+    }
+    await _cacheActiveAttendance(newRecord);
   }
 
   Future<void> checkOut(String tenantId, String attendanceId, DateTime checkOutTime) async {
-    await _restService.setDocument('attendance/$attendanceId', {
+    final data = {
       'checkOut': checkOutTime.toIso8601String(),
-    }, isUpdate: true);
+    };
+
+    try {
+      await _restService.setDocument('attendance/$attendanceId', data, isUpdate: true);
+    } catch (e) {
+      await LocalDbService.addToSyncQueue(
+        collectionPath: 'attendance/$attendanceId',
+        data: data..['id'] = attendanceId,
+        action: SyncAction.update,
+      );
+    }
+    await _prefs.remove(_activeAttendanceKey);
   }
 
   Future<AttendanceModel?> getActiveAttendance(String tenantId, String staffId) async {
-    final query = {
-      'where': {
-        'compositeFilter': {
-          'op': 'AND',
-          'filters': [
-            {
-              'fieldFilter': {
-                'field': {'fieldPath': 'tenantId'},
-                'op': 'EQUAL',
-                'value': {'stringValue': tenantId}
+    try {
+      final query = {
+        'where': {
+          'compositeFilter': {
+            'op': 'AND',
+            'filters': [
+              {
+                'fieldFilter': {
+                  'field': {'fieldPath': 'tenantId'},
+                  'op': 'EQUAL',
+                  'value': {'stringValue': tenantId}
+                }
+              },
+              {
+                'fieldFilter': {
+                  'field': {'fieldPath': 'staffId'},
+                  'op': 'EQUAL',
+                  'value': {'stringValue': staffId}
+                }
               }
-            },
-            {
-              'fieldFilter': {
-                'field': {'fieldPath': 'staffId'},
-                'op': 'EQUAL',
-                'value': {'stringValue': staffId}
-              }
-            }
-          ]
+            ]
+          }
+        }
+      };
+
+      final results = await _restService.runQuery('attendance', query);
+      for (var data in results) {
+        if (data['checkOut'] == null) {
+          final record = AttendanceModel.fromJson(data);
+          await _cacheActiveAttendance(record);
+          return record;
         }
       }
-    };
-
-    final results = await _restService.runQuery('attendance', query);
-    for (var data in results) {
-      if (data['checkOut'] == null) {
-        return AttendanceModel.fromJson(data);
-      }
+    } catch (e) {
+      return _getCachedActiveAttendance(tenantId, staffId);
     }
+    return null;
+  }
+
+  Future<void> _cacheActiveAttendance(AttendanceModel attendance) async {
+    await _prefs.setString(_activeAttendanceKey, jsonEncode(attendance.toJson()..['id'] = attendance.id));
+  }
+
+  AttendanceModel? _getCachedActiveAttendance(String tenantId, String staffId) {
+    final data = _prefs.getString(_activeAttendanceKey);
+    if (data == null) return null;
+    try {
+      final record = AttendanceModel.fromJson(jsonDecode(data));
+      if (record.tenantId == tenantId && record.staffId == staffId && record.checkOut == null) {
+        return record;
+      }
+    } catch (_) {}
     return null;
   }
 }
 
-final attendanceRepositoryProvider = Provider((ref) => AttendanceRepository(ref.watch(firestoreRestServiceProvider)));
+final attendanceRepositoryProvider = Provider((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AttendanceRepository(ref.watch(firestoreRestServiceProvider), prefs);
+});
 
 final dailyAttendanceProvider = FutureProvider.family<List<AttendanceModel>, ({String tenantId, DateTime date})>((ref, args) {
   return ref.watch(attendanceRepositoryProvider).getDailyAttendance(args.tenantId, args.date);

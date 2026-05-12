@@ -85,8 +85,21 @@ class ProductListScreen extends HookConsumerWidget {
                     child: TextField(
                       onChanged: (v) => searchQuery.value = v,
                       decoration: InputDecoration(
-                        hintText: AppStrings.get('search_hint', lang),
+                        hintText: lang == 'ar' ? 'بحث بالاسم أو الباركود...' : 'Search by name or barcode...',
                         prefixIcon: const Icon(Icons.search),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner, color: Colors.blue),
+                          onPressed: () async {
+                            final code = await showDialog<String>(
+                              context: context,
+                              builder: (context) => const BarcodeScannerDialog(),
+                            );
+                            if (code != null) {
+                              searchQuery.value = code;
+                              // We might need a controller to update the text field visually
+                            }
+                          },
+                        ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -114,7 +127,9 @@ class ProductListScreen extends HookConsumerWidget {
               error: (err, stack) => Center(child: Text('Error: $err')),
               data: (products) {
                 final filteredProducts = products.where((p) {
-                  final matchesSearch = p.name.toLowerCase().contains(searchQuery.value.toLowerCase());
+                  final query = searchQuery.value.toLowerCase();
+                  final matchesSearch = p.name.toLowerCase().contains(query) || 
+                                      (p.barcode?.toLowerCase().contains(query) ?? false);
                   final matchesCategory = selectedCategory.value == 'All' || p.category == selectedCategory.value;
                   return matchesSearch && matchesCategory;
                 }).toList();

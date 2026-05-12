@@ -51,6 +51,20 @@ class _SmartImageState extends State<SmartImage> {
     }
 
     try {
+      // 1. Check if it's already a local path
+      if (widget.imageUrl!.startsWith('C:') || widget.imageUrl!.startsWith('/') || widget.imageUrl!.startsWith('file:')) {
+        final path = widget.imageUrl!.replaceFirst('file://', '');
+        final file = File(path);
+        if (await file.exists()) {
+          if (mounted) setState(() {
+            _localFile = file;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // 2. Check in app cache directory
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = widget.imageUrl!.split('/').last;
       final file = File('${appDir.path}/product_images/$fileName');

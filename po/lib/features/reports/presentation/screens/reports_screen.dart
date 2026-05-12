@@ -397,8 +397,13 @@ class ReportsScreen extends HookConsumerWidget {
                       label = 'المبيعات النقدية';
                    } else if (e.key == 'card_sales') {
                       label = 'مبيعات الشبكة';
+                   } else if (e.key == 'total_revenue') {
+                      label = 'إجمالي المبيعات (صافي)';
+                   } else if (e.key == 'returns_count') {
+                      label = 'عدد المرتجعات';
+                      suffix = 'عمليات';
                    }
-                   return _detailRow('- $label:', '${e.value.toStringAsFixed(0)} $suffix');
+                   return _detailRow('$label:', '${e.value.toStringAsFixed(0)} $suffix');
                 }),
               ],
             ],
@@ -424,12 +429,24 @@ class ReportsScreen extends HookConsumerWidget {
 
   Widget _detailRow(String label, String value, {Color? color, bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
-          Text(value, style: TextStyle(color: color, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Expanded(
+            child: Text(label, 
+              style: const TextStyle(fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(value, 
+            style: TextStyle(
+              color: color, 
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );

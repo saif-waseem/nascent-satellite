@@ -100,17 +100,34 @@ class InventoryManagementScreen extends HookConsumerWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: SegmentedButton<InventoryFilter>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: InventoryFilter.all, label: Text('الكل'), icon: Icon(Icons.list, size: 14)),
-                    ButtonSegment(value: InventoryFilter.lowStock, label: Text('نواقص'), icon: Icon(Icons.warning_amber, size: 14)),
-                    ButtonSegment(value: InventoryFilter.nearExpiry, label: Text('صلاحية'), icon: Icon(Icons.event_busy, size: 14)),
-                    ButtonSegment(value: InventoryFilter.slowMoving, label: Text('راكد'), icon: Icon(Icons.trending_down, size: 14)),
-                    ButtonSegment(value: InventoryFilter.overstocked, label: Text('مشبع'), icon: Icon(Icons.warehouse, size: 14)),
-                  ],
-                  selected: {activeFilter.value},
-                  onSelectionChanged: (s) => activeFilter.value = s.first,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final filter in [
+                        (InventoryFilter.all, 'الكل', Icons.list),
+                        (InventoryFilter.lowStock, 'نواقص', Icons.warning_amber),
+                        (InventoryFilter.nearExpiry, 'صلاحية', Icons.event_busy),
+                        (InventoryFilter.slowMoving, 'راكد', Icons.trending_down),
+                        (InventoryFilter.overstocked, 'مشبع', Icons.warehouse),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: ChoiceChip(
+                            label: Text(filter.$2),
+                            avatar: Icon(filter.$3, size: 16, color: activeFilter.value == filter.$1 ? Colors.white : Colors.blueGrey),
+                            selected: activeFilter.value == filter.$1,
+                            onSelected: (selected) {
+                              if (selected) activeFilter.value = filter.$1;
+                            },
+                            selectedColor: Colors.blue.shade700,
+                            labelStyle: TextStyle(
+                              color: activeFilter.value == filter.$1 ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -223,16 +240,30 @@ class _InventoryItemTile extends ConsumerWidget {
           ),
         ),
       ),
-      title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      title: Text(product.name, 
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(statusText, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: isLow ? FontWeight.bold : FontWeight.normal)),
+          Text(statusText, 
+            style: TextStyle(color: statusColor, fontSize: 11, fontWeight: isLow ? FontWeight.bold : FontWeight.normal),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           if (isLow)
-            Text('نقص في المخزون! (الحد: ${product.minStockLevel ?? 5})', style: const TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+            Text('نقص في المخزون! (الحد: ${product.minStockLevel ?? 5})', 
+              style: const TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           Text(
             'شراء: ${product.purchasePrice ?? 0} | بيع: ${product.price}',
             style: const TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           ref.watch(categoriesListProvider).when(
             data: (categories) {

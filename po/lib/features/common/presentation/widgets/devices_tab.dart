@@ -619,8 +619,9 @@ class DevicesTab extends HookConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('اختر طابعة بلوتوث'),
-        content: SizedBox(
-          width: double.maxFinite,
+        content: Container(
+          width: 300,
+          constraints: const BoxConstraints(maxHeight: 400),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -636,13 +637,27 @@ class DevicesTab extends HookConsumerWidget {
                     itemCount: pairedDevices.length,
                     itemBuilder: (context, index) {
                       final device = pairedDevices[index];
-                      final String devName = device.name;
-                      final String devAddress = (device as dynamic).address ?? (device as dynamic).mac ?? 'Unknown';
+                      String devName = 'Unknown';
+                      String devAddress = 'Unknown';
+                      
+                      try {
+                        final dynamic d = device;
+                        devName = d.name?.toString() ?? 'Device $index';
+                        // The package print_bluetooth_thermal uses 'macAdress' (one 'd')
+                        devAddress = d.macAdress?.toString() ?? d.mac?.toString() ?? d.address?.toString() ?? '---';
+                      } catch (e) {
+                        devName = device.toString();
+                        if (devName.contains('#')) {
+                          final parts = devName.split('#');
+                          devName = parts[0];
+                          devAddress = parts.length > 1 ? parts[1] : '---';
+                        }
+                      }
                       
                       return ListTile(
                         leading: const Icon(Icons.bluetooth),
-                        title: Text(devName),
-                        subtitle: Text(devAddress),
+                        title: Text(devName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(devAddress, style: const TextStyle(fontSize: 10)),
                         onTap: () async {
                           if (isLabel) {
                             await ref.read(printerSettingsRepositoryProvider).saveBluetoothLabelSettings(true, devAddress);

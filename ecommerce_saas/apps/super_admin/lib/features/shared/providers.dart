@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hooks_riverpod/legacy.dart';
 import 'package:super_admin/core/services/super_admin_firestore_service.dart';
 import 'package:shared_models/shared_models.dart';

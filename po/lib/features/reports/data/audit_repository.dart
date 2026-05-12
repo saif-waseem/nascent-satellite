@@ -1,6 +1,8 @@
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/services/firestore_rest_service.dart';
+import '../../../core/services/local_db_service.dart';
+import '../../../core/models/sync_queue_item.dart';
 
 class AuditRepository {
   final FirestoreRestService _restService;
@@ -16,7 +18,7 @@ class AuditRepository {
     Map<String, dynamic> metadata = const {},
   }) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final log = AuditLogModel(
+    final auditLog = AuditLogModel(
       id: id,
       tenantId: tenantId,
       staffId: staffId,
@@ -26,7 +28,17 @@ class AuditRepository {
       timestamp: DateTime.now(),
       metadata: metadata,
     );
-    await _restService.setDocument('audit_logs/$id', log.toJson());
+    
+    try {
+      await _restService.setDocument('audit_logs/$id', auditLog.toJson());
+    } catch (e) {
+      // Offline fallback
+      await LocalDbService.addToSyncQueue(
+        collectionPath: 'audit_logs/$id', 
+        data: auditLog.toJson(), 
+        action: SyncAction.create
+      );
+    }
   }
 
   Future<List<AuditLogModel>> getLogs(String tenantId, {int limit = 100}) async {

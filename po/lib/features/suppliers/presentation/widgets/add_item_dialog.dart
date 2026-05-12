@@ -25,9 +25,9 @@ class AddItemDialog extends HookWidget {
     final availableSizes = product.variants.map((v) => v.size).toSet().toList();
 
     return AlertDialog(
+      scrollable: true,
       title: Text('إضافة مادة: ${product.name}'),
-      content: SingleChildScrollView(
-        child: Column(
+      content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -127,7 +127,6 @@ class AddItemDialog extends HookWidget {
             ),
           ],
         ),
-      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
         ElevatedButton(

@@ -102,6 +102,29 @@ class CustomerRepository {
     );
   }
 
+  Future<void> updateCustomerPoints(String tenantId, String customerId, int newPoints) async {
+    final customer = _customerBox.get(customerId);
+    if (customer == null) return;
+
+    final updated = customer.copyWith(loyaltyPoints: newPoints);
+    await _customerBox.put(customerId, updated);
+
+    if (tenantId == 'local_default') return;
+
+    final collection = customerId.startsWith('user_') ? 'users' : 'customers';
+    final docId = customerId.startsWith('user_') ? customerId.replaceFirst('user_', '') : customerId;
+
+    try {
+      await _restService.setDocument('$collection/$docId', {'loyaltyPoints': newPoints}, isUpdate: true);
+    } catch (e) {
+      await LocalDbService.addToSyncQueue(
+        collectionPath: '$collection/$docId', 
+        data: {'loyaltyPoints': newPoints, 'id': docId}, 
+        action: SyncAction.update
+      );
+    }
+  }
+
   Future<void> deleteCustomer(String tenantId, String customerId) async {
     await _customerBox.delete(customerId);
 

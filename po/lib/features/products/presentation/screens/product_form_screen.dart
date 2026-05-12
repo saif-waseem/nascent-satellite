@@ -15,6 +15,7 @@ import '../../../../core/providers/permissions_provider.dart';
 import '../../presentation/providers/product_providers.dart';
 import '../../../suppliers/presentation/providers/suppliers_provider.dart';
 import 'dart:async';
+import '../../../../core/widgets/smart_image.dart';
 
 class ProductFormScreen extends HookConsumerWidget {
   final ProductModel? product;
@@ -350,15 +351,33 @@ class ProductFormScreen extends HookConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                            const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                            const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                          ],
-                        ),
+                        if (isMobile) ...[
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                              const SizedBox(width: 16),
+                              Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                              const SizedBox(width: 16),
+                              const Spacer(),
+                            ],
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                              const SizedBox(width: 16),
+                              Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                              const SizedBox(width: 16),
+                              Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 32),
                         _buildVariantsSection(context, sizes, colors, variants, retailPriceController),
                         const SizedBox(height: 32),
@@ -434,6 +453,8 @@ class ProductFormScreen extends HookConsumerWidget {
     ValueNotifier<List<ProductVariant>> variants,
     TextEditingController priceController,
   ) {
+    final isMobile = MediaQuery.of(context).size.width < 650;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -441,14 +462,19 @@ class ProductFormScreen extends HookConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'الأصناف والمتغيرات (Table View)',
+              'الأصناف والمتغيرات',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey),
             ),
             ElevatedButton.icon(
               onPressed: () => _showAddVariantDialog(context, variants),
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('إضافة صنف جديد'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50, foregroundColor: Colors.blue.shade700, elevation: 0),
+              label: const Text('إضافة صنف'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade50, 
+                foregroundColor: Colors.blue.shade700, 
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
             ),
           ],
         ),
@@ -460,14 +486,93 @@ class ProductFormScreen extends HookConsumerWidget {
               child: Text('لا توجد أصناف مضافة.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             ),
           )
+        else if (isMobile)
+          // Mobile View: Cards
+          Column(
+            children: variants.value.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final variant = entry.value;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${variant.color} - ${variant.size}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                            onPressed: () => variants.value = List.from(variants.value)..removeAt(idx),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Expanded(child: Text('السعر الخاص:', style: TextStyle(fontSize: 12, color: Colors.grey))),
+                          SizedBox(
+                            width: 100,
+                            child: _VariantPriceField(
+                              initialValue: variant.price?.toString() ?? '',
+                              onChanged: (val) {
+                                final price = double.tryParse(val);
+                                variants.value = List.from(variants.value)..[idx] = variant.copyWith(price: price, clearPrice: val.isEmpty);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('المخازن والكميات:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: () => _showManageLocationsDialog(context, variants, idx),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (variant.storageLocations.isEmpty)
+                                const Text('لا يوجد مخازن مسجلة', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                              ...variant.storageLocations.map((loc) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warehouse_outlined, size: 14, color: Colors.blueGrey),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: Text('${loc.warehouseName}: ${loc.quantity}', style: const TextStyle(fontSize: 12))),
+                                  ],
+                                ),
+                              )),
+                              const SizedBox(height: 4),
+                              const Text('إدارة المخازن ⚙️', style: TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          )
         else
+          // Desktop View: Table
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columnSpacing: 24,
-                dataRowHeight: 120, // Set a larger fixed height to avoid overflow
+                dataRowHeight: 120,
                 headingRowColor: MaterialStateProperty.all(Colors.grey.shade50),
                 columns: const [
                   DataColumn(label: Text('اللون / الحجم', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -538,26 +643,11 @@ class ProductFormScreen extends HookConsumerWidget {
     );
   }
 
-  void _updateLoc(ValueNotifier<List<ProductVariant>> variants, int vIdx, int lIdx, {String? warehouseName, String? shelf, String? box, int? quantity, double? priceOverride, bool clearPrice = false}) {
-    final variant = variants.value[vIdx];
-    final loc = variant.storageLocations[lIdx];
-    final updatedLoc = loc.copyWith(
-      warehouseName: warehouseName,
-      shelf: shelf,
-      box: box,
-      quantity: quantity,
-      priceOverride: priceOverride,
-      clearPriceOverride: clearPrice,
-    );
-    final updatedLocs = List<ProductStorageLocation>.from(variant.storageLocations)..[lIdx] = updatedLoc;
-    
-    // Recalculate variant total stock
-    final newVStock = updatedLocs.fold(0, (sum, l) => sum + l.quantity);
-    
-    variants.value = List.from(variants.value)..[vIdx] = variant.copyWith(storageLocations: updatedLocs, stock: newVStock);
-  }
 
   void _showManageLocationsDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants, int vIdx) {
+    // We will keep a local copy of storage locations for editing
+    List<ProductStorageLocation> localLocations = List.from(variants.value[vIdx].storageLocations);
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -571,7 +661,7 @@ class ProductFormScreen extends HookConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ...variant.storageLocations.asMap().entries.map((entry) {
+                    ...localLocations.asMap().entries.map((entry) {
                       final lIdx = entry.key;
                       final loc = entry.value;
                       return Card(
@@ -579,71 +669,81 @@ class ProductFormScreen extends HookConsumerWidget {
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Expanded(child: TextField(
+                                  Expanded(child: TextFormField(
+                                    initialValue: loc.warehouseName,
                                     decoration: const InputDecoration(labelText: 'اسم المخزن', isDense: true),
-                                    controller: TextEditingController(text: loc.warehouseName)..selection = TextSelection.collapsed(offset: loc.warehouseName.length),
                                     onChanged: (val) {
-                                       _updateLoc(variants, vIdx, lIdx, warehouseName: val);
-                                       setState(() {});
+                                      localLocations[lIdx] = localLocations[lIdx].copyWith(warehouseName: val);
                                     },
                                   )),
                                   IconButton(
                                     icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                                     onPressed: () {
-                                      final updatedLocs = List<ProductStorageLocation>.from(variant.storageLocations)..removeAt(lIdx);
-                                      final newVStock = updatedLocs.fold(0, (sum, l) => sum + l.quantity);
-                                      variants.value = List.from(variants.value)..[vIdx] = variant.copyWith(storageLocations: updatedLocs, stock: newVStock);
+                                      localLocations.removeAt(lIdx);
                                       setState(() {});
                                     },
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Row(
+                              const SizedBox(height: 12),
+                              Column(
                                 children: [
-                                  Expanded(child: TextField(
-                                    decoration: const InputDecoration(labelText: 'الرف', isDense: true),
-                                    controller: TextEditingController(text: loc.shelf ?? '')..selection = TextSelection.collapsed(offset: (loc.shelf ?? '').length),
-                                    onChanged: (val) {
-                                       _updateLoc(variants, vIdx, lIdx, shelf: val);
-                                       setState(() {});
-                                    },
-                                  )),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: TextField(
-                                    decoration: const InputDecoration(labelText: 'الصندوق', isDense: true),
-                                    controller: TextEditingController(text: loc.box ?? '')..selection = TextSelection.collapsed(offset: (loc.box ?? '').length),
-                                    onChanged: (val) {
-                                       _updateLoc(variants, vIdx, lIdx, box: val);
-                                       setState(() {});
-                                    },
-                                  )),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 80,
-                                    child: TextField(
-                                      decoration: const InputDecoration(labelText: 'الكمية', isDense: true),
-                                      keyboardType: TextInputType.number,
-                                      controller: TextEditingController(text: loc.quantity.toString())..selection = TextSelection.collapsed(offset: loc.quantity.toString().length),
-                                      onChanged: (val) {
-                                         _updateLoc(variants, vIdx, lIdx, quantity: int.tryParse(val) ?? 0);
-                                         setState(() {});
-                                      },
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: loc.shelf ?? '',
+                                          decoration: const InputDecoration(labelText: 'الرف', isDense: true),
+                                          onChanged: (val) {
+                                            localLocations[lIdx] = localLocations[lIdx].copyWith(shelf: val);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: loc.box ?? '',
+                                          decoration: const InputDecoration(labelText: 'الصندوق', isDense: true),
+                                          onChanged: (val) {
+                                            localLocations[lIdx] = localLocations[lIdx].copyWith(box: val);
+                                          },
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: TextField(
-                                    decoration: const InputDecoration(labelText: 'سعر خاص', isDense: true),
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    controller: TextEditingController(text: loc.priceOverride?.toString() ?? '')..selection = TextSelection.collapsed(offset: (loc.priceOverride?.toString() ?? '').length),
-                                    onChanged: (val) {
-                                       _updateLoc(variants, vIdx, lIdx, priceOverride: double.tryParse(val), clearPrice: val.isEmpty);
-                                       setState(() {});
-                                    },
-                                  )),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: loc.quantity.toString(),
+                                          decoration: const InputDecoration(labelText: 'الكمية', isDense: true),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (val) {
+                                            localLocations[lIdx] = localLocations[lIdx].copyWith(quantity: int.tryParse(val) ?? 0);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: loc.priceOverride?.toString() ?? '',
+                                          decoration: const InputDecoration(labelText: 'سعر خاص', isDense: true),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          onChanged: (val) {
+                                            localLocations[lIdx] = localLocations[lIdx].copyWith(
+                                              priceOverride: double.tryParse(val),
+                                              clearPriceOverride: val.isEmpty,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ],
@@ -654,8 +754,7 @@ class ProductFormScreen extends HookConsumerWidget {
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
-                        final updatedLocs = [...variant.storageLocations, const ProductStorageLocation(warehouseName: 'مخزن جديد', quantity: 0)];
-                        variants.value = List.from(variants.value)..[vIdx] = variant.copyWith(storageLocations: updatedLocs);
+                        localLocations.add(const ProductStorageLocation(warehouseName: 'مخزن جديد', quantity: 0));
                         setState(() {});
                       },
                       icon: const Icon(Icons.add_business),
@@ -666,7 +765,18 @@ class ProductFormScreen extends HookConsumerWidget {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إغلاق')),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () {
+                  final newVStock = localLocations.fold(0, (sum, l) => sum + l.quantity);
+                  variants.value = List.from(variants.value)..[vIdx] = variant.copyWith(
+                    storageLocations: localLocations,
+                    stock: newVStock,
+                  );
+                  Navigator.pop(ctx);
+                },
+                child: const Text('حفظ'),
+              ),
             ],
           );
         }
@@ -785,16 +895,25 @@ class ProductFormScreen extends HookConsumerWidget {
           return Container(
             width: 100,
             margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              image: DecorationImage(image: NetworkImage(images.value[i]), fit: BoxFit.cover),
-            ),
-            child: Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                icon: const Icon(Icons.remove_circle, color: Colors.red),
-                onPressed: () => images.value = List.from(images.value)..removeAt(i),
-              ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SmartImage(
+                    imageUrl: images.value[i],
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.remove_circle, color: Colors.red),
+                    onPressed: () => images.value = List.from(images.value)..removeAt(i),
+                  ),
+                ),
+              ],
             ),
           );
         },

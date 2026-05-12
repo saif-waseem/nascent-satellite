@@ -153,30 +153,67 @@ class SalesRepository {
   }
 
   Future<void> _updateLocalStateForSale(String tenantId, SalesInvoiceModel invoice) async {
+    final productRepo = _ref.read(productRepositoryProvider);
     // Update Stocks
     for (final item in invoice.items) {
       if (item.productId.isEmpty) continue;
       final product = _productBox.get(item.productId);
       if (product != null) {
-        int newTotalStock = (product.stockQuantity - item.quantity).clamp(0, 999999);
-        int newSalesCount = (product.salesCount ?? 0) + item.quantity;
-        
         List<ProductVariant> updatedVariants = List.from(product.variants);
-        if (item.variantColor != null || item.variantSize != null) {
-          final vIndex = updatedVariants.indexWhere((v) => 
-             v.color == item.variantColor && v.size == item.variantSize);
-          if (vIndex >= 0) {
-            final v = updatedVariants[vIndex];
-            updatedVariants[vIndex] = v.copyWith(stock: (v.stock - item.quantity).clamp(0, 999999));
+        
+        // 1. Identify Variant
+        int vIndex = updatedVariants.indexWhere((v) => 
+           v.color == (item.variantColor ?? 'Default') && v.size == (item.variantSize ?? 'Default'));
+        
+        if (vIndex == -1) {
+           if (updatedVariants.isEmpty) {
+             // Create a default variant for simple products
+             updatedVariants.add(ProductVariant(
+               color: 'Default', 
+               size: 'Default', 
+               stock: product.stockQuantity, 
+               storageLocations: [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: product.stockQuantity)]
+             ));
+             vIndex = 0;
+           } else {
+             vIndex = 0; // Fallback to first if mismatch
+           }
+        }
+
+        if (vIndex >= 0) {
+          final v = updatedVariants[vIndex];
+          List<ProductStorageLocation> updatedLocs = List.from(v.storageLocations);
+          
+          // 2. Identify Warehouse to deduct from
+          int locIndex = -1;
+          if (item.warehouseName != null) {
+            locIndex = updatedLocs.indexWhere((l) => l.warehouseName == item.warehouseName);
+          }
+          
+          // If automatic or not found, find first warehouse with stock
+          if (locIndex == -1) {
+            locIndex = updatedLocs.indexWhere((l) => l.quantity >= item.quantity);
+            if (locIndex == -1 && updatedLocs.isNotEmpty) locIndex = 0;
+          }
+
+          if (locIndex >= 0) {
+            final loc = updatedLocs[locIndex];
+            updatedLocs[locIndex] = loc.copyWith(quantity: (loc.quantity - item.quantity).clamp(0, 999999));
+            
+            updatedVariants[vIndex] = v.copyWith(
+              storageLocations: updatedLocs,
+            );
           }
         }
 
-        await _productBox.put(item.productId, product.copyWith(
-          stockQuantity: newTotalStock,
-          salesCount: newSalesCount,
+        // 3. Final Integrity Check & Save
+        final updatedProduct = product.copyWith(
           variants: updatedVariants,
-          inStock: newTotalStock > 0,
-        ));
+          salesCount: (product.salesCount ?? 0) + item.quantity,
+        );
+        
+        final finalProduct = productRepo.recalculateIntegrity(updatedProduct);
+        await _productBox.put(item.productId, finalProduct);
       }
     }
 

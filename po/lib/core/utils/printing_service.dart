@@ -21,7 +21,16 @@ class PrintingService {
   Future<pw.Font> _loadArabicFont({bool forceUpdate = false}) async {
     if (_cachedArabicFont != null && !forceUpdate) return _cachedArabicFont!;
 
-    // استخدم خطوط جوجل مباشرة لتفادي مشكلة خطوط TTF غير المدعومة (مثل الخطوط المتغيرة)
+    // 1. Try loading from local assets (Offline-first)
+    try {
+      final fontData = await rootBundle.load('assets/fonts/Cairo-Regular.ttf');
+      _cachedArabicFont = pw.Font.ttf(fontData);
+      return _cachedArabicFont!;
+    } catch (e) {
+      debugPrint('Loading Cairo from assets failed: $e. Falling back to Google Fonts.');
+    }
+
+    // 2. Fallback to Google Fonts (Online)
     try {
       _cachedArabicFont = await PdfGoogleFonts.cairoRegular();
       return _cachedArabicFont!;
@@ -302,7 +311,7 @@ class PrintingService {
     if (settings.labelPreset == LabelPreset.custom) {
       pageFormat = PdfPageFormat(
         settings.customWidth * PdfPageFormat.mm,
-        settings.customHeight > 0 ? settings.customHeight * PdfPageFormat.mm : 200 * PdfPageFormat.mm,
+        settings.customHeight > 0 ? (settings.customHeight - 1) * PdfPageFormat.mm : 200 * PdfPageFormat.mm,
         marginAll: 0,
       );
       barcodeWidth = (settings.customWidth - (settings.customMargin * 2)) * PdfPageFormat.mm;
@@ -311,20 +320,20 @@ class PrintingService {
     } else {
       switch (settings.labelPreset) {
         case LabelPreset.jewelry3020:
-          pageFormat = const PdfPageFormat(30 * PdfPageFormat.mm, 20 * PdfPageFormat.mm, marginAll: 0);
+          pageFormat = const PdfPageFormat(30 * PdfPageFormat.mm, 19 * PdfPageFormat.mm, marginAll: 0);
           barcodeWidth = 24 * PdfPageFormat.mm;
           barcodeHeight = 5 * PdfPageFormat.mm;
           fontSize = 7.5;
           break;
         case LabelPreset.shipping100150:
-          pageFormat = const PdfPageFormat(100 * PdfPageFormat.mm, 150 * PdfPageFormat.mm, marginAll: 0);
+          pageFormat = const PdfPageFormat(100 * PdfPageFormat.mm, 149 * PdfPageFormat.mm, marginAll: 0);
           barcodeWidth = 80 * PdfPageFormat.mm;
           barcodeHeight = 25 * PdfPageFormat.mm;
           fontSize = 16;
           break;
         case LabelPreset.standard4030:
         default:
-          pageFormat = const PdfPageFormat(40 * PdfPageFormat.mm, 30 * PdfPageFormat.mm, marginAll: 0);
+          pageFormat = const PdfPageFormat(40 * PdfPageFormat.mm, 29 * PdfPageFormat.mm, marginAll: 0);
           barcodeWidth = 34 * PdfPageFormat.mm;
           barcodeHeight = 7 * PdfPageFormat.mm;
           fontSize = 9;
@@ -351,10 +360,12 @@ class PrintingService {
                       if (showName) ...[
                         pw.Text(
                           name.trim().isEmpty ? 'غير مصنف' : name, 
-                          style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold), 
+                          style: pw.TextStyle(
+                            fontSize: name.length > 25 ? fontSize * 0.8 : fontSize, 
+                            fontWeight: pw.FontWeight.bold
+                          ), 
                           textAlign: pw.TextAlign.center, 
-                          maxLines: 1,
-                          overflow: pw.TextOverflow.clip,
+                          maxLines: 2,
                         ),
                         pw.SizedBox(height: 1.5),
                       ],
@@ -525,7 +536,8 @@ class PrintingService {
          final connected = await bluetoothPrinterProvider.connect(bluetoothMac);
          if (connected) {
            // We need raster image for bluetooth thermal printing since they usually don't support PDF directly
-           await for (var page in Printing.raster(pdfBytes, pages: [0], dpi: 200)) {
+           // Remove pages: [0] to print all pages in the PDF
+           await for (var page in Printing.raster(pdfBytes, dpi: 200)) {
               final imageBytes = await page.toPng();
               await bluetoothPrinterProvider.printCustomImage(imageBytes);
            }
@@ -533,7 +545,7 @@ class PrintingService {
            return;
          }
        } catch(e) {
-          debugPrint('Bluetooth print failed: $e.');
+          debugPrint('Bluetooth print error: $e.');
        }
     }
 

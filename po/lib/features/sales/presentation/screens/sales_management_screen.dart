@@ -19,6 +19,8 @@ import '../widgets/variant_picker_dialog.dart';
 import '../../../common/data/app_settings_repository.dart';
 import '../../../common/data/printer_settings_repository.dart';
 import '../../../settings/data/staff_repository.dart';
+import '../../../products/presentation/providers/product_providers.dart';
+import '../../../reports/data/report_repository.dart';
 import '../../../reports/data/audit_repository.dart';
 import '../../../staff/data/shift_repository.dart';
 import '../../../staff/presentation/widgets/shift_management_dialog.dart';
@@ -120,6 +122,7 @@ class POSCheckoutView extends HookConsumerWidget {
                         child: _MobileCartBar(
                           activeInvoice: sessionState.activeInvoice, 
                           manager: sessionManager,
+                          shiftId: shift.id,
                         ),
                       ),
                   ],
@@ -957,8 +960,9 @@ class _POSCartPanel extends ConsumerWidget {
 class _MobileCartBar extends StatelessWidget {
   final sm.SalesInvoiceModel activeInvoice;
   final SalesSessionManager manager;
+  final String? shiftId;
 
-  const _MobileCartBar({required this.activeInvoice, required this.manager});
+  const _MobileCartBar({required this.activeInvoice, required this.manager, this.shiftId});
 
   @override
   Widget build(BuildContext context) {
@@ -970,21 +974,27 @@ class _MobileCartBar extends StatelessWidget {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => Container(
-            height: MediaQuery.of(context).size.height * 0.85,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-                Expanded(
-                  child: _POSCartPanel(activeInvoice: activeInvoice, manager: manager, isMobile: true),
+          builder: (context) => Consumer(
+            builder: (context, ref, _) {
+              final sessionState = ref.watch(salesSessionProvider);
+              final currentInvoice = sessionState.activeInvoice;
+              return Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-              ],
-            ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+                    Expanded(
+                      child: _POSCartPanel(activeInvoice: currentInvoice, manager: manager, isMobile: true, shiftId: shiftId),
+                    ),
+                  ],
+                ),
+              );
+            }
           ),
         );
       },
@@ -1089,7 +1099,10 @@ class _CartFooter extends HookConsumerWidget {
               SizedBox(
                 width: isMobile ? (MediaQuery.of(context).size.width - 40) : null,
                 child: OutlinedButton(
-                  onPressed: () => ref.read(salesSessionProvider.notifier).closeSession(ref.read(salesSessionProvider).activeIndex),
+                  onPressed: () {
+                    ref.read(salesSessionProvider.notifier).closeSession(ref.read(salesSessionProvider).activeIndex);
+                    if (isMobile && context.mounted) Navigator.pop(context);
+                  },
                   style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), foregroundColor: Colors.red),
                   child: const Text('مسح السلة', style: TextStyle(fontSize: 12)),
                 ),
@@ -1154,10 +1167,10 @@ class _CartFooter extends HookConsumerWidget {
       final tenantId = ref.read(tenantIdProvider);
       await ref.read(salesRepositoryProvider).saveInvoice(tenantId, invoiceToSave);
       
-      // --- Log Sale in Audit ---
+      // --- Log Sale in Audit (Non-blocking) ---
       if (currentStaff != null) {
         final warehouseSummary = activeInvoice.items.map((i) => "${i.productName} (${i.warehouseName ?? 'تلقائي'})").toSet().join(", ");
-        await ref.read(auditRepositoryProvider).log(
+        ref.read(auditRepositoryProvider).log(
           tenantId: tenantId,
           staffId: currentStaff.id,
           staffName: currentStaff.name ?? currentStaff.roleName,
@@ -1169,32 +1182,27 @@ class _CartFooter extends HookConsumerWidget {
             'amount': netTotal,
             'warehouses': activeInvoice.items.map((i) => i.warehouseName).toSet().toList(),
           },
-        );
+        ); // Not awaited to prevent blocking UI
       }
       
-      // --- Update Customer Loyalty Points ---
+      // --- Update Customer Loyalty Points (Already handled in SalesRepository locally) ---
+      // We keep this here ONLY for remote update if needed, but wrapped in try/catch to never block
       if (activeInvoice.customerId != null) {
         try {
           final appSettings = await ref.read(appSettingsRepositoryProvider).getSettings();
           if (appSettings.loyaltyEnabled) {
             final customers = await ref.read(customerRepositoryProvider).getAllCustomersFuture(tenantId);
-            final customer = customers.firstWhere((c) => c.id == activeInvoice.customerId);
+            final customer = customers.where((c) => c.id == activeInvoice.customerId).firstOrNull;
             
-            final earnedPoints = (netTotal / appSettings.pointsPerCurrencyUnit).floor();
-            final newPoints = customer.loyaltyPoints - activeInvoice.pointsRedeemed + earnedPoints;
-            
-            // If it's a POS customer (not a store user), update doc
-            if (!customer.id.startsWith('user_')) {
-               await ref.read(customerRepositoryProvider).updateCustomer(tenantId, customer.copyWith(loyaltyPoints: newPoints));
-            } else {
-               // Optional: Update 'users' collection too if needed, but POS customers are priority
-               // For now, only POS customers are fully managed by updateCustomer
+            if (customer != null) {
+               final earnedPoints = (netTotal / (appSettings.pointsPerCurrencyUnit > 0 ? appSettings.pointsPerCurrencyUnit : 1000)).floor();
+               final newPoints = (customer.loyaltyPoints ?? 0) - activeInvoice.pointsRedeemed + earnedPoints;
+               
+               await ref.read(customerRepositoryProvider).updateCustomerPoints(tenantId, customer.id, newPoints);
             }
-            
-            debugPrint('Loyalty points updated: earn=$earnedPoints, redeemed=${activeInvoice.pointsRedeemed}');
           }
         } catch (e) {
-          debugPrint('Error updating loyalty: $e');
+          debugPrint('Silent error updating loyalty: $e');
         }
       }
       try {
@@ -1227,8 +1235,17 @@ class _CartFooter extends HookConsumerWidget {
       }
 
       if (context.mounted) {
+        // --- Immediate UI Update ---
+        ref.invalidate(financialReportProvider);
+        ref.invalidate(customersListProvider);
+        ref.invalidate(activeShiftFutureProvider);
+        ref.invalidate(pagedInventoryProductsProvider);
+        ref.invalidate(pagedGeneralProductsProvider);
+        ref.invalidate(productsFutureProvider);
+        
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حفظ الفاتورة بنجاح. رقم الوصل: ${invoiceToSave.receiptNumber}')));
         ref.read(salesSessionProvider.notifier).closeSession(ref.read(salesSessionProvider).activeIndex);
+        if (isMobile) Navigator.pop(context);
       }
     } catch (e) {
       if (context.mounted) {
@@ -1426,6 +1443,14 @@ class CustomerPickerDialog extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final searchController = useTextEditingController();
+    final searchQuery = useState('');
+    
+    useEffect(() {
+      void listener() => searchQuery.value = searchController.text;
+      searchController.addListener(listener);
+      return () => searchController.removeListener(listener);
+    }, [searchController]);
+
     final customersAsync = ref.watch(customersListProvider);
 
     return AlertDialog(
@@ -1448,16 +1473,29 @@ class CustomerPickerDialog extends HookConsumerWidget {
               child: customersAsync.when(
                 data: (list) {
                   final filtered = list.where((c) => 
-                    c.name.contains(searchController.text) || 
-                    c.phoneNumber.contains(searchController.text)
+                    c.name.toLowerCase().contains(searchQuery.value.toLowerCase()) || 
+                    c.phoneNumber.contains(searchQuery.value)
                   ).toList();
                   return ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final customer = filtered[index];
                       return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: customer.id.startsWith('user_') ? Colors.orange.shade100 : Colors.blue.shade100,
+                          child: Icon(
+                            customer.id.startsWith('user_') ? Icons.app_registration : Icons.person,
+                            color: customer.id.startsWith('user_') ? Colors.orange : Colors.blue,
+                          ),
+                        ),
                         title: Text(customer.name),
-                        subtitle: Text(customer.phoneNumber),
+                        subtitle: Text('${customer.phoneNumber}\nالنقاط: ${customer.loyaltyPoints ?? 0}'),
+                        isThreeLine: true,
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit_note, color: Colors.blue),
+                          onPressed: () => _showEditPointsDialog(context, ref, customer),
+                          tooltip: 'تعديل النقاط',
+                        ),
                         onTap: () => Navigator.pop(context, customer),
                       );
                     },
@@ -1473,6 +1511,10 @@ class CustomerPickerDialog extends HookConsumerWidget {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
         TextButton(
+          onPressed: () => _showAddCustomerDialog(context, ref),
+          child: const Text('إضافة زبون جديد'),
+        ),
+        TextButton(
           onPressed: () => Navigator.pop(context, sm.CustomerModel(
             id: '', 
             tenantId: '', 
@@ -1485,4 +1527,70 @@ class CustomerPickerDialog extends HookConsumerWidget {
       ],
     );
   }
+
+  void _showEditPointsDialog(BuildContext context, WidgetRef ref, sm.CustomerModel customer) {
+    final controller = TextEditingController(text: (customer.loyaltyPoints ?? 0).toString());
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('تعديل نقاط: ${customer.name}'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'عدد النقاط الجديد', border: OutlineInputBorder()),
+          keyboardType: TextInputType.number,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () async {
+              final newPts = int.tryParse(controller.text) ?? 0;
+              final tenantId = ref.read(tenantIdProvider);
+              await ref.read(customerRepositoryProvider).updateCustomerPoints(tenantId, customer.id, newPts);
+              ref.invalidate(customersListProvider);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('تحديث النقاط'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddCustomerDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة زبون جديد'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'الاسم')),
+            TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'رقم الهاتف'), keyboardType: TextInputType.phone),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+          FilledButton(
+            onPressed: () async {
+              final tenantId = ref.read(tenantIdProvider);
+              final newCustomer = sm.CustomerModel(
+                id: '',
+                tenantId: tenantId,
+                name: nameController.text,
+                phoneNumber: phoneController.text,
+                createdAt: DateTime.now(),
+              );
+              await ref.read(customerRepositoryProvider).addCustomer(tenantId, newCustomer);
+              ref.invalidate(customersListProvider);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

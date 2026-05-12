@@ -15,7 +15,15 @@ class ProductRepository {
   Box<ProductModel> get box => _box;
   Box<ProductModel> get _box => LocalDbService.getBox<ProductModel>('products');
 
+  static bool _hasRepairedIntegrity = false;
+
   Future<List<ProductModel>> getProducts(String tenantId, {int limit = 50}) async {
+    // Perform self-healing once per session
+    if (!_hasRepairedIntegrity) {
+      _hasRepairedIntegrity = true;
+      repairAllProductsIntegrity();
+    }
+
     // 1. Return cached products first for immediate UI update
     final cached = _box.values.where((p) => p.tenantId == tenantId && !p.isArchived).toList();
     cached.sort((a, b) => a.name.compareTo(b.name));
@@ -70,9 +78,45 @@ class ProductRepository {
     }
   }
 
+  /// Recalculates total stock based on variants and storage locations to ensure integrity
+  ProductModel _ensureDataIntegrity(ProductModel product) {
+    List<ProductVariant> updatedVariants = List.from(product.variants);
+    
+    for (int i = 0; i < updatedVariants.length; i++) {
+      final v = updatedVariants[i];
+      
+      // SELF-HEALING: If variant has stock but NO storage locations, create a default one
+      if (v.stock > 0 && v.storageLocations.isEmpty) {
+        updatedVariants[i] = v.copyWith(
+          storageLocations: [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: v.stock)],
+        );
+      }
+      
+      // Recalculate based on locations
+      final currentV = updatedVariants[i];
+      if (currentV.storageLocations.isNotEmpty) {
+        final calculatedVStock = currentV.storageLocations.fold(0, (sum, loc) => sum + loc.quantity);
+        updatedVariants[i] = currentV.copyWith(stock: calculatedVStock);
+      }
+    }
+    
+    // Sum up all variants for total stock
+    final calculatedTotalStock = updatedVariants.fold(0, (sum, v) => sum + v.stock);
+    
+    return product.copyWith(
+      stockQuantity: calculatedTotalStock,
+      variants: updatedVariants,
+      inStock: calculatedTotalStock > 0,
+    );
+  }
+
   Future<void> saveProduct(String tenantId, ProductModel product) async {
     final productId = product.id.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : product.id;
-    final updatedProduct = product.copyWith(
+    
+    // Force integrity before saving
+    final productWithIntegrity = _ensureDataIntegrity(product);
+    
+    final updatedProduct = productWithIntegrity.copyWith(
       id: productId,
       tenantId: tenantId,
     );
@@ -93,6 +137,26 @@ class ProductRepository {
         action: product.id.isNotEmpty ? SyncAction.update : SyncAction.create
       );
     }
+  }
+
+  /// Recalculates total stock based on variants and storage locations to ensure integrity
+  ProductModel recalculateIntegrity(ProductModel product) {
+    return _ensureDataIntegrity(product);
+  }
+
+  /// Utility to fix all products in the box
+  Future<void> repairAllProductsIntegrity() async {
+    final allProducts = _box.values.toList();
+    int fixedCount = 0;
+    
+    for (var p in allProducts) {
+      final repaired = _ensureDataIntegrity(p);
+      if (repaired.stockQuantity != p.stockQuantity || repaired.variants != p.variants) {
+        await _box.put(p.id, repaired);
+        fixedCount++;
+      }
+    }
+    debugPrint('Data Integrity: Repaired $fixedCount products.');
   }
 
   Future<void> deleteProduct(String tenantId, String productId, {bool permanent = false}) async {
@@ -123,48 +187,56 @@ class ProductRepository {
   }
 
   Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {
-    // Check local first
+    // 1. Absolute Priority: Local Search
     try {
-      return _box.values.firstWhere((p) => p.barcode == barcode && !p.isArchived);
-    } catch (_) {
-      if (tenantId == 'local_default') return null;
-      
-      // If not in cache and online, try remote
-      try {
-        final query = {
-          'where': {
-            'compositeFilter': {
-              'op': 'AND',
-              'filters': [
-                {'fieldFilter': {'field': {'fieldPath': 'tenantId'}, 'op': 'EQUAL', 'value': {'stringValue': tenantId}}},
-                {'fieldFilter': {'field': {'fieldPath': 'barcode'}, 'op': 'EQUAL', 'value': {'stringValue': barcode}}},
-                {'fieldFilter': {'field': {'fieldPath': 'isArchived'}, 'op': 'EQUAL', 'value': {'booleanValue': false}}}
-              ]
-            }
-          },
-          'limit': 1,
-        };
-        final results = await _restService.runQuery('products', query);
-        if (results.isEmpty) return null;
-        final p = ProductModel.fromJson(results.first);
-        await _box.put(p.id, p);
-        return p;
-      } catch (e) {
-        return null;
+      final localMatch = _box.values.where((p) => p.barcode == barcode && !p.isArchived).firstOrNull;
+      if (localMatch != null) {
+        return _ensureDataIntegrity(localMatch);
       }
+    } catch (e) {
+      debugPrint('Local Barcode Lookup Error: $e');
+    }
+
+    if (tenantId == 'local_default') return null;
+      
+    // 2. Online Fallback
+    try {
+      final query = {
+        'where': {
+          'compositeFilter': {
+            'op': 'AND',
+            'filters': [
+              {'fieldFilter': {'field': {'fieldPath': 'tenantId'}, 'op': 'EQUAL', 'value': {'stringValue': tenantId}}},
+              {'fieldFilter': {'field': {'fieldPath': 'barcode'}, 'op': 'EQUAL', 'value': {'stringValue': barcode}}},
+              {'fieldFilter': {'field': {'fieldPath': 'isArchived'}, 'op': 'EQUAL', 'value': {'booleanValue': false}}}
+            ]
+          }
+        },
+        'limit': 1,
+      };
+      final results = await _restService.runQuery('products', query);
+      if (results.isEmpty) return null;
+      final p = ProductModel.fromJson(results.first);
+      final withIntegrity = _ensureDataIntegrity(p);
+      await _box.put(p.id, withIntegrity);
+      return withIntegrity;
+    } catch (e) {
+      debugPrint('Remote Barcode Lookup Failed (Offline?): $e');
+      return null;
     }
   }
 
   Future<void> updateProduct(String tenantId, String productId, ProductModel updatedProduct) async {
-    await _box.put(productId, updatedProduct);
+    final productWithIntegrity = _ensureDataIntegrity(updatedProduct);
+    await _box.put(productId, productWithIntegrity);
     if (tenantId == 'local_default') return;
 
     try {
-      await _restService.setDocument('products/$productId', updatedProduct.toJson(), isUpdate: true);
+      await _restService.setDocument('products/$productId', productWithIntegrity.toJson(), isUpdate: true);
     } catch (e) {
       await LocalDbService.addToSyncQueue(
         collectionPath: 'products/$productId', 
-        data: updatedProduct.toJson(), 
+        data: productWithIntegrity.toJson(), 
         action: SyncAction.update
       );
     }

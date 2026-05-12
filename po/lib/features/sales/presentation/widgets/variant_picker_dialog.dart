@@ -91,11 +91,16 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
                   return const Text('الخيار غير متوفر', style: TextStyle(color: Colors.red));
                 }
                 
-                final loc = match.storageLocations.where((l) => l.warehouseName == widget.selectedWarehouse).firstOrNull ?? 
-                           (match.storageLocations.isNotEmpty ? match.storageLocations.first : null);
+                final loc = widget.selectedWarehouse != null 
+                    ? match.storageLocations.where((l) => l.warehouseName == widget.selectedWarehouse).firstOrNull 
+                    : (match.storageLocations.isNotEmpty ? match.storageLocations.first : null);
                            
                 final displayPrice = loc?.priceOverride ?? match.price ?? widget.product.price;
-                final availableStock = loc?.quantity ?? match.stock;
+                
+                // If specific warehouse selected, show its stock. If not, show total stock for this variant.
+                final availableStock = widget.selectedWarehouse != null 
+                    ? (loc?.quantity ?? 0) 
+                    : match.stock; 
 
                 return Container(
                   padding: const EdgeInsets.all(12),
@@ -122,21 +127,21 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                                const Text('المخزن:', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                               Text(loc?.warehouseName ?? widget.selectedWarehouse ?? 'غير محدد', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                               Text(widget.selectedWarehouse ?? 'تلقائي (جميع المخازن)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                             ],
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                               const Text('الكمية (في المخزن):', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                               const Text('الكمية المتوفرة:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                                Text('$availableStock', style: TextStyle(fontSize: 13, color: availableStock > 0 ? Colors.green : Colors.red, fontWeight: FontWeight.bold)),
                             ],
                           )
                         ],
                       ),
-                      if (loc?.shelf != null || loc?.box != null) ...[
+                      if (loc != null && (loc.shelf != null || loc.box != null)) ...[
                         const SizedBox(height: 8),
-                        Text('الموقع: رف (${loc?.shelf ?? "-"}) | صندوق (${loc?.box ?? "-"})', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                        Text('الموقع: رف (${loc.shelf ?? "-"}) | صندوق (${loc.box ?? "-"})', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
                       ],
                     ],
                   ),
@@ -154,7 +159,10 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
         Builder(
           builder: (context) {
             final variant = widget.product.variants.where((v) => v.color == selectedColor && v.size == selectedSize).firstOrNull;
-            final canAdd = variant != null && (variant.storageLocations.where((l) => l.warehouseName == widget.selectedWarehouse).firstOrNull?.quantity ?? variant.stock) > 0;
+            final stockToCheck = widget.selectedWarehouse != null 
+                ? (variant?.storageLocations.where((l) => l.warehouseName == widget.selectedWarehouse).firstOrNull?.quantity ?? 0)
+                : (variant?.stock ?? 0);
+            final canAdd = variant != null && stockToCheck > 0;
             return ElevatedButton(
               onPressed: canAdd ? () => Navigator.pop(context, variant) : null,
               style: ElevatedButton.styleFrom(

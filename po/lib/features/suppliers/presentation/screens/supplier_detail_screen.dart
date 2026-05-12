@@ -6,6 +6,8 @@ import '../../data/purchase_repository.dart';
 import '../../../../../core/providers/tenant_provider.dart';
 import 'purchase_invoice_detail_screen.dart';
 import 'purchase_invoice_screen.dart';
+import '../widgets/barcode_scanner_widget.dart';
+import '../../../products/presentation/providers/product_providers.dart' as pos_prod;
 
 class SupplierDetailScreen extends HookConsumerWidget {
   final SupplierModel supplier;
@@ -35,7 +37,7 @@ class SupplierDetailScreen extends HookConsumerWidget {
               controller: tabController,
               children: [
                 _buildInvoicesList(ref, supplier.id),
-                _buildProductsList(ref, supplier.id, searchQuery.value),
+                _buildProductsList(ref, supplier.id, searchQuery, ref.watch(tenantIdProvider)),
               ],
             ),
           ),
@@ -102,17 +104,45 @@ class SupplierDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildProductsList(WidgetRef ref, String supplierId, String search) {
+  Widget _buildProductsList(WidgetRef ref, String supplierId, ValueNotifier<String> searchQuery, String tenantId) {
     final invoicesAsync = ref.watch(supplierInvoicesFutureProvider(supplierId));
+    final productsAsync = ref.watch(pos_prod.productsFutureProvider);
 
-    return invoicesAsync.when(
-      data: (invoices) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (val) => searchQuery.value = val,
+                  decoration: InputDecoration(
+                    hintText: 'البحث باسم المنتج أو الباركود...',
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                icon: const Icon(Icons.qr_code_scanner),
+                onPressed: () => _openScanner(ref.context, ref, searchQuery),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: invoicesAsync.when(
+            data: (invoices) {
         // Extract unique products bought from this supplier
         final productsMap = <String, Map<String, dynamic>>{};
         for (var inv in invoices) {
           for (var item in inv.items) {
             if (!productsMap.containsKey(item.productId)) {
               productsMap[item.productId] = {
+                'id': item.productId,
                 'name': item.productName,
                 'lastPrice': item.unitCost,
                 'totalQty': 0.0,
@@ -127,9 +157,25 @@ class SupplierDetailScreen extends HookConsumerWidget {
           }
         }
 
-        final productList = productsMap.values.toList();
+        final productList = productsMap.values.where((p) {
+          final search = searchQuery.value;
+          if (search.isEmpty) return true;
+          final nameMatch = p['name'].toString().toLowerCase().contains(search.toLowerCase());
+          
+          // Try to match barcode if productsAsync is available
+          bool barcodeMatch = false;
+          productsAsync.whenData((allProducts) {
+             final prod = allProducts.where((ap) => ap.id == p['id']).firstOrNull;
+             if (prod != null && prod.barcode == search) {
+                barcodeMatch = true;
+             }
+          });
+          
+          return nameMatch || barcodeMatch || p['id'] == search; 
+        }).toList();
+
         if (productList.isEmpty) {
-          return const Center(child: Text('لم يتم شراء أي مواد من هذا المورد حتى الآن'));
+          return const Center(child: Text('لا توجد مواد مطابقة للبحث'));
         }
 
         return ListView.separated(
@@ -154,14 +200,31 @@ class SupplierDetailScreen extends HookConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
-    );
-  }
+    ),
+  ),
+],
+);
+}
 
   void _showNewInvoiceDialog(BuildContext context, WidgetRef ref, SupplierModel supplier) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PurchaseInvoiceScreen(initialSupplier: supplier),
+      ),
+    );
+  }
+  
+  void _openScanner(BuildContext context, WidgetRef ref, ValueNotifier<String> searchQuery) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BarcodeScannerWidget(
+          onDetect: (barcode) {
+            searchQuery.value = barcode;
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

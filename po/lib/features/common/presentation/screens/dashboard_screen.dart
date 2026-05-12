@@ -339,8 +339,15 @@ class DashboardScreen extends HookConsumerWidget {
           crossAxisCount: isMobile ? 2 : 4,
           crossAxisSpacing: isMobile ? 12 : 20,
           mainAxisSpacing: isMobile ? 12 : 20,
-          childAspectRatio: isMobile ? 1.0 : 1.1,
+          childAspectRatio: isMobile ? 0.9 : 1.1,
           children: [
+            _DashboardCard(
+              title: 'قاعدة العملاء',
+              subtitle: 'إدارة الزبائن ونقاط الولاء',
+              icon: Icons.people_alt_rounded,
+              color: Colors.purple,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerListScreen())),
+            ),
             if (ref.hasPermission(PosPermission.manageSales))
               _DashboardCard(
                 title: 'نقطة البيع (POS)',
@@ -564,7 +571,7 @@ class _DashboardCard extends StatelessWidget {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),

@@ -4,6 +4,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/providers/tenant_provider.dart';
 import '../../../core/services/firestore_rest_service.dart';
+import '../../../core/services/local_db_service.dart';
+import '../../../core/models/sync_queue_item.dart';
 
 class ShiftRepository {
   final FirestoreRestService _restService;
@@ -48,12 +50,15 @@ class ShiftRepository {
       };
 
       final results = await _restService.runQuery('shift_sessions', query);
-
+      
       if (results.isNotEmpty) {
         final shift = ShiftSessionModel.fromJson(results.first);
         await _cacheShift(shift);
         return shift;
       }
+      
+      // If server returns empty, check if we have a locally started shift
+      return _getCachedShift(tenantId, staffId);
     } catch (e) {
       return _getCachedShift(tenantId, staffId);
     }
@@ -79,7 +84,18 @@ class ShiftRepository {
   Future<void> startShift(ShiftSessionModel shift) async {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
     final newShift = shift.copyWith(id: id);
-    await _restService.setDocument('shift_sessions/$id', newShift.toJson());
+    final data = newShift.toJson()..['id'] = id;
+
+    try {
+      await _restService.setDocument('shift_sessions/$id', data);
+    } catch (e) {
+      // Offline: Add to sync queue
+      await LocalDbService.addToSyncQueue(
+        collectionPath: 'shift_sessions/$id',
+        data: data,
+        action: SyncAction.create,
+      );
+    }
     await _cacheShift(newShift);
   }
 
@@ -90,13 +106,24 @@ class ShiftRepository {
     required double expectedCash,
     required Map<String, double> salesSummary,
   }) async {
-    await _restService.setDocument('shift_sessions/$shiftId', {
+    final data = {
       'status': 'closed',
       'endTime': DateTime.now().toIso8601String(),
       'closingBalanceActual': actualCash,
       'closingBalanceExpected': expectedCash,
       'salesSummary': salesSummary,
-    }, isUpdate: true);
+    };
+
+    try {
+      await _restService.setDocument('shift_sessions/$shiftId', data, isUpdate: true);
+    } catch (e) {
+      // Offline: Add to sync queue
+      await LocalDbService.addToSyncQueue(
+        collectionPath: 'shift_sessions/$shiftId',
+        data: data..['id'] = shiftId,
+        action: SyncAction.update,
+      );
+    }
     await _prefs.remove(_activeShiftKey);
   }
 

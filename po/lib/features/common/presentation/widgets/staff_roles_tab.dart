@@ -42,9 +42,8 @@ class _StaffManagementView extends ConsumerWidget {
     final staffAsync = ref.watch(staffListProvider(tenantId));
 
     final currentStaff = ref.watch(currentStaffProvider);
-    final isManagerial = currentStaff == null ||
-                         currentStaff.roleName.toLowerCase() == 'admin' ||
-                         currentStaff.roleName.toLowerCase() == 'manager';
+    final permissions = ref.watch(permissionsProvider);
+    final isManagerial = currentStaff == null || permissions.contains(PosPermission.manageSettings);
 
     return Scaffold(
       body: Column(
@@ -484,6 +483,7 @@ class _RoleFormDialog extends HookConsumerWidget {
       case PosPermission.manageOnlineOrders: return 'إدارة الطلبات أونلاين';
       case PosPermission.viewAuditLogs: return 'عرض سجل العمليات (Audit)';
       case PosPermission.viewShifts: return 'عرض وإدارة الورديات';
+      case PosPermission.viewCustomers: return 'إدارة وقاعدة العملاء';
     }
   }
 }

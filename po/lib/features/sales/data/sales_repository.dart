@@ -154,70 +154,26 @@ class SalesRepository {
 
   Future<void> _updateLocalStateForSale(String tenantId, SalesInvoiceModel invoice) async {
     final productRepo = _ref.read(productRepositoryProvider);
-    // Update Stocks
+    
+    // 1. Update Stocks
     for (final item in invoice.items) {
       if (item.productId.isEmpty) continue;
-      final product = _productBox.get(item.productId);
-      if (product != null) {
-        List<ProductVariant> updatedVariants = List.from(product.variants);
-        
-        // 1. Identify Variant
-        int vIndex = updatedVariants.indexWhere((v) => 
-           v.color == (item.variantColor ?? 'Default') && v.size == (item.variantSize ?? 'Default'));
-        
-        if (vIndex == -1) {
-           if (updatedVariants.isEmpty) {
-             // Create a default variant for simple products
-             updatedVariants.add(ProductVariant(
-               color: 'Default', 
-               size: 'Default', 
-               stock: product.stockQuantity, 
-               storageLocations: [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: product.stockQuantity)]
-             ));
-             vIndex = 0;
-           } else {
-             vIndex = 0; // Fallback to first if mismatch
-           }
-        }
-
-        if (vIndex >= 0) {
-          final v = updatedVariants[vIndex];
-          List<ProductStorageLocation> updatedLocs = List.from(v.storageLocations);
-          
-          // 2. Identify Warehouse to deduct from
-          int locIndex = -1;
-          if (item.warehouseName != null) {
-            locIndex = updatedLocs.indexWhere((l) => l.warehouseName == item.warehouseName);
-          }
-          
-          // If automatic or not found, find first warehouse with stock
-          if (locIndex == -1) {
-            locIndex = updatedLocs.indexWhere((l) => l.quantity >= item.quantity);
-            if (locIndex == -1 && updatedLocs.isNotEmpty) locIndex = 0;
-          }
-
-          if (locIndex >= 0) {
-            final loc = updatedLocs[locIndex];
-            updatedLocs[locIndex] = loc.copyWith(quantity: (loc.quantity - item.quantity).clamp(0, 999999));
-            
-            updatedVariants[vIndex] = v.copyWith(
-              storageLocations: updatedLocs,
-            );
-          }
-        }
-
-        // 3. Final Integrity Check & Save
-        final updatedProduct = product.copyWith(
-          variants: updatedVariants,
-          salesCount: (product.salesCount ?? 0) + item.quantity,
+      
+      try {
+        await productRepo.updateStock(
+          tenantId, 
+          item.productId, 
+          -item.quantity.toInt(), // Negative for sale
+          color: item.variantColor,
+          size: item.variantSize,
+          warehouseName: item.warehouseName ?? 'المخزن الرئيسي',
         );
-        
-        final finalProduct = productRepo.recalculateIntegrity(updatedProduct);
-        await _productBox.put(item.productId, finalProduct);
+      } catch (e) {
+        debugPrint('OFFLINE STOCK UPDATE ERROR for ${item.productName}: $e');
       }
     }
 
-    // Update Customer
+    // 2. Update Customer Balance and Points
     if (invoice.customerId != null) {
       final customer = _customerBox.get(invoice.customerId);
       if (customer != null) {
@@ -246,48 +202,69 @@ class SalesRepository {
     required double totalReturnAmount,
     required double totalExchangeAmount,
   }) async {
-    // Offline return logic
-    for (final item in returnedItems) {
-      if (item.productId.isEmpty) continue;
-      final product = _productBox.get(item.productId);
-      if (product != null) {
-        int newStock = product.stockQuantity + item.quantity;
-        List<ProductVariant> updatedVariants = List.from(product.variants);
-        if (item.variantColor != null || item.variantSize != null) {
-          final vIndex = updatedVariants.indexWhere((v) => 
-             v.color == item.variantColor && v.size == item.variantSize);
-          if (vIndex >= 0) {
-            final v = updatedVariants[vIndex];
-            updatedVariants[vIndex] = v.copyWith(stock: v.stock + item.quantity);
-          }
-        }
-        final updatedProduct = product.copyWith(stockQuantity: newStock, variants: updatedVariants);
-        await _productBox.put(item.productId, updatedProduct);
-        
-        if (tenantId != 'local_default') {
-          await LocalDbService.addToSyncQueue(
-            collectionPath: 'products/${item.productId}', 
-            data: updatedProduct.toJson(), 
-            action: SyncAction.update
-          );
-        }
+    final productRepo = _ref.read(productRepositoryProvider);
+
+    // 1. Create a "Return Invoice" record for financial reports
+    if (totalReturnAmount > 0) {
+      final returnInvoice = originalInvoice.copyWith(
+        id: 'RET-${DateTime.now().millisecondsSinceEpoch}',
+        receiptNumber: 'RET-${originalInvoice.receiptNumber}',
+        items: returnedItems,
+        totalAmount: totalReturnAmount,
+        paidAmount: totalReturnAmount, // Considered as "paid back" or credited
+        date: DateTime.now(),
+        isReturned: true, // This flag triggers the deduction in ReportRepository
+        status: SalesInvoiceStatus.finalized,
+      );
+      await _salesBox.put(returnInvoice.id, returnInvoice);
+      
+      if (tenantId != 'local_default') {
+        await LocalDbService.addToSyncQueue(
+          collectionPath: 'sales_invoices/${returnInvoice.id}', 
+          data: returnInvoice.toJson(), 
+          action: SyncAction.create
+        );
       }
     }
 
+    // 2. Return stock to inventory
+    for (final item in returnedItems) {
+      if (item.productId.isEmpty) continue;
+      
+      // Safety check: Don't allow returning more than original (Server side check)
+      final originalItem = originalInvoice.items.firstWhere((i) => i.productId == item.productId, orElse: () => item);
+      if (item.quantity > originalItem.quantity) {
+        throw 'الكمية المسترجعة (${item.quantity}) أكبر من الكمية المباعة (${originalItem.quantity})';
+      }
+
+      await productRepo.returnStock(
+        tenantId, 
+        item.productId, 
+        item.quantity.toInt(),
+        color: item.variantColor,
+        size: item.variantSize,
+        warehouseName: item.warehouseName ?? 'المخزن الرئيسي',
+      );
+    }
+
+    // 3. Process Exchange (as a new sale)
     if (exchangeItems.isNotEmpty) {
       final exchangeInvoice = originalInvoice.copyWith(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: 'EX-${DateTime.now().millisecondsSinceEpoch}',
         receiptNumber: 'EX-${originalInvoice.receiptNumber}',
         items: exchangeItems,
         totalAmount: totalExchangeAmount,
         paidAmount: totalReturnAmount.clamp(0, totalExchangeAmount),
         date: DateTime.now(),
+        isReturned: false,
         status: SalesInvoiceStatus.finalized,
+        addedBy: originalInvoice.addedBy,
+        addedById: originalInvoice.addedById,
       );
       await saveInvoice(tenantId, exchangeInvoice);
     }
 
-    // Update balance
+    // 4. Update Customer balance
     final netDiff = totalExchangeAmount - totalReturnAmount;
     if (originalInvoice.customerId != null && netDiff != 0) {
       final customer = _customerBox.get(originalInvoice.customerId);
@@ -321,6 +298,14 @@ class SalesRepository {
 
   Future<List<SalesInvoiceModel>> getSalesByCustomer(String tenantId, String customerId) async {
     return _salesBox.values.where((s) => s.tenantId == tenantId && s.customerId == customerId).toList();
+  }
+
+  List<SalesInvoiceModel> getPreviousReturnsForInvoice(String tenantId, String receiptNumber) {
+    return _salesBox.values.where((s) => 
+      s.tenantId == tenantId && 
+      s.isReturned && 
+      (s.receiptNumber == 'RET-$receiptNumber' || s.receiptNumber.contains(receiptNumber))
+    ).toList();
   }
 }
 

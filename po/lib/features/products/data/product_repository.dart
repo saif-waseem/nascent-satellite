@@ -338,6 +338,11 @@ class ProductRepository {
     }
   }
 
+  Future<void> returnStock(String tenantId, String productId, int quantity, {String? color, String? size, String? warehouseName}) async {
+    // Simply use updateStock with positive adjustment
+    await updateStock(tenantId, productId, quantity, color: color, size: size, warehouseName: warehouseName);
+  }
+
   Future<List<ProductModel>> searchProducts(String tenantId, String query) async {
     if (query.isEmpty) return [];
     final q = query.toLowerCase();

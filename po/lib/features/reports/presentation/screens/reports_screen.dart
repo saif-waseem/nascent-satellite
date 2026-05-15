@@ -244,7 +244,7 @@ class ReportsScreen extends HookConsumerWidget {
                               _buildDetailTile('صافي الربح', report.netProfit, Icons.account_balance_wallet, report.netProfit >= 0 ? Colors.teal : Colors.red, isBold: true),
                             ],
                           ],
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 100),
                         ],
                       ),
                     );

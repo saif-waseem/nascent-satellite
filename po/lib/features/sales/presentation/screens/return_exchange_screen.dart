@@ -206,48 +206,70 @@ class ReturnExchangeScreen extends HookConsumerWidget {
                 itemBuilder: (context, index) {
                   final item = searchedInvoice.value!.items[index];
                   final returningQty = returnQuantities.value[index] ?? 0;
-                  
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                Text('السعر: ${item.unitPrice} | الكمية: ${item.quantity}', style: const TextStyle(fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+
+                  return Consumer(
+                    builder: (context, ref, _) {
+                      final salesRepo = ref.watch(salesRepositoryProvider);
+                      
+                      // Calculate previous returns for this specific product in this invoice
+                      final previousReturns = salesRepo.getPreviousReturnsForInvoice(tenantId, searchedInvoice.value!.receiptNumber);
+                      int alreadyReturnedQty = 0;
+                      for (final ret in previousReturns) {
+                        for (final retItem in ret.items) {
+                          if (retItem.productId == item.productId && 
+                              retItem.variantColor == item.variantColor && 
+                              retItem.variantSize == item.variantSize) {
+                            alreadyReturnedQty += retItem.quantity.toInt();
+                          }
+                        }
+                      }
+
+                      final availableToReturn = (item.quantity - alreadyReturnedQty).clamp(0, 99999);
+                      
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                                onPressed: returningQty > 0 ? () {
-                                  final newMap = Map<int, int>.from(returnQuantities.value);
-                                  newMap[index] = returningQty - 1;
-                                  if (newMap[index] == 0) newMap.remove(index);
-                                  returnQuantities.value = newMap;
-                                } : null,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(item.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('المباع: ${item.quantity} | المسترجع سابقاً: $alreadyReturnedQty', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                                    Text('السعر: ${item.unitPrice} | متاح للإرجاع: $availableToReturn', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
                               ),
-                              Text(returningQty.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-                                onPressed: returningQty < item.quantity ? () {
-                                  final newMap = Map<int, int>.from(returnQuantities.value);
-                                  newMap[index] = returningQty + 1;
-                                  returnQuantities.value = newMap;
-                                } : null,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                    onPressed: returningQty > 0 ? () {
+                                      final newMap = Map<int, int>.from(returnQuantities.value);
+                                      newMap[index] = returningQty - 1;
+                                      if (newMap[index] == 0) newMap.remove(index);
+                                      returnQuantities.value = newMap;
+                                    } : null,
+                                  ),
+                                  Text(returningQty.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                    onPressed: returningQty < availableToReturn ? () {
+                                      final newMap = Map<int, int>.from(returnQuantities.value);
+                                      newMap[index] = returningQty + 1;
+                                      returnQuantities.value = newMap;
+                                    } : null,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    }
                   );
                 },
               ),

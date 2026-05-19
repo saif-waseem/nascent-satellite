@@ -210,6 +210,7 @@ class ReturnExchangeScreen extends HookConsumerWidget {
                   return Consumer(
                     builder: (context, ref, _) {
                       final salesRepo = ref.watch(salesRepositoryProvider);
+                      final tenantId = ref.watch(tenantIdProvider);
                       
                       // Calculate previous returns for this specific product in this invoice
                       final previousReturns = salesRepo.getPreviousReturnsForInvoice(tenantId, searchedInvoice.value!.receiptNumber);

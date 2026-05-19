@@ -19,9 +19,11 @@ class LicenseCheckWrapper extends ConsumerWidget {
           );
         }
 
+        final isExpired = tenant.expiryDate != null && tenant.expiryDate!.isBefore(DateTime.now());
+
         // Store App activation check
-        if (!tenant.isStoreEnabled) {
-          return _ActivationScreen(tenantId: tenant.id, currentCode: tenant.activationCode);
+        if (!tenant.isStoreEnabled || isExpired) {
+          return _ActivationScreen(tenantId: tenant.id, currentCode: tenant.activationCode, isExpired: isExpired);
         }
 
         return child;
@@ -36,16 +38,17 @@ class LicenseCheckWrapper extends ConsumerWidget {
   }
 }
 
-class _ActivationScreen extends StatefulWidget {
+class _ActivationScreen extends ConsumerStatefulWidget {
   final String tenantId;
   final String? currentCode;
-  const _ActivationScreen({required this.tenantId, this.currentCode});
+  final bool isExpired;
+  const _ActivationScreen({required this.tenantId, this.currentCode, this.isExpired = false});
 
   @override
-  State<_ActivationScreen> createState() => _ActivationScreenState();
+  ConsumerState<_ActivationScreen> createState() => _ActivationScreenState();
 }
 
-class _ActivationScreenState extends State<_ActivationScreen> {
+class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
   final _codeController = TextEditingController();
   bool _isLoading = false;
 
@@ -60,24 +63,30 @@ class _ActivationScreenState extends State<_ActivationScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(color: Colors.black26, blurRadius: 20, spreadRadius: 5),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.stars_rounded, size: 80, color: Colors.indigo),
+              Icon(
+                widget.isExpired ? Icons.hourglass_disabled_rounded : Icons.stars_rounded, 
+                size: 80, 
+                color: widget.isExpired ? Colors.red : Colors.indigo
+              ),
               const SizedBox(height: 24),
-              const Text(
-                'تفعيل لوحة التحكم (Store Admin)',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo),
+              Text(
+                widget.isExpired ? 'انتهت صلاحية اشتراك لوحة التحكم' : 'تفعيل لوحة التحكم (Store Admin)',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.indigo),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'يرجى إدخال كود التفعيل الخاص بمتجرك للاستمرار',
+              Text(
+                widget.isExpired 
+                    ? 'انتهت فترة اشتراك متجرك. يرجى تجديد الاشتراك للاستمرار.'
+                    : 'يرجى إدخال كود التفعيل الخاص بمتجرك للاستمرار',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 16),
+                style: const TextStyle(color: Colors.grey, fontSize: 16),
               ),
               const SizedBox(height: 32),
               TextField(
@@ -138,6 +147,7 @@ class _ActivationScreenState extends State<_ActivationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم تفعيل المتجر بنجاح!'), backgroundColor: Colors.green),
         );
+        ref.invalidate(tenantProvider);
       }
     } on FirebaseFunctionsException catch (e) {
       if (mounted) {

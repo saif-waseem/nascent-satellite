@@ -9,6 +9,7 @@ import 'package:store_admin/core/localization/resources/app_strings.dart';
 import 'package:store_admin/core/utils/formatters.dart';
 import 'package:store_admin/core/utils/formatters.dart';
 import 'package:shared_models/shared_models.dart';
+import 'package:store_admin/features/shared/barcode_scanner_dialog.dart';
 import 'package:store_admin/features/products/presentation/widgets/csv_import_export_dialog.dart';
 
 class ProductListScreen extends HookConsumerWidget {

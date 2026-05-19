@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_models/shared_models.dart';
+import '../services/local_db_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../providers/tenant_provider.dart';
@@ -96,18 +100,18 @@ class LicenseCheckWrapper extends ConsumerWidget {
   }
 }
 
-class _ActivationScreen extends StatefulWidget {
+class _ActivationScreen extends ConsumerStatefulWidget {
   final String tenantId;
   final bool isExpired;
   const _ActivationScreen({required this.tenantId, this.isExpired = false});
 
   @override
-  State<_ActivationScreen> createState() => _ActivationScreenState();
+  ConsumerState<_ActivationScreen> createState() => _ActivationScreenState();
 }
 
-class _ActivationScreenState extends State<_ActivationScreen> {
+class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
   final _codeController = TextEditingController();
-  final bool _isLoading = false;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +138,7 @@ class _ActivationScreenState extends State<_ActivationScreen> {
               Text(
                 widget.isExpired 
                     ? 'يرجى تجديد الاشتراك للتمكن من استخدام النظام مجدداً'
-                    : 'يرجى إدخال كود التفعيل الدائمي الخاص بك',
+                    : 'يرجى إدخال كود التفعيل الخاص بك لنسخة المبيعات',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.grey),
               ),
@@ -161,8 +165,8 @@ class _ActivationScreenState extends State<_ActivationScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'التفعيل متاح حالياً عبر الأجهزة المحمولة فقط لمستخدمي الويندوز.',
-                style: TextStyle(color: Colors.orange, fontSize: 12),
+                'سيتم تفعيل النظام تلقائياً بعد إدخال الكود الصحيح والتحقق منه.',
+                style: TextStyle(color: Colors.green, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -179,12 +183,70 @@ class _ActivationScreenState extends State<_ActivationScreen> {
   }
 
   Future<void> _handleActivation() async {
-    // Purged native Firebase SDK for Windows stability.
-    // Activation should be done via mobile app or a separate REST-based admin tool.
-    if (mounted) {
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('عذراً، التفعيل غير متاح حالياً على نسخة الويندوز. يرجى التفعيل من الموبايل.'), backgroundColor: Colors.orange),
-       );
+    final code = _codeController.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://us-central1-my-store-b0723.cloudfunctions.net/verifyActivationCode'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'data': {
+            'tenantId': widget.tenantId,
+            'code': code,
+            'appType': 'pos',
+          }
+        }),
+      );
+
+      Map<String, dynamic>? body;
+      try {
+        body = json.decode(response.body) as Map<String, dynamic>?;
+      } catch (_) {
+        // Not JSON
+      }
+
+      if (body != null && body.containsKey('error')) {
+        final error = body['error'];
+        final message = error['message'] ?? 'كود التفعيل غير صحيح أو فشل التحقق.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ: $message'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      if (response.statusCode == 200 && body != null && body.containsKey('result')) {
+        // Delete old cached tenant so the next provider run fetches fresh from the network
+        final box = LocalDbService.getBox<TenantModel>('tenants');
+        await box.delete(widget.tenantId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تفعيل تطبيق المبيعات بنجاح!'), backgroundColor: Colors.green),
+          );
+          // Invalidate the tenantProvider to force reload
+          ref.invalidate(tenantProvider);
+        }
+      } else {
+        throw Exception('فشل الاتصال بالسيرفر (${response.statusCode})');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في الاتصال: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 }
+

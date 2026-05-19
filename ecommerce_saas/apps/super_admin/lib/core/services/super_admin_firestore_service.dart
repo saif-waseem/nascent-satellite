@@ -105,6 +105,52 @@ class SuperAdminFirestoreService {
     }
   }
 
+  Future<void> activatePosSubscription(String tenantId, int months, String code) async {
+    try {
+      final doc = await _db.collection('tenants').doc(tenantId).get();
+      if (!doc.exists) return;
+      
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      final tenant = TenantModel.fromJson(data);
+      
+      // Determine existing expiry or start fresh
+      final now = DateTime.now();
+      final currentExpiry = tenant.posExpiryDate;
+      
+      // If no expiry yet, or it's in the past, start from now.
+      // Otherwise, add to the existing future expiry date.
+      final startDate = (currentExpiry == null || currentExpiry.isBefore(now)) 
+          ? now 
+          : currentExpiry;
+          
+      final newExpiry = startDate.add(Duration(days: months * 30));
+      
+      final updated = tenant.copyWith(
+        posExpiryDate: newExpiry,
+        isActive: true,
+        posActivationCode: code,
+      );
+      
+      await updateTenant(updated);
+
+      // Also log the activation
+      await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
+        'date': FieldValue.serverTimestamp(),
+        'months': months,
+        'code': code,
+        'expiryAfter': newExpiry.toIso8601String(),
+        'type': 'POS_RENEWAL_OR_ACTIVATION',
+      });
+      
+      print('DEBUG SUPER_ADMIN: POS Activation successful for $tenantId. New expiry: $newExpiry');
+    } catch (e, stack) {
+      print('CRITICAL ERROR during activatePosSubscription: $e');
+      print(stack);
+      rethrow;
+    }
+  }
+
   Future<int> getTenantSubscriberCount(String tenantId) async {
     try {
       // Use count() for efficiency

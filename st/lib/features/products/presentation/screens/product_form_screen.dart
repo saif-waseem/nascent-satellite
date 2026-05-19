@@ -321,9 +321,11 @@ class ProductFormScreen extends HookConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   Widget _buildVariantsSection(BuildContext context, ValueNotifier<List<ProductVariant>> variants) {
     final isMobile = MediaQuery.of(context).size.width < 650;

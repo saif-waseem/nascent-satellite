@@ -1,0 +1,66 @@
+name: Build macOS Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies & Build Store Admin (st)
+        run: |
+          cd st
+          flutter pub get
+          flutter build macos --release --no-codesign
+
+      - name: Compress Store Admin App
+        run: |
+          mkdir -p build-artifacts
+          cd st/build/macos/Build/Products/Release
+          zip -r -y ../../../../../../build-artifacts/store_admin_macos.zip *.app
+
+      - name: Install dependencies & Build POS Cashier (po)
+        run: |
+          cd po
+          flutter pub get
+          flutter build macos --release --no-codesign
+
+      - name: Compress POS Cashier App
+        run: |
+          cd po/build/macos/Build/Products/Release
+          zip -r -y ../../../../../../build-artifacts/pos_cashier_macos.zip *.app
+
+      - name: Install dependencies & Build User App (ua)
+        run: |
+          cd ua
+          flutter pub get
+          flutter build macos --release --no-codesign
+
+      - name: Compress User App
+        run: |
+          cd ua/build/macos/Build/Products/Release
+          zip -r -y ../../../../../../build-artifacts/user_app_macos.zip *.app
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-apps
+          path: build-artifacts/

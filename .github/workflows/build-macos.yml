@@ -32,7 +32,7 @@ jobs:
         run: |
           cd st
           flutter pub get
-          flutter build macos --release
+          flutter build macos --release --no-tree-shake-icons
 
       - name: Compress Store Admin App
         run: |
@@ -44,7 +44,7 @@ jobs:
         run: |
           cd po
           flutter pub get
-          flutter build macos --release
+          flutter build macos --release --no-tree-shake-icons
 
       - name: Compress POS Cashier App
         run: |
@@ -55,7 +55,7 @@ jobs:
         run: |
           cd ua
           flutter pub get
-          flutter build macos --release
+          flutter build macos --release --no-tree-shake-icons
 
       - name: Compress User App
         run: |

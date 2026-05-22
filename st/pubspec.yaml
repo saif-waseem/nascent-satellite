@@ -34,8 +34,6 @@ dependencies:
   url_launcher: ^6.3.2
   hive_ce: any
   hive_ce_flutter: any
-  chewie: ^1.14.0
-  video_player: ^2.11.1
   shimmer: ^3.0.0
   fl_chart: ^1.2.0
   lottie: ^3.3.3
@@ -68,4 +66,3 @@ flutter:
 
 dependency_overrides:
   analyzer: '>=6.0.0 <13.0.0'
-  win32: ^6.1.0

@@ -1236,6 +1236,7 @@ class _CartFooter extends HookConsumerWidget {
 
       if (context.mounted) {
         // --- Immediate UI Update ---
+        ref.invalidate(salesListProvider);
         ref.invalidate(financialReportProvider);
         ref.invalidate(customersListProvider);
         ref.invalidate(activeShiftFutureProvider);

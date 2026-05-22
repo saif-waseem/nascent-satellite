@@ -280,6 +280,7 @@ class _SalesInvoiceDetailView extends HookConsumerWidget {
               totalReturnAmount: returnQty * item.unitPrice,
               totalExchangeAmount: 0.0,
             );
+        ref.invalidate(salesListProvider);
         onReturn();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,66 +1,113 @@
 name: Build macOS Apps
-
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build-macos:
     runs-on: macos-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
 
-      - name: Install dependencies & Build Store Admin (st)
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Disable Code Signing
+        run: |
+          for dir in st po ua; do
+            for cfg in \
+              "$dir/macos/Flutter/Release.xcconfig" \
+              "$dir/macos/Flutter/Debug.xcconfig"; do
+              if [ -f "$cfg" ]; then
+                echo "CODE_SIGN_IDENTITY=" >> "$cfg"
+                echo "CODE_SIGNING_REQUIRED=NO" >> "$cfg"
+                echo "CODE_SIGNING_ALLOWED=NO" >> "$cfg"
+              fi
+            done
+            pbx="$dir/macos/Runner.xcodeproj/project.pbxproj"
+            if [ -f "$pbx" ]; then
+              sed -i '' \
+                -e 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' \
+                -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
+                "$pbx"
+            fi
+          done
+
+      - name: Remove macOS-incompatible packages
+        run: |
+          for dir in st po ua; do
+            if [ -f "$dir/pubspec.yaml" ]; then
+              sed -i '' \
+                -e '/windows_printer/d' \
+                -e '/print_bluetooth_thermal/d' \
+                "$dir/pubspec.yaml"
+            fi
+          done
+
+      - name: Build Store Admin (st)
         run: |
           cd st
+          flutter clean
           flutter pub get
           flutter build macos --release --no-tree-shake-icons
 
-      - name: Compress Store Admin App
+      - name: Create DMG - Store Admin
         run: |
           mkdir -p build-artifacts
-          cd st/build/macos/Build/Products/Release
-          zip -r -y ../../../../../../build-artifacts/store_admin_macos.zip *.app
+          create-dmg \
+            --volname "Store Admin" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 400 200 \
+            "build-artifacts/store_admin_macos.dmg" \
+            "st/build/macos/Build/Products/Release/"
 
-      - name: Install dependencies & Build POS Cashier (po)
+      - name: Build POS Cashier (po)
         run: |
           cd po
+          flutter clean
           flutter pub get
           flutter build macos --release --no-tree-shake-icons
 
-      - name: Compress POS Cashier App
+      - name: Create DMG - POS Cashier
         run: |
-          cd po/build/macos/Build/Products/Release
-          zip -r -y ../../../../../../build-artifacts/pos_cashier_macos.zip *.app
+          create-dmg \
+            --volname "POS Cashier" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 400 200 \
+            "build-artifacts/pos_cashier_macos.dmg" \
+            "po/build/macos/Build/Products/Release/"
 
-      - name: Install dependencies & Build User App (ua)
+      - name: Build User App (ua)
         run: |
           cd ua
+          flutter clean
           flutter pub get
           flutter build macos --release --no-tree-shake-icons
 
-      - name: Compress User App
+      - name: Create DMG - User App
         run: |
-          cd ua/build/macos/Build/Products/Release
-          zip -r -y ../../../../../../build-artifacts/user_app_macos.zip *.app
+          create-dmg \
+            --volname "User App" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 400 200 \
+            "build-artifacts/user_app_macos.dmg" \
+            "ua/build/macos/Build/Products/Release/"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

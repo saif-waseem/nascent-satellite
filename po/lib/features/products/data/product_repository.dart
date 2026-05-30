@@ -4,8 +4,20 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../core/services/firestore_rest_service.dart';
 import '../../../core/services/local_db_service.dart';
 import '../../../core/models/sync_queue_item.dart';
+import '../../../core/providers/sync_status_provider.dart';
 
 final productRepositoryProvider = Provider((ref) => ProductRepository(ref));
+
+final productStockVersionProvider = NotifierProvider<ProductStockVersionNotifier, int>(ProductStockVersionNotifier.new);
+
+class ProductStockVersionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void increment() {
+    state++;
+  }
+}
 
 class ProductRepository {
   final Ref _ref;
@@ -16,6 +28,10 @@ class ProductRepository {
   Box<ProductModel> get _box => LocalDbService.getBox<ProductModel>('products');
 
   static bool _hasRepairedIntegrity = false;
+
+  void _notifyStockChanged() {
+    _ref.read(productStockVersionProvider.notifier).increment();
+  }
 
   Future<List<ProductModel>> getProducts(String tenantId, {int limit = 50}) async {
     // Perform self-healing once per session
@@ -29,6 +45,12 @@ class ProductRepository {
     cached.sort((a, b) => a.name.compareTo(b.name));
     
     if (tenantId == 'local_default') return cached;
+
+    // Immediately return local cache if offline to avoid overwriting from old HTTP query cache
+    final isOnline = _ref.read(syncStatusProvider).isOnline;
+    if (!isOnline) {
+      return cached;
+    }
 
     // 2. Fetch from remote in background (if online)
     try {
@@ -61,7 +83,16 @@ class ProductRepository {
       final remoteProducts = results.map((data) => ProductModel.fromJson(data)).toList();
       
       // Update cache (Merge strategy)
+      final syncQueueBox = LocalDbService.getBox<SyncQueueItem>('sync_queue');
       for (var p in remoteProducts) {
+        // Skip overwriting local cache if there is a pending sync queue item for this product
+        final hasPendingSync = syncQueueBox.values.any((item) => 
+          item.collectionPath == 'products/${p.id}'
+        );
+        if (hasPendingSync) {
+          continue;
+        }
+
         final local = _box.get(p.id);
         if (local == null || local.toJson().toString() != p.toJson().toString()) {
           await _box.put(p.id, p);
@@ -124,6 +155,9 @@ class ProductRepository {
     // Always save to local first
     await _box.put(productId, updatedProduct);
 
+    // Notify UI of local update
+    _notifyStockChanged();
+
     if (tenantId == 'local_default') return;
 
     // Push to remote or queue
@@ -167,6 +201,9 @@ class ProductRepository {
       final p = _box.get(productId);
       if (p != null) await _box.put(productId, p.copyWith(isArchived: true));
     }
+
+    // Notify UI of local update
+    _notifyStockChanged();
 
     if (tenantId == 'local_default') return;
 
@@ -229,6 +266,10 @@ class ProductRepository {
   Future<void> updateProduct(String tenantId, String productId, ProductModel updatedProduct) async {
     final productWithIntegrity = _ensureDataIntegrity(updatedProduct);
     await _box.put(productId, productWithIntegrity);
+
+    // Notify UI of local update
+    _notifyStockChanged();
+
     if (tenantId == 'local_default') return;
 
     try {
@@ -325,6 +366,9 @@ class ProductRepository {
     
     await _box.put(productId, updatedProduct);
 
+    // Notify UI of local update
+    _notifyStockChanged();
+
     if (tenantId == 'local_default') return;
 
     try {
@@ -386,6 +430,9 @@ class ProductRepository {
         );
       }
     }
+
+    // Notify UI of local update
+    _notifyStockChanged();
   }
 
   Future<void> updateProductFields(String tenantId, String productId, Map<String, dynamic> fields) async {

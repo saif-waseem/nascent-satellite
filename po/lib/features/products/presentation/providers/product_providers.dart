@@ -8,6 +8,7 @@ import '../../data/product_repository.dart';
 final productsFutureProvider = FutureProvider.autoDispose((ref) async {
   final repo = ref.watch(productRepositoryProvider);
   final tenantId = ref.watch(tenantIdProvider);
+  ref.watch(productStockVersionProvider);
   if (tenantId.isEmpty) return <ProductModel>[];
   return await repo.getProducts(tenantId, limit: 100);
 });
@@ -50,6 +51,7 @@ class PagedInventoryProductsNotifier extends Notifier<PagedProductsState> {
   @override
   PagedProductsState build() {
     ref.watch(tenantIdProvider);
+    ref.watch(productStockVersionProvider);
     Future.microtask(() => loadInitial());
     return PagedProductsState(products: []);
   }
@@ -110,6 +112,7 @@ class PagedGeneralProductsNotifier extends Notifier<PagedProductsState> {
   @override
   PagedProductsState build() {
     ref.watch(tenantIdProvider);
+    ref.watch(productStockVersionProvider);
     Future.microtask(() => loadInitial());
     return PagedProductsState(products: []);
   }

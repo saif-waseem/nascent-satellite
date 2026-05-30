@@ -52,20 +52,23 @@ class BarcodePrintingScreen extends HookConsumerWidget {
                      final shop = tenant.value;
                      if (shop == null) return;
 
-                     for (final item in selectedProducts.value.values) {
-                       if (item.qty <= 0) continue;
-                       
-                       await printer.printBarcodeLabel(
-                         name: item.displayName,
-                         barcode: item.product.barcode ?? '',
-                         price: item.variant?.price ?? item.product.price,
-                         currency: shop.currencyUnit,
-                         count: item.qty,
-                         showName: showName.value,
-                         showPrice: showPrice.value,
-                         showBarcodeText: showBarcodeText.value,
-                       );
-                     }
+                     final printItems = selectedProducts.value.values
+                         .where((item) => item.qty > 0)
+                         .map((item) => (
+                               name: item.displayName,
+                               barcode: item.product.barcode ?? '',
+                               price: item.variant?.price ?? item.product.price,
+                               count: item.qty,
+                             ))
+                         .toList();
+
+                     await printer.printAllBarcodeLabels(
+                       items: printItems,
+                       currency: shop.currencyUnit,
+                       showName: showName.value,
+                       showPrice: showPrice.value,
+                       showBarcodeText: showBarcodeText.value,
+                     );
                      
                      if (!context.mounted) return;
                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال جميع الأوامر للطابعة')));
@@ -193,20 +196,23 @@ class BarcodePrintingScreen extends HookConsumerWidget {
                                 final shop = tenant.value;
                                 if (shop == null) return;
 
-                                for (final item in selectedProducts.value.values) {
-                                  if (item.qty <= 0) continue;
-                                  
-                                  await printer.printBarcodeLabel(
-                                    name: item.displayName,
-                                    barcode: item.product.barcode ?? '',
-                                    price: item.variant?.price ?? item.product.price,
-                                    currency: shop.currencyUnit,
-                                    count: item.qty,
-                                    showName: showName.value,
-                                    showPrice: showPrice.value,
-                                    showBarcodeText: showBarcodeText.value,
-                                  );
-                                }
+                                final printItems = selectedProducts.value.values
+                                    .where((item) => item.qty > 0)
+                                    .map((item) => (
+                                          name: item.displayName,
+                                          barcode: item.product.barcode ?? '',
+                                          price: item.variant?.price ?? item.product.price,
+                                          count: item.qty,
+                                        ))
+                                    .toList();
+
+                                await printer.printAllBarcodeLabels(
+                                  items: printItems,
+                                  currency: shop.currencyUnit,
+                                  showName: showName.value,
+                                  showPrice: showPrice.value,
+                                  showBarcodeText: showBarcodeText.value,
+                                );
                                 
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال جميع الأوامر للطابعة')));

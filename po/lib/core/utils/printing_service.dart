@@ -311,11 +311,11 @@ class PrintingService {
     if (settings.labelPreset == LabelPreset.custom) {
       pageFormat = PdfPageFormat(
         settings.customWidth * PdfPageFormat.mm,
-        settings.customHeight > 0 ? (settings.customHeight - 1) * PdfPageFormat.mm : 200 * PdfPageFormat.mm,
+        settings.customHeight > 0 ? settings.customHeight * PdfPageFormat.mm : 30 * PdfPageFormat.mm,
         marginAll: 0,
       );
       barcodeWidth = (settings.customWidth - (settings.customMargin * 2)) * PdfPageFormat.mm;
-      barcodeHeight = 10 * PdfPageFormat.mm;
+      barcodeHeight = (settings.customHeight > 0 ? settings.customHeight * 0.35 : 10) * PdfPageFormat.mm;
       fontSize = settings.customWidth < 40 ? 8 : 10;
     } else {
       switch (settings.labelPreset) {
@@ -398,6 +398,120 @@ class PrintingService {
           },
         ),
       );
+    }
+
+    final Uint8List pdfBytes = await _saveWithRecovery(pdf);
+    await _printPdf(pdfBytes, settings.labelPrinterId, format: pageFormat, useDirectPrint: settings.labelPrinterId != null, isLabel: true);
+  }
+
+  Future<void> printAllBarcodeLabels({
+    required List<({String name, String barcode, double price, int count})> items,
+    required String currency,
+    bool showName = true,
+    bool showPrice = true,
+    bool showBarcodeText = true,
+  }) async {
+    final settings = await _repo.getSettings();
+    final arabicFont = await _loadArabicFont();
+    final pdf = pw.Document();
+
+    PdfPageFormat pageFormat;
+    double barcodeWidth;
+    double barcodeHeight;
+    double fontSize;
+
+    if (settings.labelPreset == LabelPreset.custom) {
+      pageFormat = PdfPageFormat(
+        settings.customWidth * PdfPageFormat.mm,
+        settings.customHeight > 0 ? settings.customHeight * PdfPageFormat.mm : 30 * PdfPageFormat.mm,
+        marginAll: 0,
+      );
+      barcodeWidth = (settings.customWidth - (settings.customMargin * 2)) * PdfPageFormat.mm;
+      barcodeHeight = (settings.customHeight > 0 ? settings.customHeight * 0.35 : 10) * PdfPageFormat.mm;
+      fontSize = settings.customWidth < 40 ? 8 : 10;
+    } else {
+      switch (settings.labelPreset) {
+        case LabelPreset.jewelry3020:
+          pageFormat = const PdfPageFormat(30 * PdfPageFormat.mm, 19 * PdfPageFormat.mm, marginAll: 0);
+          barcodeWidth = 24 * PdfPageFormat.mm;
+          barcodeHeight = 5 * PdfPageFormat.mm;
+          fontSize = 7.5;
+          break;
+        case LabelPreset.shipping100150:
+          pageFormat = const PdfPageFormat(100 * PdfPageFormat.mm, 149 * PdfPageFormat.mm, marginAll: 0);
+          barcodeWidth = 80 * PdfPageFormat.mm;
+          barcodeHeight = 25 * PdfPageFormat.mm;
+          fontSize = 16;
+          break;
+        case LabelPreset.standard4030:
+        default:
+          pageFormat = const PdfPageFormat(40 * PdfPageFormat.mm, 29 * PdfPageFormat.mm, marginAll: 0);
+          barcodeWidth = 34 * PdfPageFormat.mm;
+          barcodeHeight = 7 * PdfPageFormat.mm;
+          fontSize = 9;
+          break;
+      }
+    }
+    
+    for (final item in items) {
+      for (int i = 0; i < item.count; i++) {
+        pdf.addPage(
+          pw.Page(
+            pageFormat: pageFormat,
+            theme: _createTheme(arabicFont),
+            build: (pw.Context context) {
+              return pw.Directionality(
+                textDirection: pw.TextDirection.rtl,
+                child: pw.Center(
+                  child: pw.Container(
+                    width: pageFormat.availableWidth,
+                    height: pageFormat.availableHeight,
+                    child: pw.Column(
+                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        if (showName) ...[
+                          pw.Text(
+                            item.name.trim().isEmpty ? 'غير مصنف' : item.name, 
+                            style: pw.TextStyle(
+                              fontSize: item.name.length > 25 ? fontSize * 0.8 : fontSize, 
+                              fontWeight: pw.FontWeight.bold
+                            ), 
+                            textAlign: pw.TextAlign.center, 
+                            maxLines: 2,
+                          ),
+                          pw.SizedBox(height: 1.5),
+                        ],
+                        pw.BarcodeWidget(
+                          barcode: pw.Barcode.code128(),
+                          data: item.barcode,
+                          width: barcodeWidth,
+                          height: barcodeHeight,
+                          drawText: false, 
+                        ),
+                        if (showBarcodeText) ...[
+                          pw.SizedBox(height: 1),
+                          pw.Text(
+                            item.barcode, 
+                            style: pw.TextStyle(fontSize: fontSize * 0.7, fontWeight: pw.FontWeight.bold)
+                          ),
+                        ],
+                        if (showPrice) ...[
+                          pw.SizedBox(height: 0.5),
+                          pw.Text(
+                            '${_formatPrice(item.price)} $currency', 
+                            style: pw.TextStyle(fontSize: fontSize * 0.9, fontWeight: pw.FontWeight.bold)
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }
     }
 
     final Uint8List pdfBytes = await _saveWithRecovery(pdf);

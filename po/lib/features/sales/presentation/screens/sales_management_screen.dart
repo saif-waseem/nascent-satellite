@@ -436,6 +436,7 @@ class _ProductSelectionPanel extends HookConsumerWidget {
     final scrollController = useScrollController();
 
     final tenantId = ref.watch(tenantIdProvider);
+    final stockVersion = ref.watch(productStockVersionProvider);
 
     Future<void> loadProducts({bool reset = false}) async {
       if (isLoading.value || (!hasMore.value && !reset)) return;
@@ -508,7 +509,7 @@ class _ProductSelectionPanel extends HookConsumerWidget {
     useEffect(() {
       loadProducts(reset: true);
       return null;
-    }, []);
+    }, [stockVersion]);
 
     useEffect(() {
       void listener() {

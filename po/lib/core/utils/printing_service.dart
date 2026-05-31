@@ -11,6 +11,8 @@ import '../../features/common/data/printer_settings_repository.dart';
 import '../../features/reports/data/report_repository.dart';
 import 'package:intl/intl.dart';
 import 'bluetooth_printing_service.dart';
+import 'package:image/image.dart' as img;
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 class PrintingService {
   final PrinterSettingsRepository _repo;
@@ -615,6 +617,34 @@ class PrintingService {
   Future<void> _printPdf(Uint8List pdfBytes, String? printerName, {PdfPageFormat? format, bool useDirectPrint = false, bool isLabel = false}) async {
     final settings = await _repo.getSettings();
     final effectiveFormat = format ?? PdfPageFormat.roll80;
+
+    if (isLabel && !kIsWeb && defaultTargetPlatform == TargetPlatform.windows && printerName != null && printerName.isNotEmpty) {
+      try {
+        final profile = await CapabilityProfile.load();
+        final paperSize = (effectiveFormat.width / PdfPageFormat.mm < 60) ? PaperSize.mm58 : PaperSize.mm80;
+        final generator = Generator(paperSize, profile);
+        List<int> escPosBytes = [];
+
+        await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+          final pngBytes = await page.toPng();
+          final img.Image? decodedImage = img.decodeImage(pngBytes);
+          if (decodedImage != null) {
+            escPosBytes += generator.imageRaster(decodedImage, imageFn: PosImageFn.graphics);
+          }
+        }
+
+        if (escPosBytes.isNotEmpty) {
+          await WindowsPrinter.printRawData(
+            printerName: printerName,
+            data: Uint8List.fromList(escPosBytes),
+            useRawDatatype: true,
+          );
+          return;
+        }
+      } catch (e) {
+        debugPrint('Raw label printing failed: $e. Falling back to default direct print.');
+      }
+    }
 
     if (useDirectPrint && printerName != null && printerName.isNotEmpty) {
       try {

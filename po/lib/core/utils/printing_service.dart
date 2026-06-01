@@ -620,7 +620,7 @@ class PrintingService {
 
     if (isLabel && !kIsWeb && defaultTargetPlatform == TargetPlatform.windows && printerName != null && printerName.isNotEmpty) {
       try {
-        final profile = await CapabilityProfile.load();
+        final profile = await CapabilityProfile.load(name: 'default');
         final paperSize = (effectiveFormat.width / PdfPageFormat.mm < 60) ? PaperSize.mm58 : PaperSize.mm80;
         final generator = Generator(paperSize, profile);
         List<int> escPosBytes = [];
@@ -629,7 +629,8 @@ class PrintingService {
           final pngBytes = await page.toPng();
           final img.Image? decodedImage = img.decodeImage(pngBytes);
           if (decodedImage != null) {
-            escPosBytes += generator.imageRaster(decodedImage, imageFn: PosImageFn.graphics);
+            escPosBytes += generator.imageRaster(decodedImage, imageFn: PosImageFn.bitImageRaster);
+            escPosBytes += generator.feed(1);
           }
         }
 
@@ -639,10 +640,11 @@ class PrintingService {
             data: Uint8List.fromList(escPosBytes),
             useRawDatatype: true,
           );
+          debugPrint('ESC/POS sent successfully: ${escPosBytes.length} bytes');
           return;
         }
       } catch (e) {
-        debugPrint('Raw label printing failed: $e. Falling back to default direct print.');
+        throw Exception('ESC/POS failed: $e');
       }
     }
 

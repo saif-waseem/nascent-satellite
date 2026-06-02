@@ -374,9 +374,8 @@ class PrintingService {
                       pw.BarcodeWidget(
                         barcode: pw.Barcode.code128(),
                         data: barcode,
-                        width: barcodeWidth,
-                        height: barcodeHeight,
                         drawText: false, 
+
                       ),
                       if (showBarcodeText) ...[
                         pw.SizedBox(height: 1),
@@ -487,8 +486,6 @@ class PrintingService {
                         pw.BarcodeWidget(
                           barcode: pw.Barcode.code128(),
                           data: item.barcode,
-                          width: barcodeWidth,
-                          height: barcodeHeight,
                           drawText: false, 
                         ),
                         if (showBarcodeText) ...[
@@ -629,8 +626,13 @@ class PrintingService {
           final pngBytes = await page.toPng();
           final img.Image? decodedImage = img.decodeImage(pngBytes);
           if (decodedImage != null) {
-            escPosBytes += generator.imageRaster(decodedImage, imageFn: PosImageFn.bitImageRaster);
-            escPosBytes += generator.feed(1);
+            final grayImage = img.grayscale(decodedImage);
+            final imageBytes = generator.imageRaster(
+              grayImage,
+              imageFn: PosImageFn.graphics,
+            );
+            escPosBytes.addAll(imageBytes);
+            escPosBytes.addAll(generator.feed(1));
           }
         }
 

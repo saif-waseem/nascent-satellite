@@ -62,8 +62,9 @@ jobs:
         run: |
           cd st
           flutter clean
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
           flutter pub get
-          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - Store Admin
@@ -82,8 +83,9 @@ jobs:
         run: |
           cd po
           flutter clean
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
           flutter pub get
-          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - POS Cashier
@@ -101,8 +103,9 @@ jobs:
         run: |
           cd ua
           flutter clean
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
           flutter pub get
-          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - User App

@@ -50,14 +50,6 @@ jobs:
               "$pbx"
           fi
 
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \;
-
       - name: Remove incompatible packages
         run: |
           sed -i '' '/windows_printer/d' po/pubspec.yaml
@@ -68,11 +60,23 @@ jobs:
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' po/pubspec.yaml
           rm -f po/pubspec.lock
 
-      - name: Build POS Cashier
+      - name: Flutter pub get
         run: |
           cd po
           flutter clean
           flutter pub get
+
+      - name: Patch connectivity_plus
+        run: |
+          find /Users/runner/.pub-cache/hosted/pub.dev \
+            -name "PathMonitorConnectivityProvider.swift" \
+            -exec sed -i '' \
+            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
+            {} \; || true
+
+      - name: Build POS Cashier
+        run: |
+          cd po
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - POS Cashier
@@ -134,14 +138,6 @@ jobs:
               "$pbx"
           fi
 
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \;
-
       - name: Remove incompatible packages
         run: |
           sed -i '' '/windows_printer/d' ecommerce_saas/apps/store_admin/pubspec.yaml
@@ -152,11 +148,23 @@ jobs:
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' ecommerce_saas/apps/store_admin/pubspec.yaml
           rm -f ecommerce_saas/apps/store_admin/pubspec.lock
 
-      - name: Build Store Admin
+      - name: Flutter pub get
         run: |
           cd ecommerce_saas/apps/store_admin
           flutter clean
           flutter pub get
+
+      - name: Patch connectivity_plus
+        run: |
+          find /Users/runner/.pub-cache/hosted/pub.dev \
+            -name "PathMonitorConnectivityProvider.swift" \
+            -exec sed -i '' \
+            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
+            {} \; || true
+
+      - name: Build Store Admin
+        run: |
+          cd ecommerce_saas/apps/store_admin
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - Store Admin
@@ -218,14 +226,6 @@ jobs:
               "$pbx"
           fi
 
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \;
-
       - name: Remove incompatible packages
         run: |
           sed -i '' '/windows_printer/d' ecommerce_saas/apps/user_app/pubspec.yaml
@@ -236,11 +236,23 @@ jobs:
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' ecommerce_saas/apps/user_app/pubspec.yaml
           rm -f ecommerce_saas/apps/user_app/pubspec.lock
 
-      - name: Build User App
+      - name: Flutter pub get
         run: |
           cd ecommerce_saas/apps/user_app
           flutter clean
           flutter pub get
+
+      - name: Patch connectivity_plus
+        run: |
+          find /Users/runner/.pub-cache/hosted/pub.dev \
+            -name "PathMonitorConnectivityProvider.swift" \
+            -exec sed -i '' \
+            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
+            {} \; || true
+
+      - name: Build User App
+        run: |
+          cd ecommerce_saas/apps/user_app
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - User App

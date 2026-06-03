@@ -12,7 +12,7 @@ import '../../features/reports/data/report_repository.dart';
 import 'package:intl/intl.dart';
 import 'bluetooth_printing_service.dart';
 import 'package:image/image.dart' as img;
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+
 
 class PrintingService {
   final PrinterSettingsRepository _repo;
@@ -305,43 +305,14 @@ class PrintingService {
     final arabicFont = await _loadArabicFont();
     final pdf = pw.Document();
 
-    PdfPageFormat pageFormat;
-    double barcodeWidth;
-    double barcodeHeight;
-    double fontSize;
-
-    if (settings.labelPreset == LabelPreset.custom) {
-      pageFormat = PdfPageFormat(
-        settings.customWidth * PdfPageFormat.mm,
-        settings.customHeight > 0 ? settings.customHeight * PdfPageFormat.mm : 30 * PdfPageFormat.mm,
-        marginAll: 0,
-      );
-      barcodeWidth = (settings.customWidth - (settings.customMargin * 2)) * PdfPageFormat.mm;
-      barcodeHeight = (settings.customHeight > 0 ? settings.customHeight * 0.35 : 10) * PdfPageFormat.mm;
-      fontSize = settings.customWidth < 40 ? 8 : 10;
-    } else {
-      switch (settings.labelPreset) {
-        case LabelPreset.jewelry3020:
-          pageFormat = const PdfPageFormat(30 * PdfPageFormat.mm, 19 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 24 * PdfPageFormat.mm;
-          barcodeHeight = 5 * PdfPageFormat.mm;
-          fontSize = 7.5;
-          break;
-        case LabelPreset.shipping100150:
-          pageFormat = const PdfPageFormat(100 * PdfPageFormat.mm, 149 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 80 * PdfPageFormat.mm;
-          barcodeHeight = 25 * PdfPageFormat.mm;
-          fontSize = 16;
-          break;
-        case LabelPreset.standard4030:
-        default:
-          pageFormat = const PdfPageFormat(40 * PdfPageFormat.mm, 29 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 34 * PdfPageFormat.mm;
-          barcodeHeight = 7 * PdfPageFormat.mm;
-          fontSize = 9;
-          break;
-      }
-    }
+    final pageFormat = PdfPageFormat(
+      40 * PdfPageFormat.mm,
+      30 * PdfPageFormat.mm,
+      marginAll: 0,
+    );
+    final barcodeWidth = 34 * PdfPageFormat.mm;
+    final barcodeHeight = 8 * PdfPageFormat.mm;
+    final fontSize = 9.0;
     
     for (int i = 0; i < count; i++) {
       pdf.addPage(
@@ -374,8 +345,9 @@ class PrintingService {
                       pw.BarcodeWidget(
                         barcode: pw.Barcode.code128(),
                         data: barcode,
+                        width: barcodeWidth,
+                        height: barcodeHeight,
                         drawText: false, 
-
                       ),
                       if (showBarcodeText) ...[
                         pw.SizedBox(height: 1),
@@ -416,43 +388,14 @@ class PrintingService {
     final arabicFont = await _loadArabicFont();
     final pdf = pw.Document();
 
-    PdfPageFormat pageFormat;
-    double barcodeWidth;
-    double barcodeHeight;
-    double fontSize;
-
-    if (settings.labelPreset == LabelPreset.custom) {
-      pageFormat = PdfPageFormat(
-        settings.customWidth * PdfPageFormat.mm,
-        settings.customHeight > 0 ? settings.customHeight * PdfPageFormat.mm : 30 * PdfPageFormat.mm,
-        marginAll: 0,
-      );
-      barcodeWidth = (settings.customWidth - (settings.customMargin * 2)) * PdfPageFormat.mm;
-      barcodeHeight = (settings.customHeight > 0 ? settings.customHeight * 0.35 : 10) * PdfPageFormat.mm;
-      fontSize = settings.customWidth < 40 ? 8 : 10;
-    } else {
-      switch (settings.labelPreset) {
-        case LabelPreset.jewelry3020:
-          pageFormat = const PdfPageFormat(30 * PdfPageFormat.mm, 19 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 24 * PdfPageFormat.mm;
-          barcodeHeight = 5 * PdfPageFormat.mm;
-          fontSize = 7.5;
-          break;
-        case LabelPreset.shipping100150:
-          pageFormat = const PdfPageFormat(100 * PdfPageFormat.mm, 149 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 80 * PdfPageFormat.mm;
-          barcodeHeight = 25 * PdfPageFormat.mm;
-          fontSize = 16;
-          break;
-        case LabelPreset.standard4030:
-        default:
-          pageFormat = const PdfPageFormat(40 * PdfPageFormat.mm, 29 * PdfPageFormat.mm, marginAll: 0);
-          barcodeWidth = 34 * PdfPageFormat.mm;
-          barcodeHeight = 7 * PdfPageFormat.mm;
-          fontSize = 9;
-          break;
-      }
-    }
+    final pageFormat = PdfPageFormat(
+      40 * PdfPageFormat.mm,
+      30 * PdfPageFormat.mm,
+      marginAll: 0,
+    );
+    final barcodeWidth = 34 * PdfPageFormat.mm;
+    final barcodeHeight = 8 * PdfPageFormat.mm;
+    final fontSize = 9.0;
     
     for (final item in items) {
       for (int i = 0; i < item.count; i++) {
@@ -486,6 +429,8 @@ class PrintingService {
                         pw.BarcodeWidget(
                           barcode: pw.Barcode.code128(),
                           data: item.barcode,
+                          width: barcodeWidth,
+                          height: barcodeHeight,
                           drawText: false, 
                         ),
                         if (showBarcodeText) ...[
@@ -617,32 +562,21 @@ class PrintingService {
 
     if (isLabel && !kIsWeb && defaultTargetPlatform == TargetPlatform.windows && printerName != null && printerName.isNotEmpty) {
       try {
-        final profile = await CapabilityProfile.load(name: 'default');
-        final paperSize = (effectiveFormat.width / PdfPageFormat.mm < 60) ? PaperSize.mm58 : PaperSize.mm80;
-        final generator = Generator(paperSize, profile);
-        List<int> escPosBytes = [];
-
+        final allBytes = <int>[];
         await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
           final pngBytes = await page.toPng();
-          final img.Image? decodedImage = img.decodeImage(pngBytes);
-          if (decodedImage != null) {
-            final grayImage = img.grayscale(decodedImage);
-            final imageBytes = generator.imageRaster(
-              grayImage,
-              imageFn: PosImageFn.graphics,
-            );
-            escPosBytes.addAll(imageBytes);
-            escPosBytes.addAll(generator.feed(1));
+          final decoded = img.decodeImage(pngBytes);
+          if (decoded != null) {
+            allBytes.addAll(_buildEscPosImageBytes(decoded));
           }
         }
-
-        if (escPosBytes.isNotEmpty) {
+        if (allBytes.isNotEmpty) {
           await WindowsPrinter.printRawData(
             printerName: printerName,
-            data: Uint8List.fromList(escPosBytes),
+            data: Uint8List.fromList(allBytes),
             useRawDatatype: true,
           );
-          debugPrint('ESC/POS sent successfully: ${escPosBytes.length} bytes');
+          debugPrint('ESC/POS sent: ${allBytes.length} bytes');
           return;
         }
       } catch (e) {
@@ -708,14 +642,46 @@ class PrintingService {
     try {
       return await pdf.save();
     } catch (e) {
-      if (e.toString().contains('UTF-8')) {
-        _cachedArabicFont = null;
-      }
-      final emptyPdf = pw.Document();
-      final errorMsg = e.toString().replaceAll(RegExp(r'[^\x00-\x7F]+'), '');
-      emptyPdf.addPage(pw.Page(build: (context) => pw.Text('Error generating PDF: $errorMsg')));
-      return await emptyPdf.save();
+      debugPrint('Failed to save PDF: $e');
+      // Create empty fallback
+      final empty = pw.Document();
+      empty.addPage(pw.Page(build: (context) => pw.Center(child: pw.Text('Error generating PDF'))));
+      return await empty.save();
     }
+  }
+
+  List<int> _buildEscPosImageBytes(img.Image image) {
+    final gray = img.grayscale(image);
+    final width = gray.width;
+    final height = gray.height;
+    final bytesPerLine = (width + 7) ~/ 8;
+    final bytes = <int>[];
+    
+    // GS v 0 - Raster bit image command
+    bytes.addAll([
+      0x1D, 0x76, 0x30, 0x00,
+      bytesPerLine & 0xFF,
+      (bytesPerLine >> 8) & 0xFF,
+      height & 0xFF,
+      (height >> 8) & 0xFF,
+    ]);
+    
+    for (int y = 0; y < height; y++) {
+      for (int xb = 0; xb < bytesPerLine; xb++) {
+        int byteVal = 0;
+        for (int bit = 0; bit < 8; bit++) {
+          final x = xb * 8 + bit;
+          if (x < width) {
+            final pixel = gray.getPixel(x, y);
+            if (pixel.luminanceNormalized < 0.5) {
+              byteVal |= (0x80 >> bit);
+            }
+          }
+        }
+        bytes.add(byteVal);
+      }
+    }
+    return bytes;
   }
 
   Future<void> openCashDrawer() async {

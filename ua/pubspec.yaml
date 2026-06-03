@@ -7,10 +7,10 @@ environment:
   sdk: ^3.10.4
 
 dependencies:
-  cloud_firestore: '>=6.3.0 <6.5.0'
-  firebase_auth: ^6.5.1
-  firebase_core: ^4.9.0
-  firebase_messaging: ^16.2.0
+  cloud_firestore: ^6.5.0
+  firebase_auth: ^6.5.0
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
   flutter:
     sdk: flutter
   flutter_hooks: ^0.21.3+1

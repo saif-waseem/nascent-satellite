@@ -63,6 +63,7 @@ jobs:
           cd st
           flutter clean
           flutter pub get
+          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - Store Admin
@@ -82,6 +83,7 @@ jobs:
           cd po
           flutter clean
           flutter pub get
+          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - POS Cashier
@@ -100,6 +102,7 @@ jobs:
           cd ua
           flutter clean
           flutter pub get
+          flutter pub upgrade cloud_firestore
           flutter build macos --release --no-tree-shake-icons
 
       - name: Create DMG - User App

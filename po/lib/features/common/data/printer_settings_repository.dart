@@ -23,6 +23,13 @@ enum LabelPreset {
   custom,       // مخصص
 }
 
+enum LabelPrinterProtocol {
+  auto,
+  tspl,
+  zpl,
+  pdf,
+}
+
 class PrinterSettings {
   final String? receiptPrinterId;
   final String? labelPrinterId;
@@ -30,6 +37,7 @@ class PrinterSettings {
   final PaperType paperType;
   final ReceiptPreset receiptPreset;
   final LabelPreset labelPreset;
+  final LabelPrinterProtocol labelProtocol;
   
   // Custom Dimensions (in mm)
   final double customWidth;
@@ -51,6 +59,7 @@ class PrinterSettings {
     this.paperType = PaperType.thermal80mm,
     this.receiptPreset = ReceiptPreset.thermal80,
     this.labelPreset = LabelPreset.standard4030,
+    this.labelProtocol = LabelPrinterProtocol.auto,
     this.customWidth = 80,
     this.customHeight = 0, // 0 means continuous/auto
     this.customMargin = 2,
@@ -67,6 +76,7 @@ class PrinterSettings {
     PaperType? paperType,
     ReceiptPreset? receiptPreset,
     LabelPreset? labelPreset,
+    LabelPrinterProtocol? labelProtocol,
     double? customWidth,
     double? customHeight,
     double? customMargin,
@@ -82,6 +92,7 @@ class PrinterSettings {
       paperType: paperType ?? this.paperType,
       receiptPreset: receiptPreset ?? this.receiptPreset,
       labelPreset: labelPreset ?? this.labelPreset,
+      labelProtocol: labelProtocol ?? this.labelProtocol,
       customWidth: customWidth ?? this.customWidth,
       customHeight: customHeight ?? this.customHeight,
       customMargin: customMargin ?? this.customMargin,
@@ -100,6 +111,7 @@ class PrinterSettingsRepository {
   static const String _paperTypeKey = 'paper_type';
   static const String _receiptPresetKey = 'receipt_preset';
   static const String _labelPresetKey = 'label_preset';
+  static const String _labelProtocolKey = 'label_protocol';
   static const String _customWidthKey = 'custom_width';
   static const String _customHeightKey = 'custom_height';
   static const String _customMarginKey = 'custom_margin';
@@ -126,6 +138,12 @@ class PrinterSettingsRepository {
       orElse: () => LabelPreset.standard4030
     );
 
+    final labelProtocolStr = prefs.getString(_labelProtocolKey);
+    final labelProtocol = LabelPrinterProtocol.values.firstWhere(
+      (e) => e.name == labelProtocolStr,
+      orElse: () => LabelPrinterProtocol.auto
+    );
+
     return PrinterSettings(
       receiptPrinterId: prefs.getString(_receiptKey),
       labelPrinterId: prefs.getString(_labelKey),
@@ -133,8 +151,9 @@ class PrinterSettingsRepository {
       paperType: paperType,
       receiptPreset: receiptPreset,
       labelPreset: labelPreset,
-      customWidth: prefs.getDouble(_customWidthKey) ?? 80,
-      customHeight: prefs.getDouble(_customHeightKey) ?? 0,
+      labelProtocol: labelProtocol,
+      customWidth: prefs.getDouble(_customWidthKey) ?? 40,
+      customHeight: prefs.getDouble(_customHeightKey) ?? 30,
       customMargin: prefs.getDouble(_customMarginKey) ?? 2,
       useBluetooth: prefs.getBool(_useBluetoothKey) ?? false,
       bluetoothPrinterMac: prefs.getString(_bluetoothMacKey),
@@ -183,6 +202,11 @@ class PrinterSettingsRepository {
   Future<void> saveLabelPreset(LabelPreset preset) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_labelPresetKey, preset.name);
+  }
+
+  Future<void> saveLabelProtocol(LabelPrinterProtocol protocol) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_labelProtocolKey, protocol.name);
   }
 
   Future<void> saveCustomDimensions({double? width, double? height, double? margin}) async {

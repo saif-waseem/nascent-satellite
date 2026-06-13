@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../data/printer_settings_repository.dart';
 import '../../data/app_settings_repository.dart';
 import '../../../../core/utils/printing_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DevicesTab extends HookConsumerWidget {
   const DevicesTab({super.key});
@@ -155,51 +156,46 @@ class DevicesTab extends HookConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // --- Label Presets ---
-            const Text('حجم ملصقات الباركود:', style: TextStyle(fontSize: 14, color: Colors.grey)),
+            // --- Label Printer Protocol ---
+            const Text('بروتوكول طابعة الباركود:', style: TextStyle(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildPresetCard(
-                    title: 'Jewelry Label',
-                    subtitle: '30x20mm',
-                    isSelected: pSettings.labelPreset == LabelPreset.jewelry3020,
-                    onTap: () => _updateLabelPreset(ref, LabelPreset.jewelry3020),
-                    icon: Icons.sell,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildPresetCard(
-                    title: 'Standard Label',
-                    subtitle: '40x30mm',
-                    isSelected: pSettings.labelPreset == LabelPreset.standard4030,
-                    onTap: () => _updateLabelPreset(ref, LabelPreset.standard4030),
-                    icon: Icons.label,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildPresetCard(
-                    title: 'Shipping Label',
-                    subtitle: '100x150mm',
-                    isSelected: pSettings.labelPreset == LabelPreset.shipping100150,
-                    onTap: () => _updateLabelPreset(ref, LabelPreset.shipping100150),
-                    icon: Icons.local_shipping,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildPresetCard(
-                    title: 'Custom',
-                    subtitle: 'مخصص',
-                    isSelected: pSettings.labelPreset == LabelPreset.custom,
-                    onTap: () => _updateLabelPreset(ref, LabelPreset.custom),
-                    icon: Icons.settings_overscan,
-                  ),
-                ],
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.blue.withOpacity(0.3))),
+              color: Colors.blue.withOpacity(0.02),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<LabelPrinterProtocol>(
+                      value: pSettings.labelProtocol,
+                      decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      items: const [
+                        DropdownMenuItem(value: LabelPrinterProtocol.auto, child: Text('تلقائي (Auto)')),
+                        DropdownMenuItem(value: LabelPrinterProtocol.tspl, child: Text('TSPL (Xprinter/TSC/GP)')),
+                        DropdownMenuItem(value: LabelPrinterProtocol.zpl, child: Text('ZPL (Zebra)')),
+                        DropdownMenuItem(value: LabelPrinterProtocol.pdf, child: Text('PDF (عام - عبر الويندوز)')),
+                      ],
+                      onChanged: (val) async {
+                        if (val != null) {
+                          await ref.read(printerSettingsRepositoryProvider).saveLabelProtocol(val);
+                          ref.invalidate(printerSettingsProvider);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('اتركه تلقائي - البرنامج يكتشف النوع المناسب', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
               ),
             ),
 
-            if (pSettings.receiptPreset == ReceiptPreset.custom || pSettings.labelPreset == LabelPreset.custom) ...[
+            if (pSettings.receiptPreset == ReceiptPreset.custom || pSettings.labelProtocol != LabelPrinterProtocol.pdf) ...[
               const SizedBox(height: 32),
-              const Text('إعدادات القياس المخصص (Custom Size)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
+              const Text('إعدادات القياس والأبعاد (بالمليمتر)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -451,6 +447,44 @@ class DevicesTab extends HookConsumerWidget {
                   ),
                 ),
                 if (printerName != null) ...[
+                  if (!title.contains('الوصلات')) ...[
+                    HookBuilder(
+                      builder: (context) {
+                        final testHeightController = useTextEditingController(text: '30');
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // حقل النص الصغير لتحديد الارتفاع بالمليمتر
+                            SizedBox(
+                              width: 100, // عرض مناسب ومحجوز للحقل الصغير
+                              child: TextField(
+                                controller: testHeightController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: "ارتفاع الاختبار (mm)",
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            
+                            // الزر الحالي الخاص بك بعد التعديل ليستدعي المعامل الجديد
+                            ElevatedButton(
+                              onPressed: () async {
+                                // استخراج القيمة أو اعتماد 30 كقيمة افتراضية عند الفشل
+                                final double targetHeight = double.tryParse(testHeightController.text) ?? 30.0;
+                                
+                                await ref.read(printingServiceProvider).printBlankLabelTest(heightMm: targetHeight);
+                              },
+                              child: const Text("اختبار الطباعة"),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   IconButton(
                     icon: const Icon(Icons.print_outlined, color: Colors.blue),
                     tooltip: 'طباعة صفحة تجريبية',

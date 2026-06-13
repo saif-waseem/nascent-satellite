@@ -1,6 +1,9 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,6 +14,7 @@ import '../../features/common/data/printer_settings_repository.dart';
 import '../../features/reports/data/report_repository.dart';
 import 'package:intl/intl.dart';
 import 'bluetooth_printing_service.dart';
+import 'tspl_generator.dart';
 import 'package:image/image.dart' as img;
 
 
@@ -301,80 +305,13 @@ class PrintingService {
     bool showPrice = true,
     bool showBarcodeText = true,
   }) async {
-    final settings = await _repo.getSettings();
-    final arabicFont = await _loadArabicFont();
-    final pdf = pw.Document();
-
-    final pageFormat = PdfPageFormat(
-      40 * PdfPageFormat.mm,
-      30 * PdfPageFormat.mm,
-      marginAll: 0,
+    await printAllBarcodeLabels(
+      items: [(name: name, barcode: barcode, price: price, count: count)],
+      currency: currency,
+      showName: showName,
+      showPrice: showPrice,
+      showBarcodeText: showBarcodeText,
     );
-    final barcodeWidth = 34 * PdfPageFormat.mm;
-    final barcodeHeight = 8 * PdfPageFormat.mm;
-    final fontSize = 9.0;
-    
-    for (int i = 0; i < count; i++) {
-      pdf.addPage(
-        pw.Page(
-          pageFormat: pageFormat,
-          theme: _createTheme(arabicFont),
-          build: (pw.Context context) {
-            return pw.Directionality(
-              textDirection: pw.TextDirection.rtl,
-              child: pw.Center(
-                child: pw.Container(
-                  width: pageFormat.availableWidth,
-                  height: pageFormat.availableHeight,
-                  child: pw.Column(
-                    mainAxisAlignment: pw.MainAxisAlignment.center,
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      if (showName) ...[
-                        pw.Text(
-                          name.trim().isEmpty ? 'غير مصنف' : name, 
-                          style: pw.TextStyle(
-                            fontSize: name.length > 25 ? fontSize * 0.8 : fontSize, 
-                            fontWeight: pw.FontWeight.bold
-                          ), 
-                          textAlign: pw.TextAlign.center, 
-                          maxLines: 2,
-                        ),
-                        pw.SizedBox(height: 1.5),
-                      ],
-                      pw.BarcodeWidget(
-                        barcode: pw.Barcode.code128(),
-                        data: barcode,
-                        width: barcodeWidth,
-                        height: barcodeHeight,
-                        drawText: false, 
-                      ),
-                      if (showBarcodeText) ...[
-                        pw.SizedBox(height: 1),
-                        pw.Text(
-                          barcode, 
-                          style: pw.TextStyle(fontSize: fontSize * 0.7, fontWeight: pw.FontWeight.bold)
-                        ),
-                      ],
-                      if (showPrice) ...[
-                        pw.SizedBox(height: 0.5),
-                        pw.Text(
-                          '${_formatPrice(price)} $currency', 
-                          style: pw.TextStyle(fontSize: fontSize * 0.9, fontWeight: pw.FontWeight.bold)
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    final Uint8List pdfBytes = await _saveWithRecovery(pdf);
-    await _printPdf(pdfBytes, settings.labelPrinterId, format: pageFormat, useDirectPrint: settings.labelPrinterId != null, isLabel: true);
   }
 
   Future<void> printAllBarcodeLabels({
@@ -385,68 +322,142 @@ class PrintingService {
     bool showBarcodeText = true,
   }) async {
     final settings = await _repo.getSettings();
+    final printerName = settings.labelPrinterId;
+    
+    if (settings.labelProtocol == LabelPrinterProtocol.tspl) {
+      await _printRawTspl(items, printerName, currency, showName, showPrice, showBarcodeText, settings);
+    } else {
+      await _printWithPackage(items, printerName, currency, showName, showPrice, showBarcodeText, settings);
+    }
+  }
+
+  Future<void> _printRawTspl(
+    List<({String name, String barcode, double price, int count})> items,
+    String? printerName,
+    String currency,
+    bool showName,
+    bool showPrice,
+    bool showBarcodeText,
+    PrinterSettings settings,
+  ) async {
+    final pageW = settings.customWidth > 0 ? settings.customWidth.toDouble() : 40.0;
+    final pageH = settings.customHeight > 0 ? settings.customHeight.toDouble() : 30.0;
+
+    final batch = <int>[];
+    
+    // تم إزالة أوامر SIZE و GAP و DIRECTION. 
+    // إرسالها برمجياً قد يلغي معايرة الطابعة الداخلية ويتسبب في تخطي ملصقات.
+    // يجب الاعتماد على معايرة حساس الطابعة الفيزيائي.
+
+    for (final item in items) {
+      for (int i = 0; i < item.count; i++) {
+        batch.addAll(await buildOneLabel(
+          name: showName ? item.name : '',
+          price: showPrice ? _formatPrice(item.price) : '',
+          barcode: item.barcode,
+          currency: currency,
+          widthMm: pageW,
+          heightMm: pageH,
+        ));
+      }
+    }
+
+    if (batch.isEmpty) return;
+    
+    final useBluetooth = settings.useBluetoothForLabels;
+    final bluetoothMac = settings.bluetoothLabelPrinterMac;
+
+    if (useBluetooth && bluetoothMac != null) {
+       try {
+         final connected = await bluetoothPrinterProvider.connect(bluetoothMac);
+         if (connected) {
+           await bluetoothPrinterProvider.printCustomImage(Uint8List.fromList(batch));
+           await bluetoothPrinterProvider.disconnect();
+         }
+       } catch (e) {
+          debugPrint('Bluetooth raw print error: $e');
+       }
+       return;
+    }
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows && printerName != null && printerName.isNotEmpty) {
+      try {
+        await WindowsPrinter.printRawData(
+          printerName: printerName,
+          data: Uint8List.fromList(batch),
+          useRawDatatype: true,
+        );
+      } catch (e) {
+        debugPrint('Raw TSPL printing failed: $e');
+      }
+    }
+  }
+
+  Future<void> _printWithPackage(
+    List<({String name, String barcode, double price, int count})> items,
+    String? printerName,
+    String currency,
+    bool showName,
+    bool showPrice,
+    bool showBarcodeText,
+    PrinterSettings settings,
+  ) async {
     final arabicFont = await _loadArabicFont();
     final pdf = pw.Document();
 
-    final pageFormat = PdfPageFormat(
-      40 * PdfPageFormat.mm,
-      30 * PdfPageFormat.mm,
+    final pageW = settings.customWidth > 0 ? settings.customWidth.toDouble() : 40.0;
+    final pageH = settings.customHeight > 0 ? settings.customHeight.toDouble() : 30.0;
+
+    // مقاس الصفحة الفعلي (يجب أن يتطابق مع الويندوز)
+    final customPageFormat = PdfPageFormat(
+      pageW * PdfPageFormat.mm, 
+      pageH * PdfPageFormat.mm, 
       marginAll: 0,
     );
-    final barcodeWidth = 34 * PdfPageFormat.mm;
-    final barcodeHeight = 8 * PdfPageFormat.mm;
-    final fontSize = 9.0;
     
     for (final item in items) {
       for (int i = 0; i < item.count; i++) {
         pdf.addPage(
           pw.Page(
-            pageFormat: pageFormat,
+            pageFormat: customPageFormat,
             theme: _createTheme(arabicFont),
             build: (pw.Context context) {
               return pw.Directionality(
                 textDirection: pw.TextDirection.rtl,
                 child: pw.Center(
-                  child: pw.Container(
-                    width: pageFormat.availableWidth,
-                    height: pageFormat.availableHeight,
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.all(1),
                     child: pw.Column(
-                      mainAxisAlignment: pw.MainAxisAlignment.center,
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: pw.CrossAxisAlignment.center,
                       children: [
-                        if (showName) ...[
+                        if (showName && item.name.isNotEmpty)
                           pw.Text(
-                            item.name.trim().isEmpty ? 'غير مصنف' : item.name, 
-                            style: pw.TextStyle(
-                              fontSize: item.name.length > 25 ? fontSize * 0.8 : fontSize, 
-                              fontWeight: pw.FontWeight.bold
-                            ), 
-                            textAlign: pw.TextAlign.center, 
-                            maxLines: 2,
-                          ),
-                          pw.SizedBox(height: 1.5),
-                        ],
-                        pw.BarcodeWidget(
-                          barcode: pw.Barcode.code128(),
-                          data: item.barcode,
-                          width: barcodeWidth,
-                          height: barcodeHeight,
-                          drawText: false, 
-                        ),
-                        if (showBarcodeText) ...[
+                            item.name.trim().isEmpty ? 'غير مصنف' : item.name.trim(),
+                            style: pw.TextStyle(font: arabicFont, fontSize: 8),
+                            maxLines: 1,
+                            overflow: pw.TextOverflow.clip,
+                          )
+                        else
                           pw.SizedBox(height: 1),
-                          pw.Text(
-                            item.barcode, 
-                            style: pw.TextStyle(fontSize: fontSize * 0.7, fontWeight: pw.FontWeight.bold)
+
+                        pw.Container(
+                          height: 28,
+                          child: pw.BarcodeWidget(
+                            barcode: pw.Barcode.code128(),
+                            data: item.barcode,
+                            drawText: showBarcodeText,
+                            textStyle: pw.TextStyle(font: arabicFont, fontSize: 7, fontWeight: pw.FontWeight.bold),
                           ),
-                        ],
-                        if (showPrice) ...[
-                          pw.SizedBox(height: 0.5),
+                        ),
+
+                        if (showPrice)
                           pw.Text(
-                            '${_formatPrice(item.price)} $currency', 
-                            style: pw.TextStyle(fontSize: fontSize * 0.9, fontWeight: pw.FontWeight.bold)
-                          ),
-                        ],
+                            '${_formatPrice(item.price)} $currency',
+                            style: pw.TextStyle(font: arabicFont, fontSize: 9, fontWeight: pw.FontWeight.bold),
+                          )
+                        else
+                          pw.SizedBox(height: 1),
                       ],
                     ),
                   ),
@@ -458,8 +469,73 @@ class PrintingService {
       }
     }
 
-    final Uint8List pdfBytes = await _saveWithRecovery(pdf);
-    await _printPdf(pdfBytes, settings.labelPrinterId, format: pageFormat, useDirectPrint: settings.labelPrinterId != null, isLabel: true);
+    if (pdf.document.pdfPageList.pages.isNotEmpty) {
+      final Uint8List pdfBytes = await _saveWithRecovery(pdf);
+      
+      await _printPdf(
+        pdfBytes, 
+        printerName, 
+        format: customPageFormat, 
+        useDirectPrint: printerName != null && printerName.isNotEmpty, 
+        isLabel: true,
+        usePrinterSettings: false, // إجبار الويندوز على مقاس الكود لمنع الفراغات
+        dynamicLayout: false,
+      );
+    }
+  }
+
+  Future<void> printBlankLabelTest({required double heightMm}) async {
+    final settings = await _repo.getSettings();
+    final printerName = settings.labelPrinterId;
+    
+    // العرض يبقى ثابتاً بناءً على إعداداتك الفعالية أو القيمة الافتراضية 40
+    final double rawW = settings.customWidth > 0 ? settings.customWidth : 40.0;
+
+    // تحويل المقاسات إلى نقاط الطباعة الخاصة بـ PdfPageFormat
+    final double exactWidth = rawW * PdfPageFormat.mm;
+    final double exactHeight = heightMm * PdfPageFormat.mm;
+    
+    final customPageFormat = PdfPageFormat(exactWidth, exactHeight, marginAll: 0);
+
+    final doc = pw.Document();
+    
+    // نفس الكود السابق الخاص بك تماماً لبناء الصفحات (على سبيل المثال الـ 3 صفحات)
+    for (int i = 0; i < 3; i++) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: customPageFormat,
+          build: (pw.Context context) {
+            return pw.Center(
+              child: pw.Text("Test ${i + 1}", style: pw.TextStyle(fontSize: 10)),
+            );
+          },
+        ),
+      );
+    }
+
+    // أمر الطباعة الفعلي
+    if (doc.document.pdfPageList.pages.isNotEmpty && printerName != null && printerName.isNotEmpty) {
+      Printer? printer;
+      try {
+        final printers = await Printing.listPrinters();
+        printer = printers.firstWhere(
+            (p) => p.name == printerName || p.url == printerName);
+      } catch (_) {
+        printer = Printer(url: printerName, name: printerName);
+      }
+      
+      final bytes = await doc.save();
+      await Printing.directPrintPdf(
+        printer: printer, 
+        format: customPageFormat, 
+        usePrinterSettings: false, // لضمان تمرير الارتفاع المخصص من الكود للويندوز
+        dynamicLayout: false, 
+        onLayout: (PdfPageFormat format) async => bytes,
+      );
+    } else {
+      final bytes = await doc.save();
+      await Printing.layoutPdf(onLayout: (_) async => bytes, format: customPageFormat);
+    }
   }
 
   Future<void> printPurchaseInvoice(PurchaseInvoiceModel invoice) async {
@@ -556,33 +632,9 @@ class PrintingService {
     await _printPdf(pdfBytes, settings.receiptPrinterId, format: pageFormat, useDirectPrint: settings.receiptPrinterId != null, isLabel: false);
   }
 
-  Future<void> _printPdf(Uint8List pdfBytes, String? printerName, {PdfPageFormat? format, bool useDirectPrint = false, bool isLabel = false}) async {
+  Future<void> _printPdf(Uint8List pdfBytes, String? printerName, {PdfPageFormat? format, bool useDirectPrint = false, bool isLabel = false, bool usePrinterSettings = false, bool dynamicLayout = true}) async {
     final settings = await _repo.getSettings();
     final effectiveFormat = format ?? PdfPageFormat.roll80;
-
-    if (isLabel && !kIsWeb && defaultTargetPlatform == TargetPlatform.windows && printerName != null && printerName.isNotEmpty) {
-      try {
-        final allBytes = <int>[];
-        await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
-          final pngBytes = await page.toPng();
-          final decoded = img.decodeImage(pngBytes);
-          if (decoded != null) {
-            allBytes.addAll(_buildEscPosImageBytes(decoded));
-          }
-        }
-        if (allBytes.isNotEmpty) {
-          await WindowsPrinter.printRawData(
-            printerName: printerName,
-            data: Uint8List.fromList(allBytes),
-            useRawDatatype: true,
-          );
-          debugPrint('ESC/POS sent: ${allBytes.length} bytes');
-          return;
-        }
-      } catch (e) {
-        throw Exception('ESC/POS failed: $e');
-      }
-    }
 
     if (useDirectPrint && printerName != null && printerName.isNotEmpty) {
       try {
@@ -603,12 +655,14 @@ class PrintingService {
           printer: printer,
           onLayout: (PdfPageFormat f) async => pdfBytes,
           format: effectiveFormat,
+          usePrinterSettings: usePrinterSettings,
+          dynamicLayout: dynamicLayout,
         );
         return;
       } catch (e) {
         debugPrint('Direct print failed: $e. Falling back to layoutPdf.');
       }
-    } 
+    }
 
     final useBluetooth = isLabel ? settings.useBluetoothForLabels : settings.useBluetooth;
     final bluetoothMac = isLabel ? settings.bluetoothLabelPrinterMac : settings.bluetoothPrinterMac;

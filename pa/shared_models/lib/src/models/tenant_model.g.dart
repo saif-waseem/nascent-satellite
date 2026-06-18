@@ -50,6 +50,9 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       isPosEnabled: fields[29] as bool,
       posExpiryDate: fields[30] as DateTime?,
       posActivationCode: fields[31] as String?,
+      isCarsEnabled: fields[34] as bool,
+      carsExpiryDate: fields[35] as DateTime?,
+      carsActivationCode: fields[36] as String?,
       appType: fields[33] as String,
     );
   }
@@ -57,7 +60,7 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
   @override
   void write(BinaryWriter writer, TenantModel obj) {
     writer
-      ..writeByte(34)
+      ..writeByte(37)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -94,6 +97,12 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       ..write(obj.posExpiryDate)
       ..writeByte(31)
       ..write(obj.posActivationCode)
+      ..writeByte(34)
+      ..write(obj.isCarsEnabled)
+      ..writeByte(35)
+      ..write(obj.carsExpiryDate)
+      ..writeByte(36)
+      ..write(obj.carsActivationCode)
       ..writeByte(33)
       ..write(obj.appType)
       ..writeByte(14)

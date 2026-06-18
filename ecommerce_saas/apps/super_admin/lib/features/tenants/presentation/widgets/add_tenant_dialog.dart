@@ -102,29 +102,43 @@ class AddTenantDialog extends HookConsumerWidget {
         ),
         FilledButton(
           onPressed: () async {
-            if (nameController.text.isEmpty || idController.text.isEmpty || adminIdController.text.isEmpty) return;
+            if (nameController.text.trim().isEmpty || idController.text.trim().isEmpty || adminIdController.text.trim().isEmpty) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('الرجاء ملء الحقول الإلزامية (اسم المتجر، المعرف، معرف المسئول)')),
+                );
+              }
+              return;
+            }
             
-            // Check if tenant exists first to preserve isActive status if it's an "edit/refresh"
-            final service = ref.read(superAdminFirestoreServiceProvider);
-            
-            final newTenant = TenantModel(
-              id: idController.text.trim(),
-              name: nameController.text.trim(),
-              adminIds: [adminIdController.text.trim()],
-              logoUrl: logoController.text.trim().isEmpty ? null : logoController.text.trim(),
-              primaryColor: colorController.text.trim().isEmpty ? '#2196F3' : colorController.text.trim(),
-              whatsappNumber: whatsappController.text.trim(),
-              oneSignalAppId: oneSignalIdController.text.trim().isEmpty ? null : oneSignalIdController.text.trim(),
-              oneSignalRestKey: oneSignalKeyController.text.trim().isEmpty ? null : oneSignalKeyController.text.trim(),
-              managerName: managerNameController.text.trim(),
-              managerPhone: managerPhoneController.text.trim(),
-              description: descriptionController.text.trim(),
-              createdAt: DateTime.now(),
-              isActive: false,
-            );
-            
-            await service.addTenant(newTenant);
-            if (context.mounted) Navigator.pop(context);
+            try {
+              final service = ref.read(superAdminFirestoreServiceProvider);
+              
+              final newTenant = TenantModel(
+                id: idController.text.trim(),
+                name: nameController.text.trim(),
+                adminIds: [adminIdController.text.trim()],
+                logoUrl: logoController.text.trim().isEmpty ? null : logoController.text.trim(),
+                primaryColor: colorController.text.trim().isEmpty ? '#2196F3' : colorController.text.trim(),
+                whatsappNumber: whatsappController.text.trim(),
+                oneSignalAppId: oneSignalIdController.text.trim().isEmpty ? null : oneSignalIdController.text.trim(),
+                oneSignalRestKey: oneSignalKeyController.text.trim().isEmpty ? null : oneSignalKeyController.text.trim(),
+                managerName: managerNameController.text.trim(),
+                managerPhone: managerPhoneController.text.trim(),
+                description: descriptionController.text.trim(),
+                createdAt: DateTime.now(),
+                isActive: false,
+              );
+              
+              await service.addTenant(newTenant);
+              if (context.mounted) Navigator.pop(context);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('حدث خطأ أثناء الإضافة: $e')),
+                );
+              }
+            }
           },
           child: Text(AppStrings.get('save', lang)),
         ),

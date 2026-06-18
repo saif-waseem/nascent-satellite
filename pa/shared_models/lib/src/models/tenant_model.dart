@@ -41,6 +41,12 @@ class TenantModel extends Equatable {
   final DateTime? posExpiryDate; // [NEW]
   @HiveField(31)
   final String? posActivationCode; // [NEW]
+  @HiveField(34)
+  final bool isCarsEnabled; // [NEW]
+  @HiveField(35)
+  final DateTime? carsExpiryDate; // [NEW]
+  @HiveField(36)
+  final String? carsActivationCode; // [NEW]
   @HiveField(33)
   final String appType; // [NEW] 'retail', 'restaurant', 'cars', etc.
   
@@ -114,6 +120,9 @@ class TenantModel extends Equatable {
     this.isPosEnabled = false,
     this.posExpiryDate,
     this.posActivationCode,
+    this.isCarsEnabled = false,
+    this.carsExpiryDate,
+    this.carsActivationCode,
     this.appType = 'retail',
   });
 
@@ -152,6 +161,9 @@ class TenantModel extends Equatable {
         isPosEnabled,
         posExpiryDate,
         posActivationCode,
+        isCarsEnabled,
+        carsExpiryDate,
+        carsActivationCode,
         appType,
       ];
 
@@ -190,6 +202,9 @@ class TenantModel extends Equatable {
       'isPosEnabled': isPosEnabled,
       'posExpiryDate': posExpiryDate?.toIso8601String(),
       'posActivationCode': posActivationCode,
+      'isCarsEnabled': isCarsEnabled,
+      'carsExpiryDate': carsExpiryDate?.toIso8601String(),
+      'carsActivationCode': carsActivationCode,
       'appType': appType,
     };
   }
@@ -236,6 +251,9 @@ class TenantModel extends Equatable {
       isPosEnabled: json['isPosEnabled'] as bool? ?? false,
       posExpiryDate: json['posExpiryDate'] != null ? _parseDate(json['posExpiryDate']) : null,
       posActivationCode: json['posActivationCode'] as String?,
+      isCarsEnabled: json['isCarsEnabled'] as bool? ?? false,
+      carsExpiryDate: json['carsExpiryDate'] != null ? _parseDate(json['carsExpiryDate']) : null,
+      carsActivationCode: json['carsActivationCode'] as String?,
       appType: json['appType'] as String? ?? 'retail',
     );
   }
@@ -274,6 +292,9 @@ class TenantModel extends Equatable {
     bool? isPosEnabled,
     DateTime? posExpiryDate,
     String? posActivationCode,
+    bool? isCarsEnabled,
+    DateTime? carsExpiryDate,
+    String? carsActivationCode,
     String? appType,
   }) {
     return TenantModel(
@@ -310,6 +331,9 @@ class TenantModel extends Equatable {
       isPosEnabled: isPosEnabled ?? this.isPosEnabled,
       posExpiryDate: posExpiryDate ?? this.posExpiryDate,
       posActivationCode: posActivationCode ?? this.posActivationCode,
+      isCarsEnabled: isCarsEnabled ?? this.isCarsEnabled,
+      carsExpiryDate: carsExpiryDate ?? this.carsExpiryDate,
+      carsActivationCode: carsActivationCode ?? this.carsActivationCode,
       appType: appType ?? this.appType,
     );
   }

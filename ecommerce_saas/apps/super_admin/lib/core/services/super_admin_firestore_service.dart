@@ -114,14 +114,10 @@ class SuperAdminFirestoreService {
       data['id'] = doc.id;
       final tenant = TenantModel.fromJson(data);
       
-      // Determine existing expiry or start fresh
       final now = DateTime.now();
       final currentExpiry = tenant.posExpiryDate;
-      
-      // If no expiry yet, or it's in the past, start from now.
-      // Otherwise, add to the existing future expiry date.
-      final startDate = (currentExpiry == null || currentExpiry.isBefore(now)) 
-          ? now 
+      final startDate = (currentExpiry == null || currentExpiry.isBefore(now))
+          ? now
           : currentExpiry;
           
       final newExpiry = startDate.add(Duration(days: months * 30));
@@ -134,18 +130,53 @@ class SuperAdminFirestoreService {
       
       await updateTenant(updated);
 
-      // Also log the activation
       await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
-        'date': FieldValue.serverTimestamp(),
-        'months': months,
-        'code': code,
-        'expiryAfter': newExpiry.toIso8601String(),
+        'activationCode': code,
+        'expiryDate': newExpiry.toIso8601String(),
+        'timestamp': FieldValue.serverTimestamp(),
         'type': 'POS_RENEWAL_OR_ACTIVATION',
       });
-      
+
       print('DEBUG SUPER_ADMIN: POS Activation successful for $tenantId. New expiry: $newExpiry');
     } catch (e, stack) {
       print('CRITICAL ERROR during activatePosSubscription: $e');
+      print(stack);
+      rethrow;
+    }
+  }
+
+  Future<void> activateCarsModule(String tenantId, String code, int daysToAdd) async {
+    try {
+      final tenantDoc = await _db.collection('tenants').doc(tenantId).get();
+      if (!tenantDoc.exists) throw Exception('Tenant not found');
+
+      final data = tenantDoc.data()!;
+      data['id'] = tenantDoc.id;
+      final tenant = TenantModel.fromJson(data);
+
+      DateTime baseDate = DateTime.now();
+      if (tenant.carsExpiryDate != null && tenant.carsExpiryDate!.isAfter(baseDate)) {
+        baseDate = tenant.carsExpiryDate!;
+      }
+
+      final newExpiry = baseDate.add(Duration(days: daysToAdd));
+
+      await _db.collection('tenants').doc(tenantId).update({
+        'isCarsEnabled': true,
+        'carsExpiryDate': newExpiry.toIso8601String(),
+        'carsActivationCode': code,
+      });
+
+      await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
+        'activationCode': code,
+        'expiryDate': newExpiry.toIso8601String(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'CARS_RENEWAL_OR_ACTIVATION',
+      });
+
+      print('DEBUG SUPER_ADMIN: Cars Activation successful for $tenantId. New expiry: $newExpiry');
+    } catch (e, stack) {
+      print('CRITICAL ERROR during activateCarsModule: $e');
       print(stack);
       rethrow;
     }
@@ -210,7 +241,22 @@ class SuperAdminFirestoreService {
     await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
       'date': FieldValue.serverTimestamp(),
       'type': 'POS_PERMANENT_ACTIVATION',
-      'code': code,
+    });
+  }
+
+  Future<void> permanentlyActivateCars(String tenantId, String code) async {
+    await _db.collection('tenants').doc(tenantId).update({
+      'isCarsEnabled': true,
+      'carsExpiryDate': null, // null means permanent
+      'carsActivationCode': code,
+    });
+
+    // Also log the activation
+    await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
+      'activationCode': code,
+      'expiryDate': 'PERMANENT',
+      'timestamp': FieldValue.serverTimestamp(),
+      'type': 'CARS_PERMANENT_ACTIVATION',
     });
   }
 

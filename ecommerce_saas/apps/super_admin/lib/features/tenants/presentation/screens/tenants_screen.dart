@@ -115,10 +115,18 @@ class _TenantCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(context, AppStrings.get('expiry', lang), 
-                  tenant.expiryDate != null ? DateFormat('yyyy/MM/dd').format(tenant.expiryDate!) : 'N/A'),
-                _buildInfoRow(context, AppStrings.get('activation_code', lang), tenant.activationCode ?? '-', isActivationCode: true),
-                const SizedBox(height: 16),
+                if (tenant.isPosEnabled || tenant.isStoreEnabled || (tenant.activationCode != null && tenant.activationCode!.isNotEmpty)) ...[
+                  _buildInfoRow(context, 'انتهاء الكاشير/المتجر', 
+                    tenant.expiryDate != null ? '${DateFormat('yyyy/MM/dd').format(tenant.expiryDate!)} (${_getRemainingDays(tenant.expiryDate!)})' : 'N/A'),
+                  _buildInfoRow(context, 'كود الكاشير/المتجر', tenant.activationCode ?? '-', isActivationCode: true),
+                  const SizedBox(height: 8),
+                ],
+                if (tenant.isCarsEnabled || (tenant.carsActivationCode != null && tenant.carsActivationCode!.isNotEmpty)) ...[
+                  _buildInfoRow(context, 'انتهاء السيارات', 
+                    tenant.carsExpiryDate != null ? '${DateFormat('yyyy/MM/dd').format(tenant.carsExpiryDate!)} (${_getRemainingDays(tenant.carsExpiryDate!)})' : 'N/A'),
+                  _buildInfoRow(context, 'كود السيارات', tenant.carsActivationCode ?? '-', isActivationCode: true),
+                  const SizedBox(height: 8),
+                ],
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -168,6 +176,14 @@ class _TenantCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _getRemainingDays(DateTime expiryDate) {
+    final now = DateTime.now();
+    final difference = expiryDate.difference(now).inDays;
+    if (difference < 0) return 'منتهي';
+    if (difference == 0) return 'ينتهي اليوم';
+    return 'باقي $difference يوم';
   }
 
   Widget _buildInfoRow(BuildContext context, String label, String value, {bool isActivationCode = false}) {

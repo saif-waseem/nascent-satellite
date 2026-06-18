@@ -15,8 +15,10 @@ class SubscriptionDialog extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final monthsController = useTextEditingController(text: '12');
     final posMonthsController = useTextEditingController(text: '12');
+    final carsDaysController = useTextEditingController(text: '365');
     final codeController = useTextEditingController(text: 'ACT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
     final posCodeController = useTextEditingController(text: 'POS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+    final carsCodeController = useTextEditingController(text: 'CAR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
 
     return AlertDialog(
       title: Text('${AppStrings.get('manage_subscription', lang)} - ${tenant.name}'),
@@ -87,6 +89,37 @@ class SubscriptionDialog extends HookConsumerWidget {
             const SizedBox(height: 16),
             const Divider(),
 
+            // --- Cars Section ---
+            _TitleSection(title: lang == 'ar' ? 'تفعيل نظام السيارات (عقود)' : 'Cars Activation'),
+            Text('${lang == 'ar' ? 'صلاحية اشتراك السيارات' : 'Cars Expiry'}: ${tenant.carsExpiryDate != null ? DateFormat('yyyy/MM/dd').format(tenant.carsExpiryDate!) : 'Permanent / None'}'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                 Expanded(
+                   child: TextField(
+                     controller: carsDaysController,
+                     decoration: InputDecoration(
+                       labelText: lang == 'ar' ? 'فترة التجديد' : 'Renewal Period',
+                       suffixText: lang == 'ar' ? 'أيام' : 'Days',
+                       hintText: 'مثال: 365',
+                     ),
+                     keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: false),
+                   ),
+                 ),
+                 const SizedBox(width: 8),
+                 ElevatedButton(
+                   onPressed: () async {
+                     final days = int.tryParse(carsDaysController.text) ?? 365;
+                     await ref.read(superAdminFirestoreServiceProvider).activateCarsModule(tenant.id, carsCodeController.text.trim(), days);
+                     if (context.mounted) Navigator.pop(context);
+                   },
+                   child: Text(AppStrings.get('activate', lang)),
+                 )
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(),
+
             _TitleSection(title: lang == 'ar' ? 'تفعيل دائمي' : 'Permanent Activation'),
             Row(
               children: [
@@ -122,6 +155,25 @@ class SubscriptionDialog extends HookConsumerWidget {
                     if (context.mounted) Navigator.pop(context);
                   },
                   child: Text('مبيعات دائم'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: carsCodeController,
+                    decoration: InputDecoration(labelText: 'كود السيارات (Cars) الجديد'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () async {
+                    await ref.read(superAdminFirestoreServiceProvider).permanentlyActivateCars(tenant.id, carsCodeController.text.trim());
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  child: Text('سيارات دائم'),
                 ),
               ],
             ),

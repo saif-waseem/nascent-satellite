@@ -17,6 +17,7 @@ service cloud.firestore {
 
     // --- Core Tenant Settings ---
     match /tenants/{tenantId} {
+      // Allow unauthenticated reads so apps can verify activation codes during login/activation
       allow read: if true;
       allow write: if isSuperAdmin() || isAuthenticated();
     }
@@ -139,6 +140,11 @@ service cloud.firestore {
 
     match /system_config/{configId} {
       allow read: if isAuthenticated();
+    }
+
+    // --- Cars App specific collections ---
+    match /car_contracts/{contractId} {
+      allow read, write: if isTenantUser();
     }
   }
 }

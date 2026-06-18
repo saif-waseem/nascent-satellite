@@ -16,54 +16,9 @@ import '../../presentation/providers/product_providers.dart';
 import '../../../suppliers/presentation/providers/suppliers_provider.dart';
 import 'dart:async';
 import '../../../../core/widgets/smart_image.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 import 'package:flutter/foundation.dart';
 
-class _BarcodeScannerDialog extends StatelessWidget {
-  const _BarcodeScannerDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        width: 400,
-        height: 400,
-        child: Stack(
-          children: [
-            MobileScanner(
-              onDetect: (capture) {
-                final List<Barcode> barcodes = capture.barcodes;
-                if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                  Navigator.pop(context, barcodes.first.rawValue);
-                }
-              },
-            ),
-            Positioned(
-              top: 16,
-              left: 16,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            const Positioned(
-              bottom: 24,
-              left: 0,
-              right: 0,
-              child: Text(
-                'قم بتوجيه الكاميرا نحو الباركود',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 16, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class ProductFormScreen extends HookConsumerWidget {
   final ProductModel? product;
@@ -372,7 +327,7 @@ class ProductFormScreen extends HookConsumerWidget {
                                             onPressed: () async {
                                               final result = await showDialog<String>(
                                                 context: context,
-                                                builder: (ctx) => const _BarcodeScannerDialog(),
+                                                builder: (ctx) => const BarcodeScannerDialog(),
                                               );
                                               if (result != null && result.isNotEmpty) {
                                                 barcodeController.text = result;

@@ -26,6 +26,7 @@ class EditTenantDialog extends HookConsumerWidget {
     
     final isStoreEnabled = useState(tenant.isStoreEnabled);
     final isPosEnabled = useState(tenant.isPosEnabled);
+    final isCarsEnabled = useState(tenant.isCarsEnabled);
 
     return AlertDialog(
       title: Text(lang == 'ar' ? 'تعديل المتجر' : 'Edit Store'),
@@ -116,17 +117,30 @@ class EditTenantDialog extends HookConsumerWidget {
               },
             ),
             const SizedBox(height: 24),
+            const SizedBox(height: 16),
             Text(lang == 'ar' ? 'تفعيل البرامج' : 'App Activation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Divider(),
-            SwitchListTile(
-              title: Text(lang == 'ar' ? 'تفعيل المتجر (Store App)' : 'Enable Store App'),
-              value: isStoreEnabled.value,
-              onChanged: (v) => isStoreEnabled.value = v,
-            ),
-            SwitchListTile(
-              title: Text(lang == 'ar' ? 'تفعيل مبيعات (POS App)' : 'Enable POS App'),
-              value: isPosEnabled.value,
-              onChanged: (v) => isPosEnabled.value = v,
+            Card(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: Text(lang == 'ar' ? 'تفعيل المتجر (للعملاء)' : 'Store Enabled'),
+                    value: isStoreEnabled.value,
+                    onChanged: (v) => isStoreEnabled.value = v,
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: Text(lang == 'ar' ? 'تفعيل المبيعات (نقطة البيع - POS)' : 'POS Enabled'),
+                    value: isPosEnabled.value,
+                    onChanged: (v) => isPosEnabled.value = v,
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: Text(lang == 'ar' ? 'تفعيل السيارات (العقود)' : 'Cars Enabled'),
+                    value: isCarsEnabled.value,
+                    onChanged: (v) => isCarsEnabled.value = v,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -154,7 +168,8 @@ class EditTenantDialog extends HookConsumerWidget {
               description: descriptionController.text.trim(),
               isStoreEnabled: isStoreEnabled.value,
               isPosEnabled: isPosEnabled.value,
-              isActive: isStoreEnabled.value || isPosEnabled.value, // Keep legacy flag consistent
+              isCarsEnabled: isCarsEnabled.value,
+              isActive: isStoreEnabled.value || isPosEnabled.value || isCarsEnabled.value, // Keep legacy flag consistent
             );
             
             await service.updateTenant(updatedTenant);

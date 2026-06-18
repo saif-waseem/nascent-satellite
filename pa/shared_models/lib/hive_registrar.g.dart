@@ -14,6 +14,7 @@ import 'package:shared_models/src/models/staff_member_model.dart';
 import 'package:shared_models/src/models/supplier_model.dart';
 import 'package:shared_models/src/models/tenant_model.dart';
 import 'package:shared_models/src/models/user_model.dart';
+import 'package:shared_models/src/models/car_contract_model.dart';
 
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
@@ -37,5 +38,6 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(SupplierModelAdapter());
     registerAdapter(TenantModelAdapter());
     registerAdapter(UserModelAdapter());
+    registerAdapter(CarContractModelAdapter());
   }
 }

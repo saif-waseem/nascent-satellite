@@ -13,7 +13,8 @@ import '../../../products/presentation/providers/category_provider.dart';
 import '../../../customers/presentation/providers/customer_providers.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../../../../core/providers/permissions_provider.dart';
-import '../../../suppliers/presentation/widgets/barcode_scanner_widget.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
+
 import '../../../../core/utils/printing_service.dart';
 import '../widgets/variant_picker_dialog.dart';
 import '../../../common/data/app_settings_repository.dart';
@@ -688,64 +689,56 @@ class _ProductSelectionPanel extends HookConsumerWidget {
       ),
     );
   }
-
-  void _showScannerDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+  void _showScannerDialog(BuildContext context, WidgetRef ref) async {
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('مسح الباركود'),
-        content: SizedBox(
-          width: 350,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                BarcodeScannerWidget(
-                  onDetect: (barcode) async {
-                    final tenantId = ref.read(tenantIdProvider);
-                    final product = await ref.read(productRepositoryProvider).getProductByBarcode(tenantId, barcode);
-                    
-                    if (product != null) {
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        if (product.variants.isNotEmpty) {
-                           final variant = await showDialog<sm.ProductVariant>(
-                              context: context,
-                              builder: (ctx) => VariantPickerDialog(product: product),
-                            );
-                            if (variant == null) return;
-                            ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                              productId: product.id,
-                              productName: product.name,
-                              quantity: 1,
-                              unitPrice: variant.price ?? product.price,
-                              category: product.category,
-                              variantColor: variant.color,
-                              variantSize: variant.size,
-                            ));
-                        } else {
-                          ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                            productId: product.id,
-                            productName: product.name,
-                            quantity: 1,
-                            unitPrice: product.price,
-                            category: product.category,
-                          ));
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('تمت إضافة: ${product.name}'), duration: const Duration(seconds: 1)),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء المربع'))],
-      ),
+      builder: (ctx) => const BarcodeScannerDialog(),
     );
+    if (result != null && result.isNotEmpty) {
+      final tenantId = ref.read(tenantIdProvider);
+      final product = await ref.read(productRepositoryProvider).getProductByBarcode(tenantId, result);
+      
+      if (product != null) {
+        if (context.mounted) {
+          if (product.variants.isNotEmpty) {
+             final variant = await showDialog<sm.ProductVariant>(
+               context: context,
+               builder: (ctx) => VariantPickerDialog(product: product),
+             );
+             if (variant != null) {
+               ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
+                 productId: product.id,
+                 productName: product.name,
+                 quantity: 1,
+                 unitPrice: variant.price ?? product.price,
+                 category: product.category,
+                 variantColor: variant.color,
+                 variantSize: variant.size,
+               ));
+             } else {
+               return; // Canceled variant selection
+             }
+          } else {
+             ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
+               productId: product.id,
+               productName: product.name,
+               quantity: 1,
+               unitPrice: product.price,
+               category: product.category,
+             ));
+          }
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('تمت إضافة: ${product.name}'), duration: const Duration(seconds: 1)),
+            );
+          }
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المنتج غير موجود')));
+        }
+      }
+    }
   }
 }
 

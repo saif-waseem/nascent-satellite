@@ -6,7 +6,8 @@ import '../../../../core/providers/tenant_provider.dart';
 import 'purchase_invoice_detail_screen.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../../../core/utils/printing_service.dart';
-import '../widgets/barcode_scanner_widget.dart';
+
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 
 final allPurchaseInvoicesProvider = FutureProvider.autoDispose((ref) {
   final tenantId = ref.watch(tenantIdProvider);
@@ -27,7 +28,7 @@ class PurchaseHistoryScreen extends HookConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () => _showScannerDialog(context, invoicesAsync.asData?.value ?? []),
+            onPressed: () => _openScanner(context, invoicesAsync.asData?.value ?? []),
           ),
         ],
         bottom: PreferredSize(
@@ -99,43 +100,22 @@ class PurchaseHistoryScreen extends HookConsumerWidget {
     );
   }
 
-  void _showScannerDialog(BuildContext context, List<PurchaseInvoiceModel> currentInvoices) {
-    showDialog(
+  void _openScanner(BuildContext context, List<PurchaseInvoiceModel> currentInvoices) async {
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('مسح كود الفاتورة'),
-        content: SizedBox(
-          width: 300,
-          height: 400,
-          child: Column(
-            children: [
-              Expanded(
-                child: BarcodeScannerWidget(
-                  onDetect: (barcode) async {
-                    // Try to find the invoice by ID
-                    final found = currentInvoices.where((inv) => inv.id == barcode).toList();
-                    if (found.isNotEmpty) {
-                      if (context.mounted) {
-                        Navigator.pop(context); // Close scanner dialog
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => PurchaseInvoiceDetailScreen(invoice: found.first)));
-                      }
-                    } else {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على الفاتورة')));
-                      }
-                    }
-                  },
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Text('وجه الكاميرا نحو الباركود/QR للفاتورة', style: TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
-              ),
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-            ],
-          ),
-        ),
-      ),
+      builder: (ctx) => const BarcodeScannerDialog(),
     );
+    if (result != null && result.isNotEmpty) {
+      final found = currentInvoices.where((inv) => inv.id == result).toList();
+      if (found.isNotEmpty) {
+        if (context.mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => PurchaseInvoiceDetailScreen(invoice: found.first)));
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على الفاتورة')));
+        }
+      }
+    }
   }
 }

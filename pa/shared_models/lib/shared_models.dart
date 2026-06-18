@@ -13,6 +13,7 @@ export 'src/models/product_storage_location.dart';
 export 'src/models/app_update_model.dart';
 export 'src/models/supplier_model.dart';
 export 'src/models/purchase_invoice_model.dart';
+export 'src/models/car_contract_model.dart';
 export 'src/models/sales_invoice_model.dart';
 export 'src/models/customer_model.dart';
 export 'src/models/expense_model.dart';

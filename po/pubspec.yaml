@@ -115,7 +115,7 @@ msix_config:
   publisher: CN=NascentSatellite
   architecture: x64
   identity_name: pos-app
-  msix_version: 1.8.4.0
+  msix_version: 1.9.0.0
   install_certificate: true
   certificate_path: pos_app_cert.pfx
   certificate_password: secret

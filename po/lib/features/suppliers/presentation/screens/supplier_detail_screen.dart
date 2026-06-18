@@ -6,7 +6,7 @@ import '../../data/purchase_repository.dart';
 import '../../../../../core/providers/tenant_provider.dart';
 import 'purchase_invoice_detail_screen.dart';
 import 'purchase_invoice_screen.dart';
-import '../widgets/barcode_scanner_widget.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 import '../../../products/presentation/providers/product_providers.dart' as pos_prod;
 
 class SupplierDetailScreen extends HookConsumerWidget {
@@ -215,18 +215,14 @@ class SupplierDetailScreen extends HookConsumerWidget {
     );
   }
   
-  void _openScanner(BuildContext context, WidgetRef ref, ValueNotifier<String> searchQuery) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScannerWidget(
-          onDetect: (barcode) {
-            searchQuery.value = barcode;
-            Navigator.pop(context);
-          },
-        ),
-      ),
+  void _openScanner(BuildContext context, WidgetRef ref, ValueNotifier<String> searchQuery) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const BarcodeScannerDialog(),
     );
+    if (result != null && result.isNotEmpty) {
+      searchQuery.value = result;
+    }
   }
 }
 

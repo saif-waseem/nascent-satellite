@@ -3,12 +3,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:shared_models/shared_models.dart';
 import '../widgets/add_item_dialog.dart';
-import '../widgets/barcode_scanner_widget.dart';
+
 import '../providers/purchase_invoice_provider.dart';
 import '../../../products/data/product_repository.dart' as pos_prod;
 import '../../data/purchase_repository.dart';
 import '../providers/suppliers_provider.dart';
 import '../../../../core/providers/tenant_provider.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 
 class PurchaseInvoiceScreen extends HookConsumerWidget {
   final SupplierModel? initialSupplier;
@@ -142,36 +143,33 @@ class PurchaseInvoiceScreen extends HookConsumerWidget {
     });
   }
 
-  void _openScanner(BuildContext context, WidgetRef ref, String tenantId) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => BarcodeScannerWidget(
-          onDetect: (barcode) async {
-            try {
-              final product = await ref.read(pos_prod.productRepositoryProvider).getProductByBarcode(tenantId, barcode);
-              if (product != null) {
-                if (context.mounted) {
-                  Navigator.pop(context); 
-                  _showAddItemDialog(context, ref, product);
-                }
-              } else {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('المنتج بالباركود $barcode غير موجود')),
-                  );
-                }
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('خطأ في المسح: $e')),
-                );
-              }
-            }
-          },
-        ),
-      ),
+  void _openScanner(BuildContext context, WidgetRef ref, String tenantId) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const BarcodeScannerDialog(),
     );
+    if (result != null && result.isNotEmpty) {
+      try {
+        final product = await ref.read(pos_prod.productRepositoryProvider).getProductByBarcode(tenantId, result);
+        if (product != null) {
+          if (context.mounted) {
+            _showAddItemDialog(context, ref, product);
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('المنتج بالباركود $result غير موجود')),
+            );
+          }
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ في المسح: $e')),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildSupplierHeader(BuildContext context, WidgetRef ref, PurchaseInvoiceModel invoice, PurchaseSessionManager manager, AsyncValue<List<SupplierModel>> suppliersAsync) {

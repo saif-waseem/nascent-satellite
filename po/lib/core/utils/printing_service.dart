@@ -488,6 +488,15 @@ class PrintingService {
     final settings = await _repo.getSettings();
     final printerName = settings.labelPrinterId;
     
+    if (settings.labelProtocol == LabelPrinterProtocol.tspl) {
+      final items = [
+        for (int i = 0; i < 3; i++)
+          (name: 'Test ${i + 1}', barcode: '12345678', price: 0.0, count: 1)
+      ];
+      await _printRawTspl(items, printerName, '', true, false, false, settings);
+      return;
+    }
+
     // العرض يبقى ثابتاً بناءً على إعداداتك الفعالية أو القيمة الافتراضية 40
     final double rawW = settings.customWidth > 0 ? settings.customWidth : 40.0;
 

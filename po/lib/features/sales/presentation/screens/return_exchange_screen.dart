@@ -5,7 +5,8 @@ import 'package:shared_models/shared_models.dart' as sm;
 import '../../data/sales_repository.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../../../products/data/product_repository.dart';
-import '../../../suppliers/presentation/widgets/barcode_scanner_widget.dart';
+import '../../../products/presentation/providers/product_providers.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 import '../widgets/variant_picker_dialog.dart';
 
 class ReturnExchangeScreen extends HookConsumerWidget {
@@ -51,22 +52,14 @@ class ReturnExchangeScreen extends HookConsumerWidget {
       }
     }
 
-    void showInvoiceScanner() {
-      showDialog(
+    void showInvoiceScanner() async {
+      final result = await showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('مسح باركود الوصل'),
-          content: BarcodeScannerWidget(
-            onDetect: (code) {
-              Navigator.pop(ctx);
-              searchInvoice(code);
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ],
-        ),
+        builder: (ctx) => const BarcodeScannerDialog(),
       );
+      if (result != null && result.isNotEmpty) {
+        searchInvoice(result);
+      }
     }
 
     // Calculations
@@ -432,30 +425,22 @@ class _ExchangeProductSearch extends HookConsumerWidget {
       isLoading.value = false;
     }
 
-    void showScanner() {
-      showDialog(
+    void showScanner() async {
+      final result = await showDialog<String>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('مسح باركود المادة البديلة'),
-          content: BarcodeScannerWidget(
-            onDetect: (barcode) async {
-              Navigator.pop(ctx);
-              final tenantId = ref.read(tenantIdProvider);
-              final product = await ref.read(productRepositoryProvider).getProductByBarcode(tenantId, barcode);
-              if (product != null) {
-                onProductData(product);
-              } else {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على المنتج')));
-                }
-              }
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ],
-        ),
+        builder: (ctx) => const BarcodeScannerDialog(),
       );
+      if (result != null && result.isNotEmpty) {
+        final tenantId = ref.read(tenantIdProvider);
+        final product = await ref.read(productRepositoryProvider).getProductByBarcode(tenantId, result);
+        if (product != null) {
+          onProductData(product);
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على المنتج')));
+          }
+        }
+      }
     }
 
     return Column(

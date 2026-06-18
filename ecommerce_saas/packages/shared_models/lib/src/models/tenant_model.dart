@@ -42,6 +42,12 @@ class TenantModel extends Equatable {
   final DateTime? posExpiryDate; // [NEW]
   @HiveField(31)
   final String? posActivationCode; // [NEW]
+  @HiveField(34)
+  final bool isCarsEnabled; // [NEW]
+  @HiveField(35)
+  final DateTime? carsExpiryDate; // [NEW]
+  @HiveField(36)
+  final String? carsActivationCode; // [NEW]
   
   // Loyalty Settings
   @HiveField(14)
@@ -113,6 +119,9 @@ class TenantModel extends Equatable {
     this.isPosEnabled = false,
     this.posExpiryDate,
     this.posActivationCode,
+    this.isCarsEnabled = false,
+    this.carsExpiryDate,
+    this.carsActivationCode,
   });
 
   @override
@@ -150,6 +159,9 @@ class TenantModel extends Equatable {
         isPosEnabled,
         posExpiryDate,
         posActivationCode,
+        isCarsEnabled,
+        carsExpiryDate,
+        carsActivationCode,
       ];
 
   Map<String, dynamic> toJson() {
@@ -187,6 +199,9 @@ class TenantModel extends Equatable {
       'isPosEnabled': isPosEnabled,
       'posExpiryDate': posExpiryDate?.toIso8601String(),
       'posActivationCode': posActivationCode,
+      'isCarsEnabled': isCarsEnabled,
+      'carsExpiryDate': carsExpiryDate?.toIso8601String(),
+      'carsActivationCode': carsActivationCode,
     };
   }
 
@@ -232,6 +247,9 @@ class TenantModel extends Equatable {
       isPosEnabled: json['isPosEnabled'] as bool? ?? false,
       posExpiryDate: json['posExpiryDate'] != null ? _parseDate(json['posExpiryDate']) : null,
       posActivationCode: json['posActivationCode'] as String?,
+      isCarsEnabled: json['isCarsEnabled'] as bool? ?? false,
+      carsExpiryDate: json['carsExpiryDate'] != null ? _parseDate(json['carsExpiryDate']) : null,
+      carsActivationCode: json['carsActivationCode'] as String?,
     );
   }
 
@@ -269,6 +287,9 @@ class TenantModel extends Equatable {
     bool? isPosEnabled,
     DateTime? posExpiryDate,
     String? posActivationCode,
+    bool? isCarsEnabled,
+    DateTime? carsExpiryDate,
+    String? carsActivationCode,
   }) {
     return TenantModel(
       id: id ?? this.id,
@@ -304,6 +325,9 @@ class TenantModel extends Equatable {
       isPosEnabled: isPosEnabled ?? this.isPosEnabled,
       posExpiryDate: posExpiryDate ?? this.posExpiryDate,
       posActivationCode: posActivationCode ?? this.posActivationCode,
+      isCarsEnabled: isCarsEnabled ?? this.isCarsEnabled,
+      carsExpiryDate: carsExpiryDate ?? this.carsExpiryDate,
+      carsActivationCode: carsActivationCode ?? this.carsActivationCode,
     );
   }
 }

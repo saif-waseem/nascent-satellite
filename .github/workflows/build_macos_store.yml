@@ -1,4 +1,4 @@
-name: Build macOS Store App
+name: Build macOS Elegant Madinaty Store App
 
 on:
   workflow_dispatch:

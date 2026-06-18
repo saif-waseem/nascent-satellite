@@ -1,4 +1,4 @@
-name: Build macOS Admin App
+name: Build macOS Store Admin App
 
 on:
   workflow_dispatch:
@@ -16,21 +16,21 @@ jobs:
           
       - name: Install Dependencies
         run: |
-          cd ecommerce_saas/apps/super_admin
+          cd ecommerce_saas/apps/store_admin
           flutter pub get
           
       - name: Build macOS App
         run: |
-          cd ecommerce_saas/apps/super_admin
+          cd ecommerce_saas/apps/store_admin
           flutter build macos --release --no-codesign
           
       - name: Zip App
         run: |
-          cd ecommerce_saas/apps/super_admin/build/macos/Build/Products/Release
-          zip -ry AdminApp-macOS.zip *.app
+          cd ecommerce_saas/apps/store_admin/build/macos/Build/Products/Release
+          zip -ry StoreAdminApp-macOS.zip *.app
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AdminApp-macOS
-          path: ecommerce_saas/apps/super_admin/build/macos/Build/Products/Release/AdminApp-macOS.zip
+          name: StoreAdminApp-macOS
+          path: ecommerce_saas/apps/store_admin/build/macos/Build/Products/Release/StoreAdminApp-macOS.zip

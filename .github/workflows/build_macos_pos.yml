@@ -1,0 +1,36 @@
+name: Build macOS POS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: Install Dependencies
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter pub get
+          
+      - name: Build macOS App
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter build macos --release --no-codesign
+          
+      - name: Zip App
+        run: |
+          cd ecommerce_saas/apps/pos_app/build/macos/Build/Products/Release
+          zip -ry POSApp-macOS.zip *.app
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: POSApp-macOS
+          path: ecommerce_saas/apps/pos_app/build/macos/Build/Products/Release/POSApp-macOS.zip

@@ -1,0 +1,36 @@
+name: Build macOS Store App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: Install Dependencies
+        run: |
+          cd ecommerce_saas/apps/user_app
+          flutter pub get
+          
+      - name: Build macOS App
+        run: |
+          cd ecommerce_saas/apps/user_app
+          flutter build macos --release --no-codesign
+          
+      - name: Zip App
+        run: |
+          cd ecommerce_saas/apps/user_app/build/macos/Build/Products/Release
+          zip -ry StoreApp-macOS.zip *.app
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StoreApp-macOS
+          path: ecommerce_saas/apps/user_app/build/macos/Build/Products/Release/StoreApp-macOS.zip

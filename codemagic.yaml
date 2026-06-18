@@ -1,0 +1,232 @@
+workflows:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. POS Cashier — macOS
+  # ─────────────────────────────────────────────────────────────────────────────
+  pos-macos:
+    name: "POS Cashier - macOS"
+    instance_type: mac_mini_m2
+    working_directory: po
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Remove Windows-only packages
+        script: |
+          sed -i '' '/windows_printer/d' pubspec.yaml
+          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
+          sed -i '' '/mobile_scanner/d' pubspec.yaml
+
+      - name: Fix cloud_firestore version
+        script: |
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
+
+      - name: Disable code signing
+        script: |
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build macOS
+        script: flutter build macos --release --no-tree-shake-icons
+
+    artifacts:
+      - build/macos/Build/Products/Release/**/*.app
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. Store Admin — macOS
+  # ─────────────────────────────────────────────────────────────────────────────
+  dar-london-store-admin-macos:
+    name: "Store Admin (Dar London) - macOS"
+    instance_type: mac_mini_m2
+    working_directory: ecommerce_saas/apps/store_admin
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Remove Windows-only packages
+        script: |
+          sed -i '' '/windows_printer/d' pubspec.yaml
+          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
+          sed -i '' '/mobile_scanner/d' pubspec.yaml
+
+      - name: Fix cloud_firestore version
+        script: |
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
+
+      - name: Disable code signing
+        script: |
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build macOS
+        script: flutter build macos --release --no-tree-shake-icons
+
+    artifacts:
+      - build/macos/Build/Products/Release/**/*.app
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. User App — Dar London Store macOS
+  # ─────────────────────────────────────────────────────────────────────────────
+  dar-london-user-app-macos:
+    name: "User App - Dar London Store - macOS"
+    instance_type: mac_mini_m2
+    working_directory: ecommerce_saas/apps/user_app
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Remove Windows-only packages
+        script: |
+          sed -i '' '/windows_printer/d' pubspec.yaml
+          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
+          sed -i '' '/mobile_scanner/d' pubspec.yaml
+
+      - name: Fix cloud_firestore version
+        script: |
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
+
+      - name: Disable code signing
+        script: |
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build macOS
+        script: flutter build macos --release --no-tree-shake-icons
+
+    artifacts:
+      - build/macos/Build/Products/Release/**/*.app
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. User App — Aneeka Madinaty Store macOS
+  # ─────────────────────────────────────────────────────────────────────────────
+  aneeka-madinaty-user-app-macos:
+    name: "User App - Aneeka Madinaty Store - macOS"
+    instance_type: mac_mini_m2
+    working_directory: ecommerce_saas/apps/user_app
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Remove Windows-only packages
+        script: |
+          sed -i '' '/windows_printer/d' pubspec.yaml
+          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
+          sed -i '' '/mobile_scanner/d' pubspec.yaml
+
+      - name: Fix cloud_firestore version
+        script: |
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          rm -f pubspec.lock
+
+      - name: Disable code signing
+        script: |
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build macOS
+        script: flutter build macos --release --no-tree-shake-icons
+
+    artifacts:
+      - build/macos/Build/Products/Release/**/*.app
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Cars App — macOS
+  # ─────────────────────────────────────────────────────────────────────────────
+  cars-app-macos:
+    name: "Cars Contracts App - macOS"
+    instance_type: mac_mini_m2
+    working_directory: ecommerce_saas/apps/cars_app
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Remove Windows-only packages
+        script: |
+          sed -i '' '/windows_printer/d' pubspec.yaml
+          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
+          sed -i '' '/mobile_scanner/d' pubspec.yaml
+
+      - name: Fix cloud_firestore version (not applicable for cars_app but kept for consistency)
+        script: |
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml || true
+          rm -f pubspec.lock
+
+      - name: Resolve local path dependency (shared_models)
+        script: |
+          # cars_app depends on pa/shared_models via relative path
+          # Codemagic working_directory is relative to repo root, so path resolves correctly
+          echo "Path dependency will resolve from repo root"
+
+      - name: Disable code signing
+        script: |
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EXPANDED_CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
+
+      - name: Flutter pub get
+        script: flutter pub get
+
+      - name: Build macOS
+        script: flutter build macos --release --no-tree-shake-icons
+
+    artifacts:
+      - build/macos/Build/Products/Release/**/*.app

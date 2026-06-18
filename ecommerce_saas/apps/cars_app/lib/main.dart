@@ -2,14 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'core/services/local_db_service.dart';
 import 'core/providers/tenant_provider.dart';
 import 'features/auth/presentation/screens/activation_screen.dart';
 import 'features/cars/presentation/screens/cars_dashboard_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocalDbService.init();
+
+  // Initialize Firebase SDK (same method as pos_app - fixes network issue)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Anonymous sign-in for Firestore security rules
+    await FirebaseAuth.instance.signInAnonymously();
+  } catch (e) {
+    debugPrint('Firebase init warning: $e');
+  }
+
   final prefs = await SharedPreferences.getInstance();
   runApp(ProviderScope(
     overrides: [

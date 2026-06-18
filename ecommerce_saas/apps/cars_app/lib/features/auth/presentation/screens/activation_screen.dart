@@ -3,8 +3,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/providers/tenant_provider.dart';
-import '../../../../core/services/firestore_rest_service.dart';
 import '../../../../core/services/local_db_service.dart';
 import '../../../../features/cars/presentation/screens/cars_dashboard_screen.dart';
 
@@ -22,19 +22,14 @@ class ActivationScreen extends HookConsumerWidget {
 
       isLoading.value = true;
       try {
-        final restService = ref.read(firestoreRestServiceProvider);
-        final results = await restService.runQuery('tenants', {
-          'where': {
-            'fieldFilter': {
-              'field': {'fieldPath': 'carsActivationCode'},
-              'op': 'EQUAL',
-              'value': {'stringValue': code}
-            }
-          },
-          'limit': 1
-        });
+        // Use Firebase SDK directly (same as pos_app) - avoids REST API network issues
+        final query = await FirebaseFirestore.instance
+            .collection('tenants')
+            .where('carsActivationCode', isEqualTo: code)
+            .limit(1)
+            .get();
 
-        if (results.isEmpty) {
+        if (query.docs.isEmpty) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('كود التفعيل غير صحيح')),
@@ -44,7 +39,8 @@ class ActivationScreen extends HookConsumerWidget {
           return;
         }
 
-        final tenantData = results.first;
+        final doc = query.docs.first;
+        final tenantData = {'id': doc.id, ...doc.data()};
         final tenant = TenantModel.fromJson(tenantData);
 
         if (!tenant.isCarsEnabled) {

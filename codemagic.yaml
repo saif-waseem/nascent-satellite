@@ -12,15 +12,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Remove Windows-only packages
+      - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
           sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-          sed -i '' '/mobile_scanner/d' pubspec.yaml
 
-      - name: Fix cloud_firestore version
+      - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_core:.*/firebase_core: ^4.10.0/' pubspec.yaml
+          sed -i '' 's/firebase_auth:.*/firebase_auth: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_storage:.*/firebase_storage: ^13.4.0/' pubspec.yaml
+          sed -i '' 's/firebase_messaging:.*/firebase_messaging: ^16.3.0/' pubspec.yaml
           rm -f pubspec.lock
 
       - name: Disable code signing
@@ -57,15 +60,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Remove Windows-only packages
+      - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
           sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-          sed -i '' '/mobile_scanner/d' pubspec.yaml
 
-      - name: Fix cloud_firestore version
+      - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_core:.*/firebase_core: ^4.10.0/' pubspec.yaml
+          sed -i '' 's/firebase_auth:.*/firebase_auth: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_storage:.*/firebase_storage: ^13.4.0/' pubspec.yaml
+          sed -i '' 's/firebase_messaging:.*/firebase_messaging: ^16.3.0/' pubspec.yaml
           rm -f pubspec.lock
 
       - name: Disable code signing
@@ -102,15 +108,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Remove Windows-only packages
+      - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
           sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-          sed -i '' '/mobile_scanner/d' pubspec.yaml
 
-      - name: Fix cloud_firestore version
+      - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_core:.*/firebase_core: ^4.10.0/' pubspec.yaml
+          sed -i '' 's/firebase_auth:.*/firebase_auth: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_storage:.*/firebase_storage: ^13.4.0/' pubspec.yaml
+          sed -i '' 's/firebase_messaging:.*/firebase_messaging: ^16.3.0/' pubspec.yaml
           rm -f pubspec.lock
 
       - name: Disable code signing
@@ -147,15 +156,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Remove Windows-only packages
+      - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
           sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-          sed -i '' '/mobile_scanner/d' pubspec.yaml
 
-      - name: Fix cloud_firestore version
+      - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_core:.*/firebase_core: ^4.10.0/' pubspec.yaml
+          sed -i '' 's/firebase_auth:.*/firebase_auth: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_storage:.*/firebase_storage: ^13.4.0/' pubspec.yaml
+          sed -i '' 's/firebase_messaging:.*/firebase_messaging: ^16.3.0/' pubspec.yaml
           rm -f pubspec.lock
 
       - name: Disable code signing
@@ -192,15 +204,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Remove Windows-only packages
+      - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
           sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-          sed -i '' '/mobile_scanner/d' pubspec.yaml
 
-      - name: Fix cloud_firestore version (not applicable for cars_app but kept for consistency)
+      - name: Fix Firebase package versions
         script: |
-          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml || true
+          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_core:.*/firebase_core: ^4.10.0/' pubspec.yaml
+          sed -i '' 's/firebase_auth:.*/firebase_auth: ^6.5.0/' pubspec.yaml
+          sed -i '' 's/firebase_storage:.*/firebase_storage: ^13.4.0/' pubspec.yaml
+          sed -i '' 's/firebase_messaging:.*/firebase_messaging: ^16.3.0/' pubspec.yaml
           rm -f pubspec.lock
 
       - name: Resolve local path dependency (shared_models)

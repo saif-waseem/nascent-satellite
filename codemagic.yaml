@@ -43,7 +43,7 @@ workflows:
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release
+        script: flutter build macos --release --no-tree-shake-icons
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -91,7 +91,7 @@ workflows:
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release
+        script: flutter build macos --release --no-tree-shake-icons
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -139,7 +139,7 @@ workflows:
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release
+        script: flutter build macos --release --no-tree-shake-icons
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -187,7 +187,7 @@ workflows:
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release
+        script: flutter build macos --release --no-tree-shake-icons
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -239,7 +239,7 @@ workflows:
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release
+        script: flutter build macos --release --no-tree-shake-icons
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app

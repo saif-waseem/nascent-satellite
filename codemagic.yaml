@@ -17,11 +17,6 @@ workflows:
           flutter clean
           rm -rf build/
 
-      - name: Remove incompatible packages
-        script: |
-          sed -i '' '/windows_printer/d' pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-
       - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
@@ -69,11 +64,6 @@ workflows:
         script: |
           flutter clean
           rm -rf build/
-
-      - name: Remove incompatible packages
-        script: |
-          sed -i '' '/windows_printer/d' pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
 
       - name: Fix Firebase package versions
         script: |
@@ -123,11 +113,6 @@ workflows:
           flutter clean
           rm -rf build/
 
-      - name: Remove incompatible packages
-        script: |
-          sed -i '' '/windows_printer/d' pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-
       - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
@@ -176,11 +161,6 @@ workflows:
           flutter clean
           rm -rf build/
 
-      - name: Remove incompatible packages
-        script: |
-          sed -i '' '/windows_printer/d' pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
-
       - name: Fix Firebase package versions
         script: |
           sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' pubspec.yaml
@@ -228,11 +208,6 @@ workflows:
         script: |
           flutter clean
           rm -rf build/
-
-      - name: Remove incompatible packages
-        script: |
-          sed -i '' '/windows_printer/d' pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' pubspec.yaml
 
       - name: Fix Firebase package versions
         script: |

@@ -29,6 +29,7 @@ class CarsDashboardScreen extends HookConsumerWidget {
     final currentPage = ref.watch(currentPageProvider);
     final settings = ref.watch(settingsProvider);
     final tenantId = ref.watch(tenantIdProvider);
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
 
     final pageLabels = {
       CarsPage.home: 'الواجهة الرئيسية',
@@ -40,47 +41,61 @@ class CarsDashboardScreen extends HookConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        appBar: isDesktop ? null : AppBar(
+          title: Text(pageLabels[currentPage]!, style: GoogleFonts.amiri(fontWeight: FontWeight.bold)),
+          backgroundColor: AppColors.lapis,
+          foregroundColor: Colors.white,
+          actions: [
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(color: const Color(0xFFe8f5e9), borderRadius: BorderRadius.circular(20)),
+              child: const Center(child: Text('● محمي', style: TextStyle(color: Color(0xFF2e7d32), fontSize: 12, fontWeight: FontWeight.w600))),
+            ),
+          ],
+        ),
+        drawer: isDesktop ? null : Drawer(
+          child: _Sidebar(
+            currentPage: currentPage,
+            settings: settings,
+            onNavigate: (page) {
+              ref.read(currentPageProvider.notifier).setPage(page);
+              Navigator.pop(context); // Close drawer
+            },
+          ),
+        ),
         body: Row(
           children: [
-            // ── SIDEBAR ──────────────────────────────────────────────
-            _Sidebar(
-              currentPage: currentPage,
-              settings: settings,
-              onNavigate: (page) => ref.read(currentPageProvider.notifier).setPage(page),
-            ),
-            // ── MAIN CONTENT ─────────────────────────────────────────
+            if (isDesktop)
+              _Sidebar(
+                currentPage: currentPage,
+                settings: settings,
+                onNavigate: (page) => ref.read(currentPageProvider.notifier).setPage(page),
+              ),
             Expanded(
               child: Column(
                 children: [
-                  // Top Bar
-                  Container(
-                    height: 60,
-                    color: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(bottom: BorderSide(color: AppColors.gold, width: 2)),
-                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          pageLabels[currentPage]!,
-                          style: GoogleFonts.amiri(fontSize: 20, color: AppColors.lapis, fontWeight: FontWeight.bold),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFe8f5e9),
-                            borderRadius: BorderRadius.circular(20),
+                  if (isDesktop)
+                    Container(
+                      height: 60,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(bottom: BorderSide(color: AppColors.gold, width: 2)),
+                        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(pageLabels[currentPage]!, style: GoogleFonts.amiri(fontSize: 20, color: AppColors.lapis, fontWeight: FontWeight.bold)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFFe8f5e9), borderRadius: BorderRadius.circular(20)),
+                            child: const Text('● محمي', style: TextStyle(color: Color(0xFF2e7d32), fontSize: 12, fontWeight: FontWeight.w600)),
                           ),
-                          child: const Text('● محمي', style: TextStyle(color: Color(0xFF2e7d32), fontSize: 12, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  // Page Content
                   Expanded(
                     child: Container(
                       color: AppColors.clay,
@@ -140,28 +155,31 @@ class _Sidebar extends StatelessWidget {
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0x4Dd4af37), width: 1)),
             ),
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                settings.logoImagePath != null
-                    ? ClipOval(
-                        child: Image.asset(settings.logoImagePath!, width: 64, height: 64, fit: BoxFit.cover),
-                      )
-                    : const Text('🚗', style: TextStyle(fontSize: 48)),
-                const SizedBox(height: 10),
-                Text(
-                  settings.officeName,
-                  style: GoogleFonts.amiri(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                const Text('نظام العقود', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              ],
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  settings.logoImagePath != null
+                      ? ClipOval(
+                          child: Image.asset(settings.logoImagePath!, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('🚗', style: TextStyle(fontSize: 48))),
+                        )
+                      : const Text('🚗', style: TextStyle(fontSize: 48)),
+                  const SizedBox(height: 10),
+                  Text(
+                    settings.officeName,
+                    style: GoogleFonts.amiri(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('نظام العقود', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
             ),
           ),
           // Nav Items
           Expanded(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               child: Column(
                 children: [
@@ -174,9 +192,12 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
           // Footer
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('Car Sales v1.3.0', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Car Sales v1.3.0', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+            ),
           ),
         ],
       ),
@@ -211,12 +232,14 @@ class _NavItem extends StatelessWidget {
           children: [
             Text(icon, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 10),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                color: isActive ? AppColors.gold : Colors.white70,
-                fontSize: 15,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.cairo(
+                  color: isActive ? AppColors.gold : Colors.white70,
+                  fontSize: 15,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
             ),
           ],
@@ -243,7 +266,7 @@ class _HomeView extends ConsumerWidget {
     final yearStart = DateTime(now.year, 1, 1);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(20),
       child: contractsAsync.when(
         data: (contracts) {
           final todayCount = contracts.where((c) => c.createdAt.isAfter(todayStart)).length;
@@ -251,12 +274,11 @@ class _HomeView extends ConsumerWidget {
           final yearCount = contracts.where((c) => c.createdAt.isAfter(yearStart)).length;
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Hero Card
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(36),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -266,7 +288,7 @@ class _HomeView extends ConsumerWidget {
                 child: Column(
                   children: [
                     if (settings.logoImagePath != null) ...[
-                      Image.asset(settings.logoImagePath!, height: 90),
+                      Image.asset(settings.logoImagePath!, height: 90, errorBuilder: (_,__,___) => const SizedBox()),
                       const SizedBox(height: 16),
                     ],
                     Text(
@@ -276,12 +298,13 @@ class _HomeView extends ConsumerWidget {
                     ),
                     if (settings.showStats) ...[
                       const SizedBox(height: 24),
-                      Row(
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        alignment: WrapAlignment.center,
                         children: [
                           _StatBox(count: todayCount, label: 'عقود اليوم', color: const Color(0xFF1565c0), bg: const Color(0xFFe3f2fd)),
-                          const SizedBox(width: 12),
                           _StatBox(count: monthCount, label: 'هذا الشهر', color: const Color(0xFFef6c00), bg: const Color(0xFFfff3e0)),
-                          const SizedBox(width: 12),
                           _StatBox(count: yearCount, label: 'هذا العام', color: const Color(0xFF2e7d32), bg: const Color(0xFFe8f5e9)),
                         ],
                       ),
@@ -321,17 +344,16 @@ class _StatBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-        child: Column(
-          children: [
-            Text('$count', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
-          ],
-        ),
+    return Container(
+      width: 130,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Column(
+        children: [
+          Text('$count', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 12, color: color.withOpacity(0.8))),
+        ],
       ),
     );
   }

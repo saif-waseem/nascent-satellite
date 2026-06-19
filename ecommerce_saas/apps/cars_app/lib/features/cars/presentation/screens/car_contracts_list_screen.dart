@@ -129,27 +129,34 @@ class _ContractCard extends StatelessWidget {
         border: const Border(right: BorderSide(color: AppColors.gold, width: 3)),
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('🚗', style: TextStyle(fontSize: 28)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(contract.carModelName, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.lapisDark)),
-                const SizedBox(height: 2),
-                Text('${contract.sellerName}  ➡️  ${contract.buyerName}', style: GoogleFonts.cairo(fontSize: 12, color: Colors.black54)),
-                Text(dateStr, style: GoogleFonts.cairo(fontSize: 11, color: Colors.black38)),
-              ],
-            ),
-          ),
           Row(
             children: [
+              const Text('🚗', style: TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(contract.carModelName, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.lapisDark)),
+                    const SizedBox(height: 2),
+                    Text('${contract.sellerName}  ➡️  ${contract.buyerName}', style: GoogleFonts.cairo(fontSize: 12, color: Colors.black54)),
+                    Text(dateStr, style: GoogleFonts.cairo(fontSize: 11, color: Colors.black38)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.start,
+            children: [
               _ActionBtn(label: 'طباعة', color: AppColors.lapis, icon: Icons.print, onTap: onPrint),
-              const SizedBox(width: 6),
               _ActionBtn(label: 'تعديل', color: AppColors.lapisDark, icon: Icons.edit, onTap: onEdit),
-              const SizedBox(width: 6),
               _ActionBtn(label: 'حذف', color: Colors.red, icon: Icons.delete, onTap: onDelete),
             ],
           ),

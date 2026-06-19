@@ -21,6 +21,7 @@ class SettingsScreen extends HookConsumerWidget {
     final showStats = useState(settings.showStats);
     final logoPath = useState<String?>(settings.logoImagePath);
     final isSaving = useState(false);
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
 
     Future<void> pickLogo() async {
       final picker = ImagePicker();
@@ -38,6 +39,7 @@ class SettingsScreen extends HookConsumerWidget {
         licenseNumber: licenseNumber.text.trim(),
         logoImagePath: logoPath.value,
         showStats: showStats.value,
+        clearLogo: logoPath.value == null,
       ));
       isSaving.value = false;
       if (context.mounted) {
@@ -62,10 +64,23 @@ class SettingsScreen extends HookConsumerWidget {
           ),
         );
 
+    Widget buildResponsiveRow(List<Widget> children) {
+      if (isDesktop) {
+        final List<Widget> rowChildren = [];
+        for (var i = 0; i < children.length; i++) {
+          rowChildren.add(Expanded(child: children[i]));
+          if (i < children.length - 1) rowChildren.add(const SizedBox(width: 16));
+        }
+        return Row(children: rowChildren);
+      } else {
+        return Column(children: children);
+      }
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(20),
       child: Container(
-        padding: const EdgeInsets.all(28),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -73,27 +88,24 @@ class SettingsScreen extends HookConsumerWidget {
           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('إعدادات المكتب', style: GoogleFonts.amiri(fontSize: 22, color: AppColors.terracotta, fontWeight: FontWeight.bold)),
             const Divider(color: AppColors.clayDark, height: 28),
-            Row(
-              children: [
-                Expanded(child: field('اسم المكتب', officeName)),
-                const SizedBox(width: 16),
-                Expanded(child: field('مدير المكتب', managerName)),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(child: field('العنوان', officeAddress)),
-                const SizedBox(width: 16),
-                Expanded(child: field('الهاتف', phone, type: TextInputType.phone)),
-              ],
-            ),
+            buildResponsiveRow([
+              field('اسم المكتب', officeName),
+              field('مدير المكتب', managerName),
+            ]),
+            buildResponsiveRow([
+              field('العنوان', officeAddress),
+              field('الهاتف', phone, type: TextInputType.phone),
+            ]),
             field('رقم الإجازة', licenseNumber),
             // Logo
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ElevatedButton.icon(
                   onPressed: pickLogo,
@@ -102,12 +114,10 @@ class SettingsScreen extends HookConsumerWidget {
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapisDark, foregroundColor: Colors.white),
                 ),
                 if (logoPath.value != null) ...[
-                  const SizedBox(width: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.file(File(logoPath.value!), width: 70, height: 70, fit: BoxFit.cover),
+                    child: Image.file(File(logoPath.value!), width: 70, height: 70, fit: BoxFit.cover, errorBuilder: (_,__,___)=>const Icon(Icons.error)),
                   ),
-                  const SizedBox(width: 8),
                   TextButton(onPressed: () => logoPath.value = null, child: const Text('إزالة', style: TextStyle(color: Colors.red))),
                 ],
               ],
@@ -122,22 +132,19 @@ class SettingsScreen extends HookConsumerWidget {
                   activeColor: AppColors.lapis,
                 ),
                 const SizedBox(width: 8),
-                Text('إظهار الإحصائيات في الصفحة الرئيسية', style: GoogleFonts.cairo(fontSize: 14)),
+                Expanded(child: Text('إظهار الإحصائيات في الصفحة الرئيسية', style: GoogleFonts.cairo(fontSize: 14))),
               ],
             ),
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: isSaving.value ? null : save,
-                icon: isSaving.value ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save),
-                label: Text('حفظ الإعدادات', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.lapis,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+            ElevatedButton.icon(
+              onPressed: isSaving.value ? null : save,
+              icon: isSaving.value ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save),
+              label: Text('حفظ الإعدادات', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.lapis,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ],

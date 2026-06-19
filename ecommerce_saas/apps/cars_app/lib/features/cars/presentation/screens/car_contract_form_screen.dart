@@ -9,7 +9,6 @@ import 'package:shared_models/shared_models.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/tenant_provider.dart';
-import '../../../../core/providers/settings_provider.dart';
 import '../../data/car_contracts_repository.dart';
 import 'car_contract_print_preview.dart';
 
@@ -22,6 +21,7 @@ class CarContractFormScreen extends HookConsumerWidget {
     final tenantId = ref.watch(tenantIdProvider);
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final isSubmitting = useState(false);
+    final isDesktop = MediaQuery.of(context).size.width >= 800;
 
     // Seller fields
     final sellerName = useTextEditingController(text: editContract?.sellerName ?? '');
@@ -166,7 +166,10 @@ class CarContractFormScreen extends HookConsumerWidget {
           children: [
             Text(label, style: const TextStyle(color: AppColors.lapisDark, fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 6),
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ElevatedButton.icon(
                   onPressed: () => pickImage(path),
@@ -174,13 +177,11 @@ class CarContractFormScreen extends HookConsumerWidget {
                   label: Text('اختر صورة', style: GoogleFonts.cairo(fontSize: 12)),
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapisDark, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                 ),
-                if (path.value != null) ...[
-                  const SizedBox(width: 10),
+                if (path.value != null)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: Image.file(File(path.value!), width: 60, height: 60, fit: BoxFit.cover),
                   ),
-                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -199,43 +200,65 @@ class CarContractFormScreen extends HookConsumerWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [sectionTitle(title), ...children]),
         );
 
+    // Helper for responsive rows
+    Widget buildResponsiveRow(List<Widget> children) {
+      if (isDesktop) {
+        final List<Widget> rowChildren = [];
+        for (var i = 0; i < children.length; i++) {
+          rowChildren.add(Expanded(child: children[i]));
+          if (i < children.length - 1) rowChildren.add(const SizedBox(width: 12));
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: rowChildren);
+      } else {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        );
+      }
+    }
+
+    final sellerFields = [
+      field('اسم البائع الثلاثي واللقب', sellerName, required: true),
+      field('رقم الهوية / البطاقة الوطنية', sellerId),
+      field('محل السكن', sellerAddress),
+      field('رقم الهاتف', sellerPhone, type: TextInputType.phone),
+      field('اسم المختار', sellerMukhtar, hint: 'يجهل اسمه'),
+      photoField('صورة البائع', sellerPhotoPath),
+    ];
+
+    final buyerFields = [
+      field('اسم المشتري الثلاثي واللقب', buyerName, required: true),
+      field('رقم الهوية / البطاقة الوطنية', buyerId),
+      field('محل السكن', buyerAddress),
+      field('رقم الهاتف', buyerPhone, type: TextInputType.phone),
+      field('اسم المختار', buyerMukhtar, hint: 'يجهل اسمه'),
+      photoField('صورة المشتري', buyerPhotoPath),
+    ];
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Form(
         key: formKey,
         child: Column(
           children: [
-            // Seller & Buyer in 2 columns
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: formSection('بيانات البائع', [
-                    field('اسم البائع الثلاثي واللقب', sellerName, required: true),
-                    field('رقم الهوية / البطاقة الوطنية', sellerId),
-                    field('محل السكن', sellerAddress),
-                    field('رقم الهاتف', sellerPhone, type: TextInputType.phone),
-                    field('اسم المختار', sellerMukhtar, hint: 'يجهل اسمه'),
-                    photoField('صورة البائع', sellerPhotoPath),
-                  ]),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: formSection('بيانات المشتري', [
-                    field('اسم المشتري الثلاثي واللقب', buyerName, required: true),
-                    field('رقم الهوية / البطاقة الوطنية', buyerId),
-                    field('محل السكن', buyerAddress),
-                    field('رقم الهاتف', buyerPhone, type: TextInputType.phone),
-                    field('اسم المختار', buyerMukhtar, hint: 'يجهل اسمه'),
-                    photoField('صورة المشتري', buyerPhotoPath),
-                  ]),
-                ),
-              ],
-            ),
+            // Seller & Buyer
+            if (isDesktop)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: formSection('بيانات البائع', sellerFields)),
+                  const SizedBox(width: 16),
+                  Expanded(child: formSection('بيانات المشتري', buyerFields)),
+                ],
+              )
+            else ...[
+              formSection('بيانات البائع', sellerFields),
+              formSection('بيانات المشتري', buyerFields),
+            ],
             // Car Section
             formSection('بيانات المركبة', [
-              Row(children: [
-                Expanded(child: Padding(
+              buildResponsiveRow([
+                Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: DropdownButtonFormField<String>(
                     value: carType.value,
@@ -245,30 +268,23 @@ class CarContractFormScreen extends HookConsumerWidget {
                         .toList(),
                     onChanged: (v) => carType.value = v!,
                   ),
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: field('اسم السيارة', carModelName, required: true)),
-                const SizedBox(width: 12),
-                Expanded(child: field('الموديل (السنة)', carYear)),
+                ),
+                field('اسم السيارة', carModelName, required: true),
+                field('الموديل (السنة)', carYear),
               ]),
-              Row(children: [
-                Expanded(child: field('رقم اللوحة والمرور', carPlate, hint: 'بغداد 12345...')),
-                const SizedBox(width: 12),
-                Expanded(child: field('اللون', carColor)),
-                const SizedBox(width: 12),
-                Expanded(child: field('رقم السنوية', carAnnualId)),
-                const SizedBox(width: 12),
-                Expanded(child: field('رقم الشاصي', carChassis, hint: 'بلا')),
+              buildResponsiveRow([
+                field('رقم اللوحة والمرور', carPlate, hint: 'بغداد 12345...'),
+                field('اللون', carColor),
+                field('رقم السنوية', carAnnualId),
+                field('رقم الشاصي', carChassis, hint: 'بلا'),
               ]),
             ]),
             // Finance Section
             formSection('المالية والملاحظات', [
-              Row(children: [
-                Expanded(child: field('مبلغ البيع الكلي', priceTotal, type: TextInputType.number)),
-                const SizedBox(width: 12),
-                Expanded(child: field('المبلغ المدفوع (المقبوض)', pricePaid, type: TextInputType.number)),
-                const SizedBox(width: 12),
-                Expanded(child: field('المبلغ المتبقي', priceRemaining, readOnly: true, textColor: Colors.red)),
+              buildResponsiveRow([
+                field('مبلغ البيع الكلي', priceTotal, type: TextInputType.number),
+                field('المبلغ المدفوع (المقبوض)', pricePaid, type: TextInputType.number),
+                field('المبلغ المتبقي', priceRemaining, readOnly: true, textColor: Colors.red),
               ]),
               field('ملاحظات إضافية (شروط العقد)', notes),
             ]),
@@ -288,27 +304,21 @@ class CarContractFormScreen extends HookConsumerWidget {
               ),
             ),
             // Action Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isSubmitting.value ? null : () => save(clearAfter: false),
-                    icon: isSubmitting.value ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save),
-                    label: Text('حفظ', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 15)),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapis, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isSubmitting.value ? null : () => save(clearAfter: true),
-                    icon: const Icon(Icons.add_task),
-                    label: Text('حفظ وآخر', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 15)),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapisDark, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
-                  ),
-                ),
-              ],
-            ),
+            buildResponsiveRow([
+              ElevatedButton.icon(
+                onPressed: isSubmitting.value ? null : () => save(clearAfter: false),
+                icon: isSubmitting.value ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save),
+                label: Text('حفظ', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 15)),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapis, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+              if (!isDesktop) const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: isSubmitting.value ? null : () => save(clearAfter: true),
+                icon: const Icon(Icons.add_task),
+                label: Text('حفظ وآخر', style: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 15)),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.lapisDark, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+              ),
+            ]),
             const SizedBox(height: 32),
           ],
         ),

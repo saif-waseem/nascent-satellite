@@ -12,6 +12,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
@@ -38,11 +43,6 @@ workflows:
           CODE_SIGN_IDENTITY =
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
-
-      - name: Clean build files
-        script: |
-          flutter clean
-          rm -rf build/
 
       - name: Flutter pub get
         script: flutter pub get
@@ -54,7 +54,7 @@ workflows:
       - build/macos/Build/Products/Release/**/*.app
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 2. Store Admin — macOS
+  # 2. Store Admin (Dar London) — macOS
   # ─────────────────────────────────────────────────────────────────────────────
   dar-london-store-admin-macos:
     name: "Store Admin (Dar London) - macOS"
@@ -65,6 +65,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
@@ -91,11 +96,6 @@ workflows:
           CODE_SIGN_IDENTITY =
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
-
-      - name: Clean build files
-        script: |
-          flutter clean
-          rm -rf build/
 
       - name: Flutter pub get
         script: flutter pub get
@@ -118,6 +118,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
@@ -144,11 +149,6 @@ workflows:
           CODE_SIGN_IDENTITY =
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
-
-      - name: Clean build files
-        script: |
-          flutter clean
-          rm -rf build/
 
       - name: Flutter pub get
         script: flutter pub get
@@ -171,6 +171,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
@@ -198,11 +203,6 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
-      - name: Clean build files
-        script: |
-          flutter clean
-          rm -rf build/
-
       - name: Flutter pub get
         script: flutter pub get
 
@@ -224,6 +224,11 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Remove incompatible packages
         script: |
           sed -i '' '/windows_printer/d' pubspec.yaml
@@ -254,11 +259,6 @@ workflows:
           CODE_SIGN_IDENTITY =
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
-
-      - name: Clean build files
-        script: |
-          flutter clean
-          rm -rf build/
 
       - name: Flutter pub get
         script: flutter pub get

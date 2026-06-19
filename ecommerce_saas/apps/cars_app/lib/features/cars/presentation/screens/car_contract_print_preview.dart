@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_models/shared_models.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/settings_provider.dart';
 
@@ -16,10 +16,13 @@ class CarContractPrintPreview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final date = contract.createdAt;
-    final dateStr = DateFormat('yyyy/MM/dd', 'ar').format(date);
-    final timeStr = DateFormat('HH:mm', 'ar').format(date);
+    final dateStr = '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    final timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     final serial = contract.id.length > 6 ? contract.id.substring(contract.id.length - 6) : contract.id;
-    final numFmt = NumberFormat('#,###');
+    
+    String formatNumber(double num) {
+      return num.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},');
+    }
 
     const tblBorder = TableBorder.symmetric(
       inside: BorderSide(color: Colors.black, width: 0.5),
@@ -143,9 +146,9 @@ class CarContractPrintPreview extends ConsumerWidget {
                 child: Table(border: tblBorder, children: [
                   TableRow(children: [tblHeader('سعر البيع الكلي'), tblHeader('المبلغ الواصل (المدفوع)'), tblHeader('المتبقي بذمة المشتري')]),
                   TableRow(children: [
-                    tblCell(numFmt.format(contract.priceTotal), bold: true),
-                    tblCell(numFmt.format(contract.pricePaid), bold: true),
-                    tblCell(numFmt.format(contract.priceRemaining), bold: true, color: Colors.red),
+                    tblCell(formatNumber(contract.priceTotal), bold: true),
+                    tblCell(formatNumber(contract.pricePaid), bold: true),
+                    tblCell(formatNumber(contract.priceRemaining), bold: true, color: Colors.red),
                   ]),
                 ]),
               ),

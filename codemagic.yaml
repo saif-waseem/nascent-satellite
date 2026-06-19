@@ -8,7 +8,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: po
     environment:
-      flutter: stable
+      flutter: 3.41.6
       xcode: latest
       cocoapods: default
     scripts:
@@ -39,11 +39,16 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Flutter pub get
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release --no-tree-shake-icons
+        script: flutter build macos --release
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -56,7 +61,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: ecommerce_saas/apps/store_admin
     environment:
-      flutter: stable
+      flutter: 3.41.6
       xcode: latest
       cocoapods: default
     scripts:
@@ -87,11 +92,16 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Flutter pub get
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release --no-tree-shake-icons
+        script: flutter build macos --release
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -104,7 +114,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: ecommerce_saas/apps/user_app
     environment:
-      flutter: stable
+      flutter: 3.41.6
       xcode: latest
       cocoapods: default
     scripts:
@@ -135,11 +145,16 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Flutter pub get
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release --no-tree-shake-icons
+        script: flutter build macos --release
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -152,7 +167,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: ecommerce_saas/apps/user_app
     environment:
-      flutter: stable
+      flutter: 3.41.6
       xcode: latest
       cocoapods: default
     scripts:
@@ -183,11 +198,16 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Flutter pub get
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release --no-tree-shake-icons
+        script: flutter build macos --release
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app
@@ -200,7 +220,7 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: ecommerce_saas/apps/cars_app
     environment:
-      flutter: stable
+      flutter: 3.41.6
       xcode: latest
       cocoapods: default
     scripts:
@@ -220,8 +240,6 @@ workflows:
 
       - name: Resolve local path dependency (shared_models)
         script: |
-          # cars_app depends on pa/shared_models via relative path
-          # Codemagic working_directory is relative to repo root, so path resolves correctly
           echo "Path dependency will resolve from repo root"
 
       - name: Disable code signing
@@ -237,11 +255,16 @@ workflows:
           EXPANDED_CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =" >> macos/Flutter/Debug.xcconfig
 
+      - name: Clean build files
+        script: |
+          flutter clean
+          rm -rf build/
+
       - name: Flutter pub get
         script: flutter pub get
 
       - name: Build macOS
-        script: flutter build macos --release --no-tree-shake-icons
+        script: flutter build macos --release
 
     artifacts:
       - build/macos/Build/Products/Release/**/*.app

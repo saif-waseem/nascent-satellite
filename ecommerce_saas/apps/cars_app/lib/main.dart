@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'core/services/local_db_service.dart';
 import 'core/providers/tenant_provider.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/screens/activation_screen.dart';
 import 'features/cars/presentation/screens/cars_dashboard_screen.dart';
 import 'firebase_options.dart';
@@ -40,13 +41,10 @@ class CarsApp extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'برنامج عقود سيارات',
+      title: 'برنامج عقود سيارات - بوابة سومر',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Cairo',
-        useMaterial3: true,
-      ),
+      theme: AppTheme.theme,
+      locale: const Locale('ar', 'IQ'),
       home: const AppRoot(),
     );
   }

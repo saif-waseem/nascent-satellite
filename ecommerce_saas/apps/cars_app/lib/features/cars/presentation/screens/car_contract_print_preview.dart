@@ -1,198 +1,231 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_models/shared_models.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/providers/settings_provider.dart';
 
-class CarContractPrintPreview extends StatelessWidget {
+class CarContractPrintPreview extends ConsumerWidget {
   final CarContractModel contract;
-
   const CarContractPrintPreview({super.key, required this.contract});
 
-  Future<Uint8List> _generatePdf(PdfPageFormat format) async {
-    final pdf = pw.Document();
-    
-    final fontData = await rootBundle.load('assets/fonts/Cairo-Regular.ttf');
-    final ttf = pw.Font.ttf(fontData);
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final date = contract.createdAt;
+    final dateStr = DateFormat('yyyy/MM/dd', 'ar').format(date);
+    final timeStr = DateFormat('HH:mm', 'ar').format(date);
+    final serial = contract.id.length > 6 ? contract.id.substring(contract.id.length - 6) : contract.id;
+    final numFmt = NumberFormat('#,###');
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        textDirection: pw.TextDirection.rtl,
-        theme: pw.ThemeData.withFont(base: ttf),
-        build: (context) {
-          return pw.Container(
-            padding: const pw.EdgeInsets.all(24),
-            decoration: pw.BoxDecoration(border: pw.Border.all(width: 2, color: PdfColors.black)),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
+    const tblBorder = TableBorder.symmetric(
+      inside: BorderSide(color: Colors.black, width: 0.5),
+      outside: BorderSide(color: Colors.black, width: 1),
+    );
+
+    Widget tblHeader(String text) => Container(
+          color: const Color(0xFFeeeeee),
+          padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+          child: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+        );
+
+    Widget tblCell(String text, {bool bold = false, Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+          child: Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: bold ? FontWeight.bold : FontWeight.normal, color: color, fontFamily: 'Cairo')),
+        );
+
+    Widget secTitle(String title) => Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontFamily: 'Cairo')),
+        );
+
+    final printContent = Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── HEADER ──────────────────────────────────────────────
+            Table(
               children: [
-                pw.Text('عقد بيع وشراء مركبة', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 8),
-                pw.Text('التاريخ: ${DateFormat('yyyy/MM/dd').format(contract.createdAt)}'),
-                pw.SizedBox(height: 24),
-                
-                // Seller & Buyer info
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.all(8),
-                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey)),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('الطرف الأول (البائع)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
-                            pw.Divider(),
-                            pw.Text('الاسم: ${contract.sellerName}'),
-                            if (contract.sellerId?.isNotEmpty == true) pw.Text('الهوية: ${contract.sellerId}'),
-                            if (contract.sellerAddress?.isNotEmpty == true) pw.Text('السكن: ${contract.sellerAddress}'),
-                            if (contract.sellerPhone?.isNotEmpty == true) pw.Text('الهاتف: ${contract.sellerPhone}'),
-                            if (contract.sellerMukhtar?.isNotEmpty == true) pw.Text('المختار: ${contract.sellerMukhtar}'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    pw.SizedBox(width: 16),
-                    pw.Expanded(
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.all(8),
-                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey)),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('الطرف الثاني (المشتري)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                            pw.Divider(),
-                            pw.Text('الاسم: ${contract.buyerName}'),
-                            if (contract.buyerId?.isNotEmpty == true) pw.Text('الهوية: ${contract.buyerId}'),
-                            if (contract.buyerAddress?.isNotEmpty == true) pw.Text('السكن: ${contract.buyerAddress}'),
-                            if (contract.buyerPhone?.isNotEmpty == true) pw.Text('الهاتف: ${contract.buyerPhone}'),
-                            if (contract.buyerMukhtar?.isNotEmpty == true) pw.Text('المختار: ${contract.buyerMukhtar}'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 24),
-
-                // Car info
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
-                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('تفاصيل المركبة', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Divider(),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text('النوع: ${contract.carType}'),
-                          pw.Text('الموديل: ${contract.carModelName}'),
-                          pw.Text('السنة: ${contract.carYear ?? "-"}'),
-                        ],
-                      ),
-                      pw.SizedBox(height: 8),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text('رقم اللوحة: ${contract.carPlate ?? "-"}'),
-                          pw.Text('اللون: ${contract.carColor ?? "-"}'),
-                          pw.Text('رقم الشاصي: ${contract.carChassis ?? "-"}'),
-                        ],
-                      ),
-                    ],
+                TableRow(children: [
+                  // Office Info (right)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(settings.officeName, style: GoogleFonts.amiri(fontSize: 18, color: const Color(0xFFc62828), fontWeight: FontWeight.bold)),
+                      const Text('لاستيراد وتسجيل السيارات', style: TextStyle(fontSize: 10, fontFamily: 'Cairo')),
+                      const Text('عقود مرورية - مكاتبات', style: TextStyle(fontSize: 10, fontFamily: 'Cairo')),
+                      if (settings.managerName.isNotEmpty)
+                        Text('بإدارة: ${settings.managerName}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+                    ]),
                   ),
-                ),
-                pw.SizedBox(height: 24),
-
-                // Financials
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(8),
-                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('التفاصيل المالية', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Divider(),
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        children: [
-                          pw.Text('مبلغ البيع الكلي: ${contract.priceTotal} د.ع'),
-                          pw.Text('المبلغ المقبوض: ${contract.pricePaid} د.ع'),
-                          pw.Text('المبلغ المتبقي: ${contract.priceRemaining} د.ع', style: pw.TextStyle(color: PdfColors.red900, fontWeight: pw.FontWeight.bold)),
-                        ],
-                      ),
-                    ],
+                  // Logo (center)
+                  Center(
+                    child: settings.logoImagePath != null
+                        ? Image.file(File(settings.logoImagePath!), height: 70, width: 100, fit: BoxFit.contain)
+                        : const Text('🚗', style: TextStyle(fontSize: 40)),
                   ),
-                ),
-                
-                if (contract.notes?.isNotEmpty == true) ...[
-                  pw.SizedBox(height: 16),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.all(8),
-                    decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey)),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text('ملاحظات إضافية', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.Divider(),
-                        pw.Text(contract.notes!),
-                      ]
-                    )
-                  )
-                ],
-
-                pw.Spacer(),
-                
-                // Signatures
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      children: [
-                        pw.Text('توقيع البائع', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.SizedBox(height: 40),
-                        pw.Text('......................'),
-                      ],
-                    ),
-                    pw.Column(
-                      children: [
-                        pw.Text('توقيع المشتري', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.SizedBox(height: 40),
-                        pw.Text('......................'),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 16),
+                  // Contact (left)
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      if (settings.licenseNumber.isNotEmpty) Text('رقم الإجازة: ${settings.licenseNumber}', style: const TextStyle(fontSize: 10, fontFamily: 'Cairo')),
+                      if (settings.officeAddress.isNotEmpty) Text('العنوان: ${settings.officeAddress}', style: const TextStyle(fontSize: 10, fontFamily: 'Cairo')),
+                      if (settings.phone.isNotEmpty) Text('هاتف: ${settings.phone}', style: const TextStyle(fontSize: 10, fontFamily: 'Cairo')),
+                    ]),
+                  ),
+                ]),
               ],
             ),
-          );
-        },
+            const Divider(color: AppColors.gold, thickness: 2),
+            // Serial / Date / Time
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('التسلسل: $serial', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+                Text('تاريخ: $dateStr', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+                Text('الوقت: $timeStr', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // ── SELLER TABLE ────────────────────────────────────────
+            secTitle('معلومات البائع'),
+            Table(border: tblBorder, columnWidths: const {0: FlexColumnWidth(2), 1: FlexColumnWidth(2), 2: FlexColumnWidth(1.5), 3: FlexColumnWidth(1.5), 4: FlexColumnWidth(1.5)}, children: [
+              TableRow(children: [tblHeader('الاسم الثلاثي واللقب'), tblHeader('السكن'), tblHeader('رقم الهوية'), tblHeader('رقم الهاتف'), tblHeader('اسم المختار')]),
+              TableRow(children: [tblCell(contract.sellerName), tblCell(contract.sellerAddress ?? ''), tblCell(contract.sellerId ?? ''), tblCell(contract.sellerPhone ?? ''), tblCell(contract.sellerMukhtar ?? 'يجهل اسمه')]),
+            ]),
+            // Seller Photo
+            if (contract.sellerPhotoUrl != null && File(contract.sellerPhotoUrl!).existsSync())
+              Padding(padding: const EdgeInsets.only(top: 4), child: Image.file(File(contract.sellerPhotoUrl!), width: 60, height: 60, fit: BoxFit.cover)),
+            const SizedBox(height: 8),
+            // ── BUYER TABLE ─────────────────────────────────────────
+            secTitle('معلومات المشتري'),
+            Table(border: tblBorder, columnWidths: const {0: FlexColumnWidth(2), 1: FlexColumnWidth(2), 2: FlexColumnWidth(1.5), 3: FlexColumnWidth(1.5), 4: FlexColumnWidth(1.5)}, children: [
+              TableRow(children: [tblHeader('الاسم الثلاثي واللقب'), tblHeader('السكن'), tblHeader('رقم الهوية'), tblHeader('رقم الهاتف'), tblHeader('اسم المختار')]),
+              TableRow(children: [tblCell(contract.buyerName), tblCell(contract.buyerAddress ?? ''), tblCell(contract.buyerId ?? ''), tblCell(contract.buyerPhone ?? ''), tblCell(contract.buyerMukhtar ?? 'يجهل اسمه')]),
+            ]),
+            // Buyer Photo
+            if (contract.buyerPhotoUrl != null && File(contract.buyerPhotoUrl!).existsSync())
+              Padding(padding: const EdgeInsets.only(top: 4), child: Image.file(File(contract.buyerPhotoUrl!), width: 60, height: 60, fit: BoxFit.cover)),
+            const SizedBox(height: 10),
+            // Contract Text
+            Center(
+              child: Text(
+                'عقد هذا الاتفاق بين الطرفين كما يلي: باع الطرف الاول للطرف الثاني السيارة المفصلة أدناه:',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // ── CAR TABLE ───────────────────────────────────────────
+            Table(border: tblBorder, children: [
+              TableRow(children: [tblHeader('تصنيف السيارة'), tblHeader('اسم السيارة'), tblHeader('رقم اللوحة'), tblHeader('الموديل'), tblHeader('اللون'), tblHeader('رقم الشاصي')]),
+              TableRow(children: [
+                tblCell(contract.carType, bold: true),
+                tblCell(contract.carModelName),
+                tblCell(contract.carPlate ?? 'غير مسجل'),
+                tblCell(contract.carYear ?? ''),
+                tblCell(contract.carColor ?? ''),
+                tblCell(contract.carChassis ?? 'بلا'),
+              ]),
+            ]),
+            const SizedBox(height: 6),
+            // ── PRICE TABLE ─────────────────────────────────────────
+            Center(
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.65,
+                child: Table(border: tblBorder, children: [
+                  TableRow(children: [tblHeader('سعر البيع الكلي'), tblHeader('المبلغ الواصل (المدفوع)'), tblHeader('المتبقي بذمة المشتري')]),
+                  TableRow(children: [
+                    tblCell(numFmt.format(contract.priceTotal), bold: true),
+                    tblCell(numFmt.format(contract.pricePaid), bold: true),
+                    tblCell(numFmt.format(contract.priceRemaining), bold: true, color: Colors.red),
+                  ]),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Notes + Disclaimer
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(border: Border.all(color: Colors.black), borderRadius: BorderRadius.circular(4)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('الملاحظات: ${contract.notes?.isNotEmpty == true ? contract.notes : 'لا يوجد'}', style: const TextStyle(fontSize: 9, fontFamily: 'Cairo')),
+                const SizedBox(height: 4),
+                const Text(
+                  'تنبيه وإخلاء مسؤولية: المكتب غير مسؤول عن إبراز المستمسكات المزورة للطرفين أن وجد ذلك لأن الطرفان متعارفان ومتفقان خارج المكتب والمكتب وسيط وليس كفيل. يتعهد الطرفان بصحة المعلومات أعلاه.',
+                  style: TextStyle(fontSize: 9, fontFamily: 'Cairo'),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 28),
+            // ── SIGNATURES ──────────────────────────────────────────
+            Row(
+              children: [
+                Expanded(child: Column(children: [
+                  const Divider(color: Colors.black, thickness: 1),
+                  const SizedBox(height: 4),
+                  const Text('توقيع وبصمة البائع', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                  const SizedBox(height: 40),
+                  Text(contract.sellerName, style: const TextStyle(fontSize: 10, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                ])),
+                const SizedBox(width: 16),
+                Expanded(child: Column(children: [
+                  const Divider(color: Colors.black, thickness: 1),
+                  const SizedBox(height: 4),
+                  const Text('إدارة المكتب', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                  const SizedBox(height: 40),
+                  Text(settings.managerName.isNotEmpty ? settings.managerName : settings.officeName, style: const TextStyle(fontSize: 10, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                ])),
+                const SizedBox(width: 16),
+                Expanded(child: Column(children: [
+                  const Divider(color: Colors.black, thickness: 1),
+                  const SizedBox(height: 4),
+                  const Text('توقيع وبصمة المشتري', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                  const SizedBox(height: 40),
+                  Text(contract.buyerName, style: const TextStyle(fontSize: 10, fontFamily: 'Cairo'), textAlign: TextAlign.center),
+                ])),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: Colors.black),
+            const Center(child: Text('تم الإنشاء بواسطة المهندس سيف وسيم', style: TextStyle(fontSize: 9, fontFamily: 'Cairo', color: Colors.black54))),
+          ],
+        ),
       ),
     );
 
-    return pdf.save();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('طباعة العقد')),
-      body: PdfPreview(
-        build: _generatePdf,
-        initialPageFormat: PdfPageFormat.a4,
-        allowSharing: true,
-        allowPrinting: true,
-        canChangeOrientation: false,
-        canChangePageFormat: false,
-        pdfFileName: 'contract_${contract.id}.pdf',
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFf0f0f0),
+        appBar: AppBar(
+          title: Text('معاينة العقد - ${contract.carModelName}', style: GoogleFonts.amiri()),
+          backgroundColor: AppColors.lapis,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.print),
+              tooltip: 'طباعة',
+              onPressed: () {
+                // On Android: use system share/print
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('استخدم زر المشاركة لإرسال أو طباعة العقد')),
+                );
+              },
+            ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Card(elevation: 4, child: printContent),
+        ),
       ),
     );
   }

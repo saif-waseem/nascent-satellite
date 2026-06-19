@@ -1,86 +1,88 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../../../core/services/firestore_rest_service.dart';
-import '../../../core/services/local_db_service.dart';
-import '../../../core/models/sync_queue_item.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import '../../../../core/services/local_db_service.dart';
 
 final carContractsRepositoryProvider = Provider((ref) => CarContractsRepository(ref));
 
-final carContractsProvider = FutureProvider.family<List<CarContractModel>, String>((ref, tenantId) async {
+final carContractsStreamProvider = StreamProvider.family<List<CarContractModel>, String>((ref, tenantId) {
   final repo = ref.watch(carContractsRepositoryProvider);
-  return repo.getContracts(tenantId);
+  return repo.watchContracts(tenantId);
 });
 
 class CarContractsRepository {
   final Ref _ref;
-  FirestoreRestService get _restService => _ref.read(firestoreRestServiceProvider);
-
   CarContractsRepository(this._ref);
 
-  Box<CarContractModel> get _carsBox => LocalDbService.getBox<CarContractModel>('car_contracts');
+  Box<CarContractModel> get _box => LocalDbService.getBox<CarContractModel>('car_contracts');
 
-  Future<List<CarContractModel>> getContracts(String tenantId, {int limit = 100}) async {
-    final cached = _carsBox.values
-        .where((s) => s.tenantId == tenantId)
-        .toList()
+  /// Local-first stream
+  Stream<List<CarContractModel>> watchContracts(String tenantId) async* {
+    // Yield local immediately
+    final local = _box.values.where((c) => c.tenantId == tenantId).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    
-    final result = cached.take(limit).toList();
-    
-    if (tenantId == 'local_default') return result;
+    yield local;
 
-    _fetchContractsRemote(tenantId, limit);
-    
-    return result;
-  }
-
-  Future<void> _fetchContractsRemote(String tenantId, int limit) async {
+    // Then sync from Firestore
+    if (tenantId.isEmpty || tenantId == 'local_default') return;
     try {
-      final query = {
-        'where': {
-          'fieldFilter': {
-            'field': {'fieldPath': 'tenantId'},
-            'op': 'EQUAL',
-            'value': {'stringValue': tenantId}
-          }
-        },
-        'orderBy': [
-          {'field': {'fieldPath': 'createdAt'}, 'direction': 'DESCENDING'}
-        ],
-        'limit': limit,
-      };
-      final results = await _restService.runQuery('car_contracts', query);
-      final remoteContracts = results.map((data) => CarContractModel.fromJson(data)).toList();
-      for (var contract in remoteContracts) {
-        await _carsBox.put(contract.id, contract);
+      await for (final snapshot in FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('car_contracts')
+          .orderBy('createdAt', descending: true)
+          .snapshots()) {
+        for (final doc in snapshot.docs) {
+          final data = {'id': doc.id, ...doc.data()};
+          final contract = CarContractModel.fromJson(data);
+          await _box.put(contract.id, contract);
+        }
+        final updated = _box.values.where((c) => c.tenantId == tenantId).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        yield updated;
       }
     } catch (e) {
-      debugPrint('Error background fetching car contracts: $e');
+      debugPrint('Error watching contracts: $e');
     }
   }
 
   Future<void> saveContract(String tenantId, CarContractModel contract) async {
-    await _carsBox.put(contract.id, contract);
+    // Save locally first
+    await _box.put(contract.id, contract);
 
-    if (tenantId == 'local_default') return;
-
-    await LocalDbService.addToSyncQueue(
-      collectionPath: 'car_contracts',
-      data: contract.toJson(),
-      action: SyncAction.create,
-    );
+    // Sync to Firestore
+    if (tenantId.isEmpty || tenantId == 'local_default') return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('car_contracts')
+          .doc(contract.id)
+          .set(contract.toJson());
+    } catch (e) {
+      debugPrint('Error saving contract to Firestore: $e');
+    }
   }
 
   Future<void> deleteContract(String tenantId, String contractId) async {
-    await _carsBox.delete(contractId);
+    await _box.delete(contractId);
+    if (tenantId.isEmpty || tenantId == 'local_default') return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(tenantId)
+          .collection('car_contracts')
+          .doc(contractId)
+          .delete();
+    } catch (e) {
+      debugPrint('Error deleting contract from Firestore: $e');
+    }
+  }
 
-    if (tenantId == 'local_default') return;
-
-    await LocalDbService.addToSyncQueue(
-      collectionPath: 'car_contracts/$contractId',
-      data: {'id': contractId},
-      action: SyncAction.delete,
-    );
+  List<CarContractModel> getLocalContracts(String tenantId) {
+    return _box.values.where((c) => c.tenantId == tenantId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 }

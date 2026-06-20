@@ -70,18 +70,14 @@ class SettingsNotifier extends Notifier<OfficeSettings> {
 
   @override
   OfficeSettings build() {
-    _load();
-    return const OfficeSettings();
-  }
-
-  Future<void> _load() async {
-    final prefs = ref.read(sharedPreferencesProvider);
+    final prefs = ref.watch(sharedPreferencesProvider);
     final raw = prefs.getString(_key);
     if (raw != null) {
       try {
-        state = OfficeSettings.fromJson(json.decode(raw) as Map<String, dynamic>);
+        return OfficeSettings.fromJson(json.decode(raw) as Map<String, dynamic>);
       } catch (_) {}
     }
+    return const OfficeSettings();
   }
 
   Future<void> save(OfficeSettings settings) async {

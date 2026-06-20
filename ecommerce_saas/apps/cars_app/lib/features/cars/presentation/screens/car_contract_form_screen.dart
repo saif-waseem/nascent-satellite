@@ -22,6 +22,7 @@ class CarContractFormScreen extends HookConsumerWidget {
     final formKey = useMemoized(() => GlobalKey<FormState>());
     final isSubmitting = useState(false);
     final isDesktop = MediaQuery.of(context).size.width >= 800;
+    final currentId = useState(editContract?.id ?? const Uuid().v4());
 
     // Seller fields
     final sellerName = useTextEditingController(text: editContract?.sellerName ?? '');
@@ -81,6 +82,7 @@ class CarContractFormScreen extends HookConsumerWidget {
       priceTotal.text = '0'; pricePaid.text = '0'; priceRemaining.text = '0'; notes.clear();
       sellerPhotoPath.value = null; buyerPhotoPath.value = null;
       carType.value = 'خصوصي';
+      currentId.value = const Uuid().v4();
     }
 
     Future<void> save({bool clearAfter = false}) async {
@@ -88,7 +90,7 @@ class CarContractFormScreen extends HookConsumerWidget {
       isSubmitting.value = true;
       try {
         final contract = CarContractModel(
-          id: editContract?.id ?? const Uuid().v4(),
+          id: currentId.value,
           tenantId: tenantId.isEmpty ? 'local_default' : tenantId,
           sellerName: sellerName.text.trim(),
           sellerId: sellerId.text.trim(),

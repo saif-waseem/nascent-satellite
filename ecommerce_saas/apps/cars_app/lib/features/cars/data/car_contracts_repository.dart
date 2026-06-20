@@ -18,33 +18,30 @@ class CarContractsRepository {
 
   Box<CarContractModel> get _box => LocalDbService.getBox<CarContractModel>('car_contracts');
 
-  /// Local-first stream
   Stream<List<CarContractModel>> watchContracts(String tenantId) async* {
-    // Yield local immediately
-    final local = _box.values.where((c) => c.tenantId == tenantId).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    yield local;
+    // Yield local initially
+    yield getLocalContracts(tenantId);
 
-    // Then sync from Firestore
-    if (tenantId.isEmpty || tenantId == 'local_default') return;
-    try {
-      await for (final snapshot in FirebaseFirestore.instance
+    // Sync from Firestore in background
+    if (tenantId.isNotEmpty && tenantId != 'local_default') {
+      FirebaseFirestore.instance
           .collection('tenants')
           .doc(tenantId)
           .collection('car_contracts')
           .orderBy('createdAt', descending: true)
-          .snapshots()) {
+          .snapshots()
+          .listen((snapshot) {
         for (final doc in snapshot.docs) {
           final data = {'id': doc.id, ...doc.data()};
           final contract = CarContractModel.fromJson(data);
-          await _box.put(contract.id, contract);
+          _box.put(contract.id, contract);
         }
-        final updated = _box.values.where((c) => c.tenantId == tenantId).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        yield updated;
-      }
-    } catch (e) {
-      debugPrint('Error watching contracts: $e');
+      }, onError: (e) => debugPrint('Sync error: $e'));
+    }
+
+    // Yield on every local db change (insert, update, delete)
+    await for (final _ in _box.watch()) {
+      yield getLocalContracts(tenantId);
     }
   }
 

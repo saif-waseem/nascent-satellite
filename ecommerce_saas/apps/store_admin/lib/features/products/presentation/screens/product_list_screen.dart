@@ -103,17 +103,19 @@ class ProductListScreen extends HookConsumerWidget {
                   itemCount: filteredProducts.length,
                   itemBuilder: (context, index) {
                     final product = filteredProducts[index];
-                    final categoryName = asyncCategories.maybeWhen(
-                      data: (cats) => cats.any((c) => c.id == product.category) 
-                        ? cats.firstWhere((c) => c.id == product.category).name 
-                        : product.category,
-                      orElse: () => product.category,
-                    );
                     
                     final imageUrl = product.images.isNotEmpty ? product.images.first : null;
 
+                    final isLowStock = product.minStockLevel != null && product.stockQuantity <= (product.minStockLevel ?? 0);
+                    final now = DateTime.now();
+                    final isExpiringSoon = product.expiryDate != null && 
+                                          product.expiryDate!.isAfter(now) && 
+                                          product.expiryDate!.difference(now).inDays < 30;
+                    final isExpired = product.expiryDate != null && product.expiryDate!.isBefore(now);
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 2,
                       child: ListTile(
                         leading: Container(
                           width: 50,
@@ -130,10 +132,32 @@ class ProductListScreen extends HookConsumerWidget {
                                 : Icon(IconData(int.tryParse(imageUrl) ?? 58900, fontFamily: 'MaterialIcons'))),
                         ),
                         title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${formatCurrency(product.price, lang: lang)} • Stock: ${product.stockQuantity} • $categoryName'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${AppStrings.get('stock_label', lang)}: ${product.stockQuantity} ${product.unit ?? ""}', 
+                                style: TextStyle(color: isLowStock ? Colors.red : Colors.grey[700])),
+                            Text('${AppStrings.get('barcode', lang)}: ${product.barcode ?? "---"}'),
+                            if (product.expiryDate != null)
+                              Text('${AppStrings.get('expiry_date', lang)}: ${product.expiryDate!.year}-${product.expiryDate!.month.toString().padLeft(2, '0')}-${product.expiryDate!.day.toString().padLeft(2, '0')}',
+                                  style: TextStyle(color: isExpired ? Colors.red : (isExpiringSoon ? Colors.orange : Colors.grey[700]))),
+                          ],
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(formatCurrency(product.price, lang: lang), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                                if (isLowStock) 
+                                  const Icon(Icons.warning, color: Colors.red, size: 18),
+                                if (isExpiringSoon || isExpired)
+                                  const Icon(Icons.event_busy, color: Colors.orange, size: 18),
+                              ],
+                            ),
+                            const SizedBox(width: 8),
                             IconButton(
                               icon: const Icon(Icons.edit_outlined),
                               onPressed: () => context.push('/product-form', extra: product),

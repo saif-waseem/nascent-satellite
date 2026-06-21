@@ -15,10 +15,21 @@ class LocalCacheService {
     if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(CategoryModelAdapter());
     if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(TenantModelAdapter());
 
-    // Open Boxes
-    await Hive.openBox<ProductModel>(productsBoxName);
-    await Hive.openBox<CategoryModel>(categoriesBoxName);
-    await Hive.openBox<TenantModel>(tenantsBoxName);
+    // Open Boxes with schema error handling
+    await _openBoxSafe<ProductModel>(productsBoxName);
+    await _openBoxSafe<CategoryModel>(categoriesBoxName);
+    await _openBoxSafe<TenantModel>(tenantsBoxName);
+  }
+
+  Future<void> _openBoxSafe<T>(String boxName) async {
+    try {
+      await Hive.openBox<T>(boxName);
+    } catch (e) {
+      // If there's a schema mismatch (e.g. added new fields to models) or corruption,
+      // delete the local box and open a fresh one.
+      await Hive.deleteBoxFromDisk(boxName);
+      await Hive.openBox<T>(boxName);
+    }
   }
 
   // --- Products ---

@@ -16,7 +16,7 @@ class PurchaseRepository {
           .collection('purchase_invoices')
           .withConverter<PurchaseInvoiceModel>(
             fromFirestore: (snapshot, _) =>
-                PurchaseInvoiceModel.fromJson(snapshot.data()!..['id'] = snapshot.id),
+                PurchaseInvoiceModel.fromJson({...snapshot.data()!, 'id': snapshot.id}),
             toFirestore: (model, _) => model.toJson(),
           );
 

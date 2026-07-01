@@ -15,7 +15,7 @@ class ProductRepository {
           .collection('products')
           .withConverter<ProductModel>(
             fromFirestore: (snapshot, _) =>
-                ProductModel.fromJson(snapshot.data()!..['id'] = snapshot.id),
+                ProductModel.fromJson({...snapshot.data()!, 'id': snapshot.id}),
             toFirestore: (model, options) => model.toJson(),
           );
 

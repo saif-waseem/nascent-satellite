@@ -14,7 +14,7 @@ class CategoryRepository {
           .collection('categories')
           .withConverter<CategoryModel>(
             fromFirestore: (snapshot, _) =>
-                CategoryModel.fromJson(snapshot.data()!..['id'] = snapshot.id ..putIfAbsent('icon', () => 'folder')),
+                CategoryModel.fromJson({...snapshot.data()!, 'id': snapshot.id} ..putIfAbsent('icon', () => 'folder')),
             toFirestore: (model, options) => model.toJson(),
           );
 

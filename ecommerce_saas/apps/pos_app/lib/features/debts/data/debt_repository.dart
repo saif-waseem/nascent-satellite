@@ -10,13 +10,13 @@ class DebtRepository {
 
   CollectionReference<CustomerModel> _customerBase() =>
       _firestore.collection('customers').withConverter<CustomerModel>(
-            fromFirestore: (snapshot, _) => CustomerModel.fromJson(snapshot.data()!..['id'] = snapshot.id),
+            fromFirestore: (snapshot, _) => CustomerModel.fromJson({...snapshot.data()!, 'id': snapshot.id}),
             toFirestore: (model, _) => model.toJson(),
           );
 
   CollectionReference<SupplierModel> _supplierBase() =>
       _firestore.collection('suppliers').withConverter<SupplierModel>(
-            fromFirestore: (snapshot, _) => SupplierModel.fromJson(snapshot.data()!..['id'] = snapshot.id),
+            fromFirestore: (snapshot, _) => SupplierModel.fromJson({...snapshot.data()!, 'id': snapshot.id}),
             toFirestore: (model, _) => model.toJson(),
           );
 

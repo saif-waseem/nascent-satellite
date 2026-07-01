@@ -174,7 +174,7 @@ class SalesRepository {
     
     if (originalInvoice.customerId != null) {
       final tenantDoc = await _firestore.collection('tenants').doc(tenantId).get();
-      final tenant = tenantDoc.exists ? TenantModel.fromJson(tenantDoc.data()!..['id'] = tenantDoc.id) : TenantModel(id: '', name: '', adminIds: const [], createdAt: DateTime.now());
+      final tenant = tenantDoc.exists ? TenantModel.fromJson({...tenantDoc.data()!, 'id': tenantDoc.id}) : TenantModel(id: '', name: '', adminIds: const [], createdAt: DateTime.now());
       
       final netPointsChange = (netDifference * tenant.purchasePointsPercent).floor(); 
       
@@ -255,7 +255,7 @@ class SalesRepository {
       if (productSnapshot.exists) {
         final data = productSnapshot.data();
         if (data == null) continue;
-        final product = ProductModel.fromJson(data..['id'] = productSnapshot.id);
+        final product = ProductModel.fromJson(<String, dynamic>{...data, 'id': productSnapshot.id});
         
         List<ProductVariant> updatedVariants = List.from(product.variants);
         if (item.variantColor != null || item.variantSize != null) {
@@ -284,7 +284,7 @@ class SalesRepository {
          // Fallback to minimal calculation if tenant not found (should not happen)
          return;
       }
-      final tenant = TenantModel.fromJson(tenantDoc.data()!..['id'] = tenantDoc.id);
+      final tenant = TenantModel.fromJson({...tenantDoc.data()!, 'id': tenantDoc.id});
       
       final pointsValue = finalInvoice.pointsRedeemed * tenant.pointsToCurrencyRatio;
       final netTotal = finalInvoice.totalAmount - finalInvoice.discountAmount - pointsValue;

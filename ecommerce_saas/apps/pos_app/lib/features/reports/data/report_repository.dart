@@ -99,7 +99,7 @@ class ReportRepository {
 
       for (var doc in filteredSales) {
         final data = doc.data();
-        final invoice = SalesInvoiceModel.fromJson(data..['id'] = doc.id);
+        final invoice = SalesInvoiceModel.fromJson(<String, dynamic>{...data, 'id': doc.id});
         final staffName = (invoice.addedBy?.isNotEmpty ?? false) ? invoice.addedBy! : 'موظف غير معروف';
         final staffId = invoice.addedById ?? '';
 
@@ -162,7 +162,7 @@ class ReportRepository {
 
       double totalPurchases = 0;
       for (var doc in filteredPurchases) {
-        final invoice = PurchaseInvoiceModel.fromJson(doc.data()..['id'] = doc.id);
+        final invoice = PurchaseInvoiceModel.fromJson(<String, dynamic>{...doc.data(), 'id': doc.id});
         totalPurchases += invoice.totalAmount;
       }
 

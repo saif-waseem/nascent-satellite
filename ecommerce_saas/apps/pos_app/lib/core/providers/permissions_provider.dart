@@ -36,7 +36,7 @@ final rolesProvider = StreamProvider((ref) {
       .collection('roles')
       .where('tenantId', isEqualTo: tenantId)
       .snapshots()
-      .map((s) => s.docs.map((d) => PosRoleModel.fromJson(d.data()..['id'] = d.id)).toList());
+      .map((s) => s.docs.map((d) => PosRoleModel.fromJson(<String, dynamic>{...d.data(), 'id': d.id})).toList());
 });
 
 final permissionsProvider = Provider<Set<PosPermission>>((ref) {

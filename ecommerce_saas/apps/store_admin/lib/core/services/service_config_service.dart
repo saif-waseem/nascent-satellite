@@ -33,10 +33,23 @@ class ServiceConfig {
 class ServiceConfigService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Stream<ServiceConfig> watchConfig() {
-    return _db.collection('system_config').doc('services').snapshots().map((snapshot) {
-      if (!snapshot.exists) {
-        return ServiceConfig(
+  Stream<ServiceConfig> watchConfig() async* {
+    while (true) {
+      try {
+        final snapshot = await _db.collection('system_config').doc('services').get();
+        if (!snapshot.exists) {
+          yield ServiceConfig(
+            imageService: 'imgbb',
+            imageApiKey: '4c2a2e4993d69bf3fe8bf8d09d1a2520',
+            videoService: 'disabled',
+            videoLibraryId: '',
+            videoApiKey: '',
+          );
+        } else {
+          yield ServiceConfig.fromJson(snapshot.data()!);
+        }
+      } catch (e) {
+        yield ServiceConfig(
           imageService: 'imgbb',
           imageApiKey: '4c2a2e4993d69bf3fe8bf8d09d1a2520',
           videoService: 'disabled',
@@ -44,8 +57,8 @@ class ServiceConfigService {
           videoApiKey: '',
         );
       }
-      return ServiceConfig.fromJson(snapshot.data()!);
-    });
+      await Future.delayed(const Duration(seconds: 10));
+    }
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -14,6 +16,7 @@ import 'package:store_admin/features/shared/providers.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:store_admin/core/services/notification_service.dart';
 import 'package:shared_models/shared_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
@@ -54,7 +57,6 @@ void main() async {
       localCacheServiceProvider.overrideWithValue(cacheService),
     ],
   );
-  // Notification Service initialization moved to where tenantId is available
 
   runApp(UncontrolledProviderScope(
     container: container,
@@ -196,6 +198,16 @@ class _StoreAdminAppState extends ConsumerState<StoreAdminApp> {
                   ElevatedButton(
                     onPressed: () => ref.refresh(tenantProvider),
                     child: const Text('Retry'),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('tenant_id');
+                      ref.invalidate(tenantProvider);
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('تسجيل خروج الطوارئ', style: TextStyle(color: Colors.white)),
                   ),
                 ],
               ),

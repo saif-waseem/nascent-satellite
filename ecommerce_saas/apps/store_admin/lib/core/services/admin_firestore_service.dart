@@ -7,11 +7,13 @@ class AdminFirestoreService {
   // --- Store Settings (Tenant) ---
   Stream<TenantModel?> getTenant(String tenantId) {
     return _db.collection('tenants').doc(tenantId).snapshots().map((doc) {
-      if (!doc.exists || doc.data() == null) return null;
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
       final data = doc.data()!;
       data['id'] = doc.id;
       return TenantModel.fromJson(data);
-    });
+    }).handleError((_) => null);
   }
 
   Future<void> updateTenant(TenantModel tenant) async {
@@ -19,18 +21,23 @@ class AdminFirestoreService {
   }
 
   // --- Categories ---
-  Stream<List<CategoryModel>> getCategories(String tenantId) {
-    return _db
-        .collection('categories')
-        .where('tenantId', isEqualTo: tenantId)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return CategoryModel.fromJson(data);
-      }).toList();
-    });
+  Stream<List<CategoryModel>> getCategories(String tenantId) async* {
+    while (true) {
+      try {
+        final snapshot = await _db
+            .collection('categories')
+            .where('tenantId', isEqualTo: tenantId)
+            .get();
+        yield snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return CategoryModel.fromJson(data);
+        }).toList();
+      } catch (e) {
+        yield [];
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
   Future<void> addCategory(CategoryModel category, String tenantId) async {
@@ -50,18 +57,23 @@ class AdminFirestoreService {
   }
 
   // --- Products ---
-  Stream<List<ProductModel>> getProducts(String tenantId) {
-    return _db
-        .collection('products')
-        .where('tenantId', isEqualTo: tenantId)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return ProductModel.fromJson(data);
-      }).toList();
-    });
+  Stream<List<ProductModel>> getProducts(String tenantId) async* {
+    while (true) {
+      try {
+        final snapshot = await _db
+            .collection('products')
+            .where('tenantId', isEqualTo: tenantId)
+            .get();
+        yield snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return ProductModel.fromJson(data);
+        }).toList();
+      } catch (e) {
+        yield [];
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
   Future<void> addProduct(ProductModel product, String tenantId) async {
@@ -81,27 +93,38 @@ class AdminFirestoreService {
   }
 
   // --- Orders ---
-  Stream<List<OrderModel>> getAllOrders(String tenantId) {
-    return _db
-        .collection('orders')
-        .where('tenantId', isEqualTo: tenantId)
-        .snapshots()
-        .map((snapshot) {
-      final orders = snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return OrderModel.fromJson(data);
-      }).where((o) => !o.isHiddenForAdmin).toList();
-      
-      // Sort in memory to avoid composite index requirements
-      orders.sort((a, b) => b.date.compareTo(a.date));
-      return orders;
-    });
+  Stream<List<OrderModel>> getAllOrders(String tenantId) async* {
+    while (true) {
+      try {
+        final snapshot = await _db
+            .collection('orders')
+            .where('tenantId', isEqualTo: tenantId)
+            .get();
+        final orders = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return OrderModel.fromJson(data);
+        }).where((o) => !o.isHiddenForAdmin).toList();
+        orders.sort((a, b) => b.date.compareTo(a.date));
+        yield orders;
+      } catch (e) {
+        yield [];
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
   // --- Settings ---
-  Stream<Map<String, dynamic>> getGlobalSettings() {
-    return _db.collection('settings').doc('global').snapshots().map((doc) => doc.data() ?? {});
+  Stream<Map<String, dynamic>> getGlobalSettings() async* {
+    while (true) {
+      try {
+        final doc = await _db.collection('settings').doc('global').get();
+        yield doc.data() ?? {};
+      } catch (e) {
+        yield {};
+      }
+      await Future.delayed(const Duration(seconds: 10));
+    }
   }
 
   Future<void> deleteOrder(String orderId) async {
@@ -246,18 +269,23 @@ class AdminFirestoreService {
   }
 
   // --- Customers (Users) ---
-  Stream<List<UserModel>> getCustomers(String tenantId) {
-    return _db
-        .collection('users')
-        .where('tenantId', isEqualTo: tenantId)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return UserModel.fromJson(data);
-      }).toList();
-    });
+  Stream<List<UserModel>> getCustomers(String tenantId) async* {
+    while (true) {
+      try {
+        final snapshot = await _db
+            .collection('users')
+            .where('tenantId', isEqualTo: tenantId)
+            .get();
+        yield snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return UserModel.fromJson(data);
+        }).toList();
+      } catch (e) {
+        yield [];
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
   Future<void> updateUserPoints(String userId, int points) async {
@@ -269,19 +297,24 @@ class AdminFirestoreService {
   }
 
   // --- Coupons ---
-  Stream<List<CouponModel>> getCoupons(String tenantId) {
-    return _db
-        .collection('tenants')
-        .doc(tenantId)
-        .collection('coupons')
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return CouponModel.fromJson(data);
-      }).toList();
-    });
+  Stream<List<CouponModel>> getCoupons(String tenantId) async* {
+    while (true) {
+      try {
+        final snapshot = await _db
+            .collection('tenants')
+            .doc(tenantId)
+            .collection('coupons')
+            .get();
+        yield snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return CouponModel.fromJson(data);
+        }).toList();
+      } catch (e) {
+        yield [];
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
   }
 
   Future<void> addCoupon(String tenantId, CouponModel coupon) async {

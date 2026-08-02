@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+export 'package:hive/hive.dart';
 import 'package:shared_models/shared_models.dart';
 
 class LocalCacheService {
@@ -10,10 +11,10 @@ class LocalCacheService {
     await Hive.initFlutter();
     
     // Register Adapters (MUST match typeIds in shared_models)
-    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(ProductModelAdapter());
-    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(ProductVariantAdapter());
-    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(CategoryModelAdapter());
-    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(TenantModelAdapter());
+    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter<ProductModel>(ProductModelAdapter());
+    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter<ProductVariant>(ProductVariantAdapter());
+    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter<CategoryModel>(CategoryModelAdapter());
+    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter<TenantModel>(TenantModelAdapter());
 
     // Open Boxes with schema error handling
     await _openBoxSafe<ProductModel>(productsBoxName);

@@ -2,6 +2,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:store_admin/core/services/admin_firestore_service.dart';
+import 'package:store_admin/core/services/admin_supabase_service.dart';
 import 'package:store_admin/core/services/storage_service.dart';
 import 'package:store_admin/core/services/notification_service.dart';
 import 'package:store_admin/core/services/analytics_service.dart';
@@ -12,6 +13,7 @@ import 'package:store_admin/core/services/service_config_service.dart';
 
 // --- Services ---
 final adminFirestoreServiceProvider = Provider((ref) => AdminFirestoreService());
+final adminSupabaseServiceProvider = Provider((ref) => AdminSupabaseService());
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
 final storageServiceProvider = Provider((ref) {
@@ -133,24 +135,32 @@ final tenantProvider = StreamProvider<TenantModel?>((ref) {
   return ref.watch(adminFirestoreServiceProvider).getTenant(tenantId);
 });
 
-// --- Products (Cache-then-Network) ---
+// --- Products (Cache-First -> Supabase SQL Primary -> Firestore Fallback) ---
 final adminProductsProvider = StreamProvider<List<ProductModel>>((ref) async* {
   final cache = ref.watch(localCacheServiceProvider);
+  final supabase = ref.watch(adminSupabaseServiceProvider);
   final firestore = ref.watch(adminFirestoreServiceProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
   
-  // 1. Yield cached data
+  // 1. Yield cached data immediately (instant zero-latency display)
   final cached = cache.getCachedProducts();
   if (cached.isNotEmpty) {
     yield cached;
   }
 
-  // 2. Listen to Firestore
+  // 2. Stream from Supabase SQL (Fast & Iraq friendly)
   if (tenantId.isNotEmpty) {
-    await for (final products in firestore.getProducts(tenantId)) {
-      // 3. Update cache
-      await cache.saveProducts(products);
-      yield products;
+    try {
+      await for (final products in supabase.getProductsStream(tenantId)) {
+        await cache.saveProducts(products);
+        yield products;
+      }
+    } catch (_) {
+      // Fallback to Firestore if offline or during transition
+      await for (final products in firestore.getProducts(tenantId)) {
+        await cache.saveProducts(products);
+        yield products;
+      }
     }
   }
 });
@@ -161,15 +171,22 @@ final adminOrdersProvider = StreamProvider<List<OrderModel>>((ref) {
   return ref.watch(adminFirestoreServiceProvider).getAllOrders(tenantId);
 });
 
+// --- POS Sales Invoices Sync (مزامنة فواتير ومبيعات الكاشير) ---
+final adminPosInvoicesProvider = StreamProvider<List<SalesInvoiceModel>>((ref) {
+  final tenantId = ref.watch(currentTenantIdProvider);
+  return ref.watch(adminFirestoreServiceProvider).getSalesInvoices(tenantId);
+});
+
 // --- Customers ---
 final customerListProvider = StreamProvider<List<UserModel>>((ref) {
   final tenantId = ref.watch(currentTenantIdProvider);
   return ref.watch(adminFirestoreServiceProvider).getCustomers(tenantId);
 });
 
-// --- Categories (Cache-then-Network) ---
+// --- Categories (Cache-First -> Supabase SQL Primary -> Firestore Fallback) ---
 final adminCategoriesProvider = StreamProvider<List<CategoryModel>>((ref) async* {
   final cache = ref.watch(localCacheServiceProvider);
+  final supabase = ref.watch(adminSupabaseServiceProvider);
   final firestore = ref.watch(adminFirestoreServiceProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
 
@@ -179,12 +196,19 @@ final adminCategoriesProvider = StreamProvider<List<CategoryModel>>((ref) async*
     yield cached;
   }
 
-  // 2. Listen to Firestore
+  // 2. Stream from Supabase SQL
   if (tenantId.isNotEmpty) {
-    await for (final categories in firestore.getCategories(tenantId)) {
-      // 3. Update cache
-      await cache.saveCategories(categories);
-      yield categories;
+    try {
+      await for (final categories in supabase.getCategoriesStream(tenantId)) {
+        await cache.saveCategories(categories);
+        yield categories;
+      }
+    } catch (_) {
+      // Fallback to Firestore
+      await for (final categories in firestore.getCategories(tenantId)) {
+        await cache.saveCategories(categories);
+        yield categories;
+      }
     }
   }
 });

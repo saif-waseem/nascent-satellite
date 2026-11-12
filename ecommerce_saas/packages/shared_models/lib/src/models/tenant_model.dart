@@ -11,7 +11,7 @@ class TenantModel extends Equatable {
   @HiveField(1)
   final String name;
   @HiveField(2)
-  final List<String> adminIds; // Changed from ownerId
+  final List<String> adminIds;
   @HiveField(3)
   final String? logoUrl;
   @HiveField(4)
@@ -25,29 +25,29 @@ class TenantModel extends Equatable {
   @HiveField(8)
   final DateTime createdAt;
   @HiveField(9)
-  final DateTime? expiryDate; // [NEW]
+  final DateTime? expiryDate;
   @HiveField(10)
-  final String? activationCode; // [NEW]
+  final String? activationCode;
   @HiveField(11)
-  final int subscriberCount; // [NEW]
+  final int subscriberCount;
   @HiveField(12)
-  final String? managerName; // [NEW]
+  final String? managerName;
   @HiveField(13)
-  final String? managerPhone; // [NEW]
+  final String? managerPhone;
   @HiveField(32)
-  final bool isStoreEnabled; // [NEW]
+  final bool isStoreEnabled;
   @HiveField(29)
-  final bool isPosEnabled; // [NEW]
+  final bool isPosEnabled;
   @HiveField(30)
-  final DateTime? posExpiryDate; // [NEW]
+  final DateTime? posExpiryDate;
   @HiveField(31)
-  final String? posActivationCode; // [NEW]
+  final String? posActivationCode;
   @HiveField(34)
-  final bool isCarsEnabled; // [NEW]
+  final bool isCarsEnabled;
   @HiveField(35)
-  final DateTime? carsExpiryDate; // [NEW]
+  final DateTime? carsExpiryDate;
   @HiveField(36)
-  final String? carsActivationCode; // [NEW]
+  final String? carsActivationCode;
   
   // Loyalty Settings
   @HiveField(14)
@@ -84,6 +84,34 @@ class TenantModel extends Equatable {
   final int maxDailySharePoints;
   @HiveField(28)
   final int maxDailyPurchasePoints;
+
+  // ==================== Tiers & Super Admin Controls ====================
+  @HiveField(37)
+  final String posTier; // 'A', 'B', 'C', 'D'
+  @HiveField(38)
+  final int posDeviceLimit; // 1 (Tier A), 5 (Tier B), 10 (Tier C), -1 (Unlimited Tier D)
+  @HiveField(39)
+  final bool isTrialActive; // هل المتجر حالياً في فترة مجانية تجريبية
+  @HiveField(40)
+  final DateTime? trialStartDate;
+  @HiveField(41)
+  final DateTime? trialEndDate;
+  @HiveField(42)
+  final int posGraceDays; // أيام السماح بعد انتهاء الاشتراك (افتراضياً 14)
+  @HiveField(43)
+  final bool posLanSyncEnabled; // مزامنة الشبكة المحلية بدون إنترنت
+  @HiveField(44)
+  final bool posCloudBackupEnabled; // النسخ الاحتياطي السحابي
+  @HiveField(45)
+  final bool posRemoteDashEnabled; // لوحة المراقبة عن بعد
+  @HiveField(46)
+  final bool posExcelEnabled; // استيراد وتصدير إكسل
+  @HiveField(47)
+  final bool posMultiBranchEnabled; // الفروع المتعددة
+  @HiveField(48)
+  final bool posVideoGenEnabled; // توليد فيديوهات المنتجات بالذكاء الاصطناعي
+  @HiveField(49)
+  final int posDailyVideoQuota; // عدد الفيديوهات المسموحة يومياً
 
   const TenantModel({
     required this.id,
@@ -122,6 +150,20 @@ class TenantModel extends Equatable {
     this.isCarsEnabled = false,
     this.carsExpiryDate,
     this.carsActivationCode,
+    // Tiers defaults
+    this.posTier = 'A',
+    this.posDeviceLimit = 1,
+    this.isTrialActive = false,
+    this.trialStartDate,
+    this.trialEndDate,
+    this.posGraceDays = 14,
+    this.posLanSyncEnabled = false,
+    this.posCloudBackupEnabled = false,
+    this.posRemoteDashEnabled = false,
+    this.posExcelEnabled = false,
+    this.posMultiBranchEnabled = false,
+    this.posVideoGenEnabled = false,
+    this.posDailyVideoQuota = 0,
   });
 
   @override
@@ -162,6 +204,19 @@ class TenantModel extends Equatable {
         isCarsEnabled,
         carsExpiryDate,
         carsActivationCode,
+        posTier,
+        posDeviceLimit,
+        isTrialActive,
+        trialStartDate,
+        trialEndDate,
+        posGraceDays,
+        posLanSyncEnabled,
+        posCloudBackupEnabled,
+        posRemoteDashEnabled,
+        posExcelEnabled,
+        posMultiBranchEnabled,
+        posVideoGenEnabled,
+        posDailyVideoQuota,
       ];
 
   Map<String, dynamic> toJson() {
@@ -202,28 +257,42 @@ class TenantModel extends Equatable {
       'isCarsEnabled': isCarsEnabled,
       'carsExpiryDate': carsExpiryDate?.toIso8601String(),
       'carsActivationCode': carsActivationCode,
+      // Tiers fields in JSON
+      'posTier': posTier,
+      'posDeviceLimit': posDeviceLimit,
+      'isTrialActive': isTrialActive,
+      'trialStartDate': trialStartDate?.toIso8601String(),
+      'trialEndDate': trialEndDate?.toIso8601String(),
+      'posGraceDays': posGraceDays,
+      'posLanSyncEnabled': posLanSyncEnabled,
+      'posCloudBackupEnabled': posCloudBackupEnabled,
+      'posRemoteDashEnabled': posRemoteDashEnabled,
+      'posExcelEnabled': posExcelEnabled,
+      'posMultiBranchEnabled': posMultiBranchEnabled,
+      'posVideoGenEnabled': posVideoGenEnabled,
+      'posDailyVideoQuota': posDailyVideoQuota,
     };
   }
 
-  static DateTime _parseDate(dynamic val) {
-    if (val is DateTime) return val;
-    if (val is String) return DateTime.parse(val);
-    if (val is Timestamp) return val.toDate();
-    return DateTime.now();
-  }
-
   factory TenantModel.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
     return TenantModel(
       id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? 'Unnamed Store',
-      adminIds: (json['adminIds'] as List?)?.cast<String>() ?? [json['ownerId'] as String? ?? ''],
+      name: json['name'] as String? ?? '',
+      adminIds: (json['adminIds'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
       logoUrl: json['logoUrl'] as String?,
       description: json['description'] as String? ?? '',
       whatsappNumber: json['whatsappNumber'] as String? ?? '',
       primaryColor: json['primaryColor'] as String? ?? '#000000',
       isActive: json['isActive'] as bool? ?? false,
-      createdAt: _parseDate(json['createdAt']),
-      expiryDate: json['expiryDate'] != null ? _parseDate(json['expiryDate']) : null,
+      createdAt: parseDate(json['createdAt']) ?? DateTime.now(),
+      expiryDate: parseDate(json['expiryDate']),
       activationCode: json['activationCode'] as String?,
       subscriberCount: json['subscriberCount'] as int? ?? 0,
       managerName: json['managerName'] as String?,
@@ -245,11 +314,25 @@ class TenantModel extends Equatable {
       maxDailyPurchasePoints: json['maxDailyPurchasePoints'] as int? ?? 1000,
       isStoreEnabled: json['isStoreEnabled'] as bool? ?? json['isActive'] as bool? ?? false,
       isPosEnabled: json['isPosEnabled'] as bool? ?? false,
-      posExpiryDate: json['posExpiryDate'] != null ? _parseDate(json['posExpiryDate']) : null,
+      posExpiryDate: parseDate(json['posExpiryDate']),
       posActivationCode: json['posActivationCode'] as String?,
       isCarsEnabled: json['isCarsEnabled'] as bool? ?? false,
-      carsExpiryDate: json['carsExpiryDate'] != null ? _parseDate(json['carsExpiryDate']) : null,
+      carsExpiryDate: parseDate(json['carsExpiryDate']),
       carsActivationCode: json['carsActivationCode'] as String?,
+      // Tiers fields parsing
+      posTier: json['posTier'] as String? ?? 'A',
+      posDeviceLimit: json['posDeviceLimit'] as int? ?? 1,
+      isTrialActive: json['isTrialActive'] as bool? ?? false,
+      trialStartDate: parseDate(json['trialStartDate']),
+      trialEndDate: parseDate(json['trialEndDate']),
+      posGraceDays: json['posGraceDays'] as int? ?? 14,
+      posLanSyncEnabled: json['posLanSyncEnabled'] as bool? ?? false,
+      posCloudBackupEnabled: json['posCloudBackupEnabled'] as bool? ?? false,
+      posRemoteDashEnabled: json['posRemoteDashEnabled'] as bool? ?? false,
+      posExcelEnabled: json['posExcelEnabled'] as bool? ?? false,
+      posMultiBranchEnabled: json['posMultiBranchEnabled'] as bool? ?? false,
+      posVideoGenEnabled: json['posVideoGenEnabled'] as bool? ?? false,
+      posDailyVideoQuota: json['posDailyVideoQuota'] as int? ?? 0,
     );
   }
 
@@ -290,6 +373,20 @@ class TenantModel extends Equatable {
     bool? isCarsEnabled,
     DateTime? carsExpiryDate,
     String? carsActivationCode,
+    // Tiers copyWith
+    String? posTier,
+    int? posDeviceLimit,
+    bool? isTrialActive,
+    DateTime? trialStartDate,
+    DateTime? trialEndDate,
+    int? posGraceDays,
+    bool? posLanSyncEnabled,
+    bool? posCloudBackupEnabled,
+    bool? posRemoteDashEnabled,
+    bool? posExcelEnabled,
+    bool? posMultiBranchEnabled,
+    bool? posVideoGenEnabled,
+    int? posDailyVideoQuota,
   }) {
     return TenantModel(
       id: id ?? this.id,
@@ -328,8 +425,19 @@ class TenantModel extends Equatable {
       isCarsEnabled: isCarsEnabled ?? this.isCarsEnabled,
       carsExpiryDate: carsExpiryDate ?? this.carsExpiryDate,
       carsActivationCode: carsActivationCode ?? this.carsActivationCode,
+      posTier: posTier ?? this.posTier,
+      posDeviceLimit: posDeviceLimit ?? this.posDeviceLimit,
+      isTrialActive: isTrialActive ?? this.isTrialActive,
+      trialStartDate: trialStartDate ?? this.trialStartDate,
+      trialEndDate: trialEndDate ?? this.trialEndDate,
+      posGraceDays: posGraceDays ?? this.posGraceDays,
+      posLanSyncEnabled: posLanSyncEnabled ?? this.posLanSyncEnabled,
+      posCloudBackupEnabled: posCloudBackupEnabled ?? this.posCloudBackupEnabled,
+      posRemoteDashEnabled: posRemoteDashEnabled ?? this.posRemoteDashEnabled,
+      posExcelEnabled: posExcelEnabled ?? this.posExcelEnabled,
+      posMultiBranchEnabled: posMultiBranchEnabled ?? this.posMultiBranchEnabled,
+      posVideoGenEnabled: posVideoGenEnabled ?? this.posVideoGenEnabled,
+      posDailyVideoQuota: posDailyVideoQuota ?? this.posDailyVideoQuota,
     );
   }
 }
-
-

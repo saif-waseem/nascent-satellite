@@ -314,7 +314,76 @@ $productUrl
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (item.images.isNotEmpty)
+            // Media Gallery: Video appears FIRST if present, followed by images
+            if (item.videoUrl != null && item.videoUrl!.isNotEmpty) ...[
+              // Video Section First
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  Container(
+                    height: 380,
+                    width: double.infinity,
+                    color: Colors.black,
+                    child: AdaptiveVideoPlayer(
+                      videoUrl: item.videoUrl!,
+                      autoPlay: false,
+                      looping: true,
+                      previewImageUrl: item.images.isNotEmpty ? item.images.first : null,
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.videocam, color: Colors.amber, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'فيديو المنتج',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (item.images.isNotEmpty) ...[
+                // Horizontal Image Thumbnails gallery when video is shown
+                SizedBox(
+                  height: 90,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: item.images.length,
+                    itemBuilder: (context, idx) {
+                      return GestureDetector(
+                        onTap: () => _showZoomableImage(context, item.images, idx),
+                        child: Container(
+                          width: 80,
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: OptimizedImage(
+                            imageUrl: item.images[idx],
+                            fit: BoxFit.cover,
+                            memCacheWidth: 200,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ] else if (item.images.isNotEmpty)
               Stack(
                 alignment: Alignment.bottomCenter,
                 children: [
@@ -529,21 +598,6 @@ $productUrl
                   ),
                   const SizedBox(height: 24),
 
-                   if (item.videoUrl != null && item.videoUrl!.isNotEmpty) ...[
-                    Text(AppStrings.get('product_video', lang), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 12),
-                    Container(
-                      height: 220,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: AdaptiveVideoPlayer(videoUrl: item.videoUrl!),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
 
                   Text(AppStrings.get('description', lang), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
@@ -998,23 +1052,4 @@ $productUrl
   }
 
 
-}
-
-class AdaptiveVideoPlayer extends StatelessWidget {
-  final String videoUrl;
-  const AdaptiveVideoPlayer({super.key, required this.videoUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.play_circle_outline, color: Colors.white, size: 64),
-          SizedBox(height: 16),
-          Text('Video Player Placeholder', style: TextStyle(color: Colors.white)),
-        ],
-      ),
-    );
-  }
 }

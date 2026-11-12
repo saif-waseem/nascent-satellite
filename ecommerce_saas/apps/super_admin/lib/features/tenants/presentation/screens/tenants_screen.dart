@@ -99,13 +99,42 @@ class _TenantCard extends ConsumerWidget {
           ),
         ),
         title: Text(tenant.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Row(
+        subtitle: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
           children: [
             Icon(Icons.shop, size: 14, color: tenant.isStoreEnabled ? Colors.green : Colors.grey),
-            const SizedBox(width: 4),
             Icon(Icons.point_of_sale, size: 14, color: tenant.isPosEnabled ? Colors.green : Colors.grey),
-            const SizedBox(width: 8),
             Text('ID: ${tenant.id}'),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _getTierColor(tenant.posTier).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _getTierColor(tenant.posTier), width: 0.8),
+              ),
+              child: Text(
+                'Tier ${tenant.posTier}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: _getTierColor(tenant.posTier),
+                ),
+              ),
+            ),
+            if (tenant.isTrialActive)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.teal, width: 0.8),
+                ),
+                child: const Text(
+                  'تجربة مجانية',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal),
+                ),
+              ),
           ],
         ),
         trailing: Text('${AppStrings.get('subscriber_count', lang)}: ${tenant.subscriberCount}'),
@@ -176,6 +205,21 @@ class _TenantCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Color _getTierColor(String tier) {
+    switch (tier) {
+      case 'A':
+        return Colors.blueGrey;
+      case 'B':
+        return Colors.blue;
+      case 'C':
+        return Colors.indigo;
+      case 'D':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
   }
 
   String _getRemainingDays(DateTime expiryDate) {

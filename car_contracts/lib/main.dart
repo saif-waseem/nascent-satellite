@@ -1,122 +1,335 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_models/shared_models.dart';
+import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const CarContractsApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class CarContractsApp extends StatelessWidget {
+  const CarContractsApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'إدارة عقود ومعارض السيارات',
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('ar'),
+      supportedLocales: const [Locale('ar'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const CarContractsDashboardScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class CarContractsDashboardScreen extends StatefulWidget {
+  const CarContractsDashboardScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<CarContractsDashboardScreen> createState() =>
+      _CarContractsDashboardScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CarContractsDashboardScreenState
+    extends State<CarContractsDashboardScreen> {
+  final List<CarContractModel> _contracts = [
+    CarContractModel(
+      id: '1',
+      tenantId: 'mahmodcar',
+      sellerName: 'أحمد علي حسن',
+      sellerPhone: '07701234567',
+      sellerAddress: 'بغداد - الكرادة',
+      buyerName: 'سيف وسيم كريم',
+      buyerPhone: '07809876543',
+      buyerAddress: 'بغداد - المنصور',
+      carType: 'خصوصي',
+      carModelName: 'تويوتا كامري',
+      carYear: '2023',
+      carPlate: '12345 بغداد',
+      carColor: 'أبيض لؤلؤي',
+      priceTotal: 28500000,
+      pricePaid: 20000000,
+      priceRemaining: 8500000,
+      notes: 'تم فحص السيارة بالكامل وتسليم السنوية',
+      createdAt: DateTime.now(),
+    ),
+  ];
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  Future<void> _exportContracts() async {
+    try {
+      final csvData = UniversalExcelService.exportCarContractsToCsv(
+        _contracts,
+        lang: 'ar',
+      );
+      final bytes = utf8.encode(csvData);
+      final fileName =
+          'car_contracts_${DateTime.now().millisecondsSinceEpoch}.csv';
+
+      if (kIsWeb) {
+        // Web: use file_picker save (not supported) — show snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('التصدير غير مدعوم على الويب في هذا الإصدار'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Desktop & Android: save via path_provider
+      String? outputPath;
+
+      // Let user pick save location (desktop)
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        outputPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'حفظ ملف العقود',
+          fileName: fileName,
+          allowedExtensions: ['csv'],
+          type: FileType.custom,
+        );
+      } else {
+        // Android / iOS — save to downloads
+        final dir = await getExternalStorageDirectory() ??
+            await getApplicationDocumentsDirectory();
+        outputPath = '${dir.path}/$fileName';
+      }
+
+      if (outputPath == null) return; // user cancelled
+
+      await File(outputPath).writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم تصدير العقود إلى: $outputPath 🚗'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ أثناء التصدير: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importContracts() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'txt'],
+        withData: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        Uint8List? bytes;
+
+        if (result.files.first.bytes != null) {
+          bytes = result.files.first.bytes!;
+        } else if (result.files.first.path != null) {
+          bytes = await File(result.files.first.path!).readAsBytes();
+        }
+
+        if (bytes == null) throw Exception('الملف فارغ');
+
+        final csvString = utf8.decode(bytes);
+        final parsed = UniversalExcelService.parseCarContractsFromCsv(
+          csvString,
+          'mahmodcar',
+        );
+
+        if (parsed.isEmpty) {
+          throw Exception('لم يتم العثور على عقود صالحة في الملف');
+        }
+
+        setState(() {
+          for (var p in parsed) {
+            _contracts.add(
+              CarContractModel(
+                id: const Uuid().v4(),
+                tenantId: 'mahmodcar',
+                sellerName: p['sellerName'] ?? '',
+                sellerPhone: p['sellerPhone'] ?? '',
+                sellerAddress: p['sellerAddress'] ?? '',
+                buyerName: p['buyerName'] ?? '',
+                buyerPhone: p['buyerPhone'] ?? '',
+                buyerAddress: p['buyerAddress'] ?? '',
+                carType: p['carType'] ?? 'خصوصي',
+                carModelName: p['carModelName'] ?? '',
+                carYear: p['carYear'] ?? '',
+                carPlate: p['carPlate'] ?? '',
+                carColor: p['carColor'] ?? '',
+                carChassis: p['carChassis'],
+                priceTotal: (p['priceTotal'] ?? 0).toDouble(),
+                pricePaid: (p['pricePaid'] ?? 0).toDouble(),
+                priceRemaining: (p['priceRemaining'] ?? 0).toDouble(),
+                notes: p['notes'],
+                createdAt: DateTime.now(),
+              ),
+            );
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم استيراد ${parsed.length} عقد سيارة بنجاح! ✅'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ أثناء الاستيراد: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('عقود ومعارض السيارات - السجل العام'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined, color: Colors.green),
+            onPressed: _exportContracts,
+            tooltip: 'تصدير العقود إلى إكسل',
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined, color: Colors.blue),
+            onPressed: _importContracts,
+            tooltip: 'استيراد عقود من إكسل',
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: _contracts.isEmpty
+          ? const Center(child: Text('لا توجد عقود مسجلة حالياً'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _contracts.length,
+              itemBuilder: (context, index) {
+                final c = _contracts[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.directions_car_filled,
+                              color: Colors.blueGrey,
+                              size: 28,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${c.carModelName} (${c.carYear ?? "عام"})',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blueGrey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                c.carType,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '👤 البائع: ${c.sellerName}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '🤝 المشتري: ${c.buyerName}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '💰 الإجمالي: ${c.priceTotal.toStringAsFixed(0)} د.ع',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.indigo,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '💵 الواصل: ${c.pricePaid.toStringAsFixed(0)} د.ع',
+                                style: const TextStyle(color: Colors.green),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '⏳ المتبقي: ${c.priceRemaining.toStringAsFixed(0)} د.ع',
+                                style: const TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

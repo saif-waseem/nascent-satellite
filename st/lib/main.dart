@@ -14,12 +14,16 @@ import 'package:store_admin/core/widgets/desktop_actions_wrapper.dart';
 import 'package:store_admin/features/shared/providers.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:store_admin/core/services/notification_service.dart';
+import 'package:store_admin/core/services/supabase_config.dart';
 import 'package:shared_models/shared_models.dart';
 
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase SQL Database & Cloudflare Storage
+  await SupabaseConfig.initialize();
 
   // Initialize Local Cache (Hive)
   final cacheService = LocalCacheService();

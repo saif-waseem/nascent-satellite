@@ -1,0 +1,15 @@
+# Production Build & Security Hardening Commands
+# Run these commands when generating final production APKs or AAB bundles for stores
+
+# 1. Store Admin (أدمن المتجر)
+# Builds obfuscated Release APK stripping debug symbols & encrypting code trees
+flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+# 2. Cashier POS (الكاشير)
+flutter build apk --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+# 3. User Storefront App (تطبيق المتجر للزبائن - Google Play Bundle)
+flutter build appbundle --release --obfuscate --split-debug-info=build/app/outputs/symbols
+
+# 4. Web Deployment (Super Admin & Store Web)
+flutter build web --release --pwa-strategy=none

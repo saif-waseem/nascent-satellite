@@ -120,6 +120,23 @@ class AdminFirestoreService {
     });
   }
 
+  // --- POS Cashier Invoices Sync (مزامنة فواتير الكاشير) ---
+  Stream<List<SalesInvoiceModel>> getSalesInvoices(String tenantId) {
+    return _db
+        .collection('sales_invoices')
+        .where('tenantId', isEqualTo: tenantId)
+        .snapshots()
+        .map((snapshot) {
+      final invoices = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return SalesInvoiceModel.fromJson(data);
+      }).toList();
+      invoices.sort((a, b) => b.date.compareTo(a.date));
+      return invoices;
+    });
+  }
+
   // --- Settings ---
   Stream<Map<String, dynamic>> getGlobalSettings() {
     return _db.collection('settings').doc('global').snapshots().map((doc) => doc.data() ?? {});

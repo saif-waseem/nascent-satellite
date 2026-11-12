@@ -1,4 +1,6 @@
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'service_config_service.dart';
@@ -64,17 +66,55 @@ class StorageService {
     }
   }
 
-  Future<String?> pickAndUploadVideo() async {
+  Future<String?> pickAndUploadVideo({String folder = 'products_videos', String tenantId = 'store'}) async {
     try {
       final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
       if (video == null) return null;
 
-      if (config.videoService == 'bunny') {
-        return _uploadToBunny(video);
+      // 1. First priority: Supabase Storage (Works flawlessly in Iraq via Cloudflare Global CDN)
+      try {
+        final cleanName = video.name.split(RegExp(r'[/\\]')).last;
+        final path = '$tenantId/videos/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+        final bytes = await video.readAsBytes();
+
+        await Supabase.instance.client.storage.from('product-media').uploadBinary(
+              path,
+              bytes,
+              fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true),
+            );
+        return Supabase.instance.client.storage.from('product-media').getPublicUrl(path);
+      } catch (supabaseError) {
+        print('Supabase storage not configured yet, trying Bunny or Firebase: $supabaseError');
       }
-      return null;
+
+      if (config.videoService == 'bunny' && config.videoApiKey.isNotEmpty) {
+        return await _uploadToBunny(video);
+      }
+      
+      // Fallback: Firebase Storage
+      return await _uploadVideoToFirebaseStorage(video, folder);
     } catch (e) {
       print('CRITICAL VIDEO ERROR: $e');
+      rethrow;
+    }
+  }
+
+  Future<String?> _uploadVideoToFirebaseStorage(XFile video, String folder) async {
+    try {
+      final cleanName = video.name.split(RegExp(r'[/\\]')).last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+      final ref = FirebaseStorage.instance.ref().child(folder).child(fileName);
+
+      final bytes = await video.readAsBytes();
+      final uploadTask = await ref.putData(
+        bytes,
+        SettableMetadata(contentType: 'video/mp4'),
+      );
+
+      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      print('FIREBASE STORAGE VIDEO UPLOAD ERROR: $e');
       rethrow;
     }
   }

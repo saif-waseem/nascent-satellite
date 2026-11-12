@@ -1,0 +1,416 @@
+name: Build Windows & Android Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FLUTTER_VERSION: '3.44.8'
+
+jobs:
+
+  # ─────────────────────────────────────────────
+  # Job 1: Super Admin — Windows EXE
+  # ─────────────────────────────────────────────
+  build-super-admin-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get - shared_models (ecommerce_saas)
+        run: |
+          cd ecommerce_saas/packages/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - super_admin
+        run: |
+          cd ecommerce_saas/apps/super_admin
+          flutter clean
+          flutter pub get
+
+      - name: Build Super Admin Windows
+        run: |
+          cd ecommerce_saas/apps/super_admin
+          flutter build windows --release --no-tree-shake-icons
+
+      - name: Package Windows Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "build-artifacts"
+          $candidates = @(
+            "ecommerce_saas/apps/super_admin/build/windows/x64/runner/Release",
+            "ecommerce_saas/apps/super_admin/build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if ($found) {
+            Write-Host "Packaging from: $found"
+            Compress-Archive -Path "$found\*" -DestinationPath "build-artifacts/super_admin_windows.zip" -Force
+          } else {
+            Write-Error "Could not find build output directory!"
+            exit 1
+          }
+
+      - name: Upload Artifact - Super Admin Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-admin-windows
+          path: build-artifacts/super_admin_windows.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 2: Super Admin — Android APK
+  # ─────────────────────────────────────────────
+  build-super-admin-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter pub get - shared_models (ecommerce_saas)
+        run: |
+          cd ecommerce_saas/packages/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - super_admin
+        run: |
+          cd ecommerce_saas/apps/super_admin
+          flutter clean
+          flutter pub get
+
+      - name: Build Super Admin APK
+        run: |
+          cd ecommerce_saas/apps/super_admin
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename & Move APK
+        run: |
+          mkdir -p build-artifacts
+          find ecommerce_saas/apps/super_admin/build -name "*.apk" -exec cp {} build-artifacts/super_admin_android.apk \;
+
+      - name: Upload Artifact - Super Admin Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-admin-android
+          path: build-artifacts/super_admin_android.apk
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 3: Store Admin (st) — Windows EXE
+  # ─────────────────────────────────────────────
+  build-store-admin-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get - shared_models (pa)
+        run: |
+          cd pa/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - shared_ui (pa)
+        run: |
+          cd pa/shared_ui
+          flutter pub get
+
+      - name: Flutter pub get - store_admin
+        run: |
+          cd st
+          flutter clean
+          flutter pub get
+
+      - name: Build Store Admin Windows
+        run: |
+          cd st
+          flutter build windows --release --no-tree-shake-icons
+
+      - name: Package Windows Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "build-artifacts"
+          $candidates = @(
+            "st/build/windows/x64/runner/Release",
+            "st/build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if ($found) {
+            Write-Host "Packaging from: $found"
+            Compress-Archive -Path "$found\*" -DestinationPath "build-artifacts/store_admin_windows.zip" -Force
+          } else {
+            Write-Error "Could not find build output directory!"
+            exit 1
+          }
+
+      - name: Upload Artifact - Store Admin Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-admin-windows
+          path: build-artifacts/store_admin_windows.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 4: Store Admin (st) — Android APK
+  # ─────────────────────────────────────────────
+  build-store-admin-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter pub get - shared_models (pa)
+        run: |
+          cd pa/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - shared_ui (pa)
+        run: |
+          cd pa/shared_ui
+          flutter pub get
+
+      - name: Flutter pub get - store_admin
+        run: |
+          cd st
+          flutter clean
+          flutter pub get
+
+      - name: Build Store Admin APK
+        run: |
+          cd st
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename & Move APK
+        run: |
+          mkdir -p build-artifacts
+          find st/build -name "*.apk" -exec cp {} build-artifacts/store_admin_android.apk \;
+
+      - name: Upload Artifact - Store Admin Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-admin-android
+          path: build-artifacts/store_admin_android.apk
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 5: User App / دار لندن (ua) — Android APK
+  # ─────────────────────────────────────────────
+  build-user-app-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter pub get - shared_models (pa)
+        run: |
+          cd pa/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - shared_ui (pa)
+        run: |
+          if [ -d "pa/shared_ui" ]; then
+            cd pa/shared_ui
+            flutter pub get
+          fi
+
+      - name: Flutter pub get - user_app
+        run: |
+          cd ua
+          flutter clean
+          flutter pub get
+
+      - name: Build User App APK
+        run: |
+          cd ua
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename & Move APK
+        run: |
+          mkdir -p build-artifacts
+          find ua/build -name "*.apk" -exec cp {} build-artifacts/dar_london_user_android.apk \;
+
+      - name: Upload Artifact - User App Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: dar-london-user-android
+          path: build-artifacts/dar_london_user_android.apk
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 6: Car Contracts — Windows EXE
+  # ─────────────────────────────────────────────
+  build-car-contracts-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get - shared_models (pa)
+        run: |
+          cd pa/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - car_contracts
+        run: |
+          cd car_contracts
+          flutter clean
+          flutter pub get
+
+      - name: Build Car Contracts Windows
+        run: |
+          cd car_contracts
+          flutter build windows --release --no-tree-shake-icons
+
+      - name: Package Windows Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "build-artifacts"
+          $candidates = @(
+            "car_contracts/build/windows/x64/runner/Release",
+            "car_contracts/build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if ($found) {
+            Write-Host "Packaging from: $found"
+            Compress-Archive -Path "$found\*" -DestinationPath "build-artifacts/car_contracts_windows.zip" -Force
+          } else {
+            Write-Error "Could not find build output directory!"
+            exit 1
+          }
+
+      - name: Upload Artifact - Car Contracts Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: car-contracts-windows
+          path: build-artifacts/car_contracts_windows.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────
+  # Job 7: Car Contracts — Android APK
+  # ─────────────────────────────────────────────
+  build-car-contracts-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter pub get - shared_models (pa)
+        run: |
+          cd pa/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - car_contracts
+        run: |
+          cd car_contracts
+          flutter clean
+          flutter pub get
+
+      - name: Build Car Contracts APK
+        run: |
+          cd car_contracts
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename & Move APK
+        run: |
+          mkdir -p build-artifacts
+          find car_contracts/build -name "*.apk" -exec cp {} build-artifacts/car_contracts_android.apk \;
+
+      - name: Upload Artifact - Car Contracts Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: car-contracts-android
+          path: build-artifacts/car_contracts_android.apk
+          retention-days: 30

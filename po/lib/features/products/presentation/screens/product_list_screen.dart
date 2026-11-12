@@ -9,6 +9,7 @@ import 'product_form_screen.dart';
 import '../../data/product_repository.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../../../../core/widgets/smart_image.dart';
+import '../widgets/pos_excel_import_export_dialog.dart';
 
 class ProductListScreen extends HookConsumerWidget {
   const ProductListScreen({super.key});
@@ -150,6 +151,14 @@ class ProductListScreen extends HookConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.table_view_rounded, color: Colors.green),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const PosExcelImportExportDialog(),
+            ),
+            tooltip: 'استيراد وتصدير إكسل / Excel Import-Export',
+          ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),
             onPressed: () => _showArchiveDialog(context, ref),

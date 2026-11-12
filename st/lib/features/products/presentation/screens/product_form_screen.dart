@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:store_admin/features/shared/providers.dart';
+import 'package:store_admin/features/products/presentation/widgets/ai_video_generator_dialog.dart';
 import 'package:store_admin/features/shared/barcode_scanner_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
@@ -53,6 +54,8 @@ class ProductFormScreen extends HookConsumerWidget {
     final descriptionController = useTextEditingController(text: product?.description ?? '');
     
     final images = useState<List<String>>(product?.images ?? []);
+    final videoUrl = useState<String?>(product?.videoUrl);
+    final isUploadingVideo = useState<bool>(false);
     final variants = useState<List<ProductVariant>>(product?.variants ?? []);
     
     final isOffer = useState(product?.isOffer ?? false);
@@ -122,6 +125,7 @@ class ProductFormScreen extends HookConsumerWidget {
         unit: unitController.text.trim(),
         category: categoryController.text.trim(),
         images: images.value,
+        videoUrl: videoUrl.value,
         variants: variants.value.map((v) {
           final vStock = v.storageLocations.fold(0, (s, loc) => s + loc.quantity);
           return v.copyWith(stock: vStock);
@@ -134,6 +138,11 @@ class ProductFormScreen extends HookConsumerWidget {
 
       try {
         isLoading.value = true;
+        try {
+          await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId);
+        } catch (supabaseError) {
+          debugPrint('Supabase SQL save: $supabaseError');
+        }
         final firestore = ref.read(adminFirestoreServiceProvider);
         if (isEditing) {
           await firestore.updateProduct(newProduct, tenantId);
@@ -295,6 +304,18 @@ class ProductFormScreen extends HookConsumerWidget {
                       const Text('صور المنتج:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 12),
                       _buildImageGrid(images, tenantId, ref),
+                      const SizedBox(height: 24),
+                      _buildVideoSection(
+                        videoUrl: videoUrl,
+                        isUploading: isUploadingVideo,
+                        productName: nameController.text,
+                        price: double.tryParse(retailPriceController.text) ?? 0.0,
+                        images: images.value,
+                        description: descriptionController.text,
+                        tenantId: tenantId,
+                        context: context,
+                        ref: ref,
+                      ),
                       const SizedBox(height: 32),
                       _buildSectionHeader('خيارات إضافية', Icons.settings_outlined),
                       _buildAdvancedOptions(isOffer, isFeaturedDeal, isDailyStarred),
@@ -530,6 +551,154 @@ class ProductFormScreen extends HookConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildVideoSection({
+    required ValueNotifier<String?> videoUrl,
+    required ValueNotifier<bool> isUploading,
+    required String productName,
+    required double price,
+    required List<String> images,
+    required String description,
+    required String tenantId,
+    required BuildContext context,
+    required WidgetRef ref,
+  }) {
+    final tenant = ref.watch(tenantProvider).value;
+    final currency = tenant?.currencyUnit ?? 'IQD';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.indigo.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.video_library_rounded, color: Colors.indigo, size: 20),
+              const SizedBox(width: 8),
+              const Text('فيديو المنتج الترويجي (Video Reel / Motion):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const Spacer(),
+              if (videoUrl.value != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
+                  child: const Text('مرفوع ومفعل ✅', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (videoUrl.value != null) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
+              child: Row(
+                children: [
+                  const Icon(Icons.play_circle_fill, color: Colors.indigo, size: 28),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      videoUrl.value!,
+                      style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'إزالة الفيديو',
+                    onPressed: () => videoUrl.value = null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (isUploading.value) ...[
+            const Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 12),
+                Text('جاري رفع الفيديو إلى السحابة... يرجى الانتظار', style: TextStyle(fontSize: 12, color: Colors.indigo)),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('رفع فيديو من الجهاز 📤'),
+                onPressed: isUploading.value
+                    ? null
+                    : () async {
+                        try {
+                          isUploading.value = true;
+                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo();
+                          if (url != null) {
+                            videoUrl.value = url;
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم رفع الفيديو وتعيينه للمنتج بنجاح!'), backgroundColor: Colors.green),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('فشل رفع الفيديو: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        } finally {
+                          isUploading.value = false;
+                        }
+                      },
+              ),
+              FilledButton.icon(
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('🎬 توليد فيديو بالذكاء الاصطناعي (AI Motion)'),
+                style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
+                onPressed: () {
+                  final dummyProduct = ProductModel(
+                    id: '',
+                    tenantId: tenantId,
+                    name: productName.isNotEmpty ? productName : 'منتج جديد',
+                    price: price,
+                    category: 'عام',
+                    description: description,
+                    rating: 5.0,
+                    isOffer: false,
+                    inStock: true,
+                    images: images,
+                    sizes: const [],
+                    colors: const [],
+                    stockQuantity: 10,
+                    salesCount: 0,
+                    variants: const [],
+                  );
+
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AiVideoGeneratorDialog(
+                      product: dummyProduct,
+                      currency: currency,
+                      onVideoAssigned: (generatedUrl) {
+                        videoUrl.value = generatedUrl;
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

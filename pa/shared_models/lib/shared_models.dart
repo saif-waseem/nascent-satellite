@@ -25,3 +25,4 @@ export 'src/models/audit_log_model.dart';
 export 'src/models/promo_banner_model.dart';
 export 'src/models/chat_message_model.dart';
 export 'src/models/review_model.dart';
+export 'src/services/universal_excel_service.dart';

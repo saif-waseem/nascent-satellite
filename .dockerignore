@@ -1,0 +1,11 @@
+# Git & Docker Ignore
+.dart_tool/
+.packages
+build/
+.gradle/
+*.iml
+.idea/
+.vscode/
+node_modules/
+.next/
+*.log

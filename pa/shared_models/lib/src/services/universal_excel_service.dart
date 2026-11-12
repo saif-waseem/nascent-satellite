@@ -56,47 +56,25 @@ class UniversalExcelService {
     rows.add(getProductHeaders(lang));
 
     for (var p in products) {
-      // If product has specific storage locations, export them
-      if (p.storageLocations.isNotEmpty) {
-        for (var loc in p.storageLocations) {
-          rows.add([
-            p.name,
-            p.barcode ?? '',
-            p.price,
-            p.purchasePrice,
-            p.stockQuantity,
-            loc.warehouseName,
-            loc.shelf ?? '',
-            loc.box ?? '',
-            loc.quantity,
-            p.category,
-            p.unit,
-            p.minStockLevel,
-            p.description,
-          ]);
-        }
-      } else {
-        // Default warehouse row
-        rows.add([
-          p.name,
-          p.barcode ?? '',
-          p.price,
-          p.purchasePrice,
-          p.stockQuantity,
-          'المخزن الرئيسي',
-          '',
-          '',
-          p.stockQuantity,
-          p.category,
-          p.unit,
-          p.minStockLevel,
-          p.description,
-        ]);
-      }
+      rows.add([
+        p.name,
+        p.barcode ?? '',
+        p.price,
+        p.purchasePrice ?? 0,
+        p.stockQuantity,
+        lang == langArabic ? 'المخزن الرئيسي' : 'Main Warehouse',
+        '',
+        '',
+        p.stockQuantity,
+        p.category,
+        p.unit ?? '',
+        p.minStockLevel ?? 5,
+        p.description,
+      ]);
     }
 
     // Prepend UTF-8 BOM (\uFEFF) so Excel displays Arabic correctly without garbled text
-    return '\uFEFF' + const ListToCsvConverter().convert(rows);
+    return '\uFEFF' + ListToCsvConverter().convert(rows);
   }
 
   /// Parses CSV string into a list of parsed product maps ready to save
@@ -107,7 +85,7 @@ class UniversalExcelService {
       cleanStr = cleanStr.substring(1);
     }
 
-    final rows = const CsvToListConverter().convert(cleanStr);
+    final rows = CsvToListConverter().convert(cleanStr);
     if (rows.length <= 1) return [];
 
     final Map<String, Map<String, dynamic>> aggregatedProducts = {};
@@ -243,7 +221,7 @@ class UniversalExcelService {
       ]);
     }
 
-    return '\uFEFF' + const ListToCsvConverter().convert(rows);
+    return '\uFEFF' + ListToCsvConverter().convert(rows);
   }
 
   static List<Map<String, dynamic>> parseCarContractsFromCsv(String csvString, String tenantId) {
@@ -252,7 +230,7 @@ class UniversalExcelService {
       cleanStr = cleanStr.substring(1);
     }
 
-    final rows = const CsvToListConverter().convert(cleanStr);
+    final rows = CsvToListConverter().convert(cleanStr);
     if (rows.length <= 1) return [];
 
     final List<Map<String, dynamic>> contracts = [];

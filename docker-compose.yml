@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # 1. Super Admin SaaS Platform (لوحة التحكم العامة للمستأجرين والتيرات)
+  super_admin:
+    build:
+      context: .
+      dockerfile: ecommerce_saas/apps/super_admin/Dockerfile
+    container_name: saas_super_admin
+    restart: always
+    ports:
+      - "8090:80"
+    networks:
+      - saas_network
+
+  # 2. Store Admin Dashboard (لوحة تحكم التاجر والمتجر)
+  store_admin:
+    build:
+      context: .
+      dockerfile: st/Dockerfile
+    container_name: saas_store_admin
+    restart: always
+    ports:
+      - "8091:80"
+    networks:
+      - saas_network
+
+  # 3. User Storefront Web App (تطبيق المتجر للزبائن)
+  user_storefront:
+    build:
+      context: .
+      dockerfile: ua/Dockerfile
+    container_name: saas_user_storefront
+    restart: always
+    ports:
+      - "8092:80"
+    networks:
+      - saas_network
+
+  # 4. Next.js High-Speed Web Portal (بوابة الويب المتوافقة مع محركات البحث SSR)
+  web_portal:
+    build:
+      context: .
+      dockerfile: web_nextjs/Dockerfile
+    container_name: saas_nextjs_portal
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=https://axcdhxubqzbzjpbhyvvf.supabase.co
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_wVnAoc2K3TewY6Wpb0-D4Q_fX94VBMH
+    networks:
+      - saas_network
+
+networks:
+  saas_network:
+    driver: bridge

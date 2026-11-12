@@ -93,32 +93,17 @@ class _CarContractsDashboardScreenState
         return;
       }
 
-      // Desktop & Android: save via path_provider
-      String? outputPath;
+      final savedUri = await FilePicker.saveFile(
+        fileName: fileName,
+        bytes: Uint8List.fromList(bytes),
+      );
 
-      // Let user pick save location (desktop)
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        outputPath = await FilePicker.platform.saveFile(
-          dialogTitle: 'حفظ ملف العقود',
-          fileName: fileName,
-          allowedExtensions: ['csv'],
-          type: FileType.custom,
-        );
-      } else {
-        // Android / iOS — save to downloads
-        final dir = await getExternalStorageDirectory() ??
-            await getApplicationDocumentsDirectory();
-        outputPath = '${dir.path}/$fileName';
-      }
-
-      if (outputPath == null) return; // user cancelled
-
-      await File(outputPath).writeAsBytes(bytes);
+      if (savedUri == null) return; // user cancelled
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم تصدير العقود إلى: $outputPath 🚗'),
+          const SnackBar(
+            content: Text('تم تصدير العقود بنجاح! 🚗'),
             backgroundColor: Colors.green,
           ),
         );
@@ -137,21 +122,14 @@ class _CarContractsDashboardScreenState
 
   Future<void> _importContracts() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
-        withData: true,
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        Uint8List? bytes;
-
-        if (result.files.first.bytes != null) {
-          bytes = result.files.first.bytes!;
-        } else if (result.files.first.path != null) {
-          bytes = await File(result.files.first.path!).readAsBytes();
-        }
-
+      if (files.isNotEmpty) {
+        final file = files.first;
+        final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
         if (bytes == null) throw Exception('الملف فارغ');
 
         final csvString = utf8.decode(bytes);

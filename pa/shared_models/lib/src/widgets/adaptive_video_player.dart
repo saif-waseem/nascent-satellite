@@ -4,12 +4,14 @@ import 'package:video_player/video_player.dart';
 
 class AdaptiveVideoPlayer extends StatefulWidget {
   final String videoUrl;
+  final String? previewImageUrl;
   final bool autoPlay;
   final bool looping;
 
   const AdaptiveVideoPlayer({
     super.key,
     required this.videoUrl,
+    this.previewImageUrl,
     this.autoPlay = false,
     this.looping = false,
   });

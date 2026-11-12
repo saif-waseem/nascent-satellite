@@ -138,22 +138,11 @@ class CsvImportExportDialog extends HookConsumerWidget {
         return;
       }
 
-      String? outputPath;
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        outputPath = await FilePicker.platform.saveFile(
-          dialogTitle: 'حفظ ملف المنتجات',
-          fileName: fileName,
-          allowedExtensions: ['csv'],
-          type: FileType.custom,
-        );
-      } else {
-        final dir = await getExternalStorageDirectory() ??
-            await getApplicationDocumentsDirectory();
-        outputPath = '${dir.path}/$fileName';
-      }
-
-      if (outputPath == null) return;
-      await File(outputPath).writeAsBytes(bytes);
+      final savedUri = await FilePicker.saveFile(
+        fileName: fileName,
+        bytes: Uint8List.fromList(bytes),
+      );
+      if (savedUri == null) return;
 
       if (context.mounted) {
         Navigator.pop(context);
@@ -170,14 +159,14 @@ class CsvImportExportDialog extends HookConsumerWidget {
 
   Future<void> _importProducts(BuildContext context, WidgetRef ref) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
-        withData: true,
       );
 
-      if (result != null && result.files.isNotEmpty) {
-        final bytes = result.files.first.bytes;
+      if (files.isNotEmpty) {
+        final file = files.first;
+        final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
         if (bytes == null) throw Exception('الملف فارغ');
 
         final csvString = utf8.decode(bytes);
@@ -204,7 +193,6 @@ class CsvImportExportDialog extends HookConsumerWidget {
             unit: p['unit'],
             minStockLevel: p['minStockLevel'],
             description: p['description'],
-            storageLocations: p['storageLocations'],
             inStock: (p['stockQuantity'] as int) > 0,
             images: [],
             sizes: [],

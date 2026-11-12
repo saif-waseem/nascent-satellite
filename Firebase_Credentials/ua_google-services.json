@@ -1,0 +1,86 @@
+{
+  "project_info": {
+    "project_number": "1031487835291",
+    "project_id": "my-store-b0723",
+    "storage_bucket": "my-store-b0723.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031487835291:android:f4e2721771a01e7be58a3e",
+        "android_client_info": {
+          "package_name": "com.saas.ecommerce.store_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031487835291:android:fa06280bc469c97ce58a3e",
+        "android_client_info": {
+          "package_name": "com.saas.ecommerce.user_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031487835291:android:b46d88080fc66e2ee58a3e",
+        "android_client_info": {
+          "package_name": "com.saas.ecommerce.user_app.anegmadenty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031487835291:android:4d916fa8fbaa9ac4e58a3e",
+        "android_client_info": {
+          "package_name": "com.saas.ecommerce.user_app.landan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjmGWBANCyPt3sFF6L7Cxp1N1I_w_E5Ws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/settings_provider.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../../../cars/data/car_contracts_repository.dart';
+import '../widgets/tier_badge_widget.dart';
+import '../widgets/car_contracts_excel_dialog.dart';
 import 'car_contract_form_screen.dart';
 import 'car_contracts_list_screen.dart';
 import 'settings_screen.dart';
@@ -46,11 +47,17 @@ class CarsDashboardScreen extends HookConsumerWidget {
           backgroundColor: AppColors.lapis,
           foregroundColor: Colors.white,
           actions: [
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: const Color(0xFFe8f5e9), borderRadius: BorderRadius.circular(20)),
-              child: const Center(child: Text('● محمي', style: TextStyle(color: Color(0xFF2e7d32), fontSize: 12, fontWeight: FontWeight.w600))),
+            IconButton(
+              tooltip: 'إكسل عقود السيارات',
+              icon: const Icon(Icons.table_chart, color: Colors.white),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => const CarContractsExcelDialog(),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              child: TierBadgeWidget(compact: true),
             ),
           ],
         ),
@@ -88,10 +95,26 @@ class CarsDashboardScreen extends HookConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(pageLabels[currentPage]!, style: GoogleFonts.amiri(fontSize: 20, color: AppColors.lapis, fontWeight: FontWeight.bold)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(color: const Color(0xFFe8f5e9), borderRadius: BorderRadius.circular(20)),
-                            child: const Text('● محمي', style: TextStyle(color: Color(0xFF2e7d32), fontSize: 12, fontWeight: FontWeight.w600)),
+                          Row(
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => const CarContractsExcelDialog(),
+                                ),
+                                icon: const Icon(Icons.table_chart, size: 16),
+                                label: Text('إكسل عقود السيارات', style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF107C41),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  elevation: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const TierBadgeWidget(),
+                            ],
                           ),
                         ],
                       ),
@@ -186,10 +209,22 @@ class _Sidebar extends StatelessWidget {
                   _NavItem(icon: '🏠', label: 'الواجهة الرئيسية', page: CarsPage.home, current: currentPage, onTap: onNavigate),
                   _NavItem(icon: '📝', label: 'تسجيل عقد جديد', page: CarsPage.newContract, current: currentPage, onTap: onNavigate),
                   _NavItem(icon: '📂', label: 'سجل العقود', page: CarsPage.contractsList, current: currentPage, onTap: onNavigate),
+                  _NavItem(
+                    icon: '📊',
+                    label: 'إكسل (استيراد وتصدير)',
+                    page: CarsPage.home,
+                    current: currentPage,
+                    onTap: (_) => showDialog(context: context, builder: (_) => const CarContractsExcelDialog()),
+                  ),
                   _NavItem(icon: '⚙️', label: 'إعدادات المكتب', page: CarsPage.settings, current: currentPage, onTap: onNavigate),
                 ],
               ),
             ),
+          ),
+          // Tier Badge in Sidebar
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TierBadgeWidget(),
           ),
           // Footer
           SafeArea(

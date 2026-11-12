@@ -49,6 +49,41 @@ class TenantModel extends Equatable {
   final String? carsActivationCode; // [NEW]
   @HiveField(33)
   final String appType; // [NEW] 'retail', 'restaurant', 'cars', etc.
+
+  // ==================== Tiers & Super Admin Controls ====================
+  @HiveField(37)
+  final String posTier; // 'A', 'B', 'C', 'D'
+  @HiveField(38)
+  final int posDeviceLimit; // 1 (Tier A), 5 (Tier B), 10 (Tier C), -1 (Unlimited Tier D)
+  @HiveField(39)
+  final bool isTrialActive; // هل المتجر حالياً في فترة مجانية تجريبية
+  @HiveField(40)
+  final DateTime? trialStartDate;
+  @HiveField(41)
+  final DateTime? trialEndDate;
+  @HiveField(42)
+  final int posGraceDays; // أيام السماح بعد انتهاء الاشتراك (افتراضياً 14)
+  @HiveField(43)
+  final bool posLanSyncEnabled; // مزامنة الشبكة المحلية بدون إنترنت
+  @HiveField(44)
+  final bool posCloudBackupEnabled; // النسخ الاحتياطي السحابي
+  @HiveField(45)
+  final bool posRemoteDashEnabled; // لوحة المراقبة عن بعد
+  @HiveField(46)
+  final bool posExcelEnabled; // استيراد وتصدير إكسل
+  @HiveField(47)
+  final bool posMultiBranchEnabled; // الفروع المتعددة
+  @HiveField(48)
+  final bool posVideoGenEnabled; // توليد فيديوهات المنتجات بالذكاء الاصطناعي
+  @HiveField(49)
+  final int posDailyVideoQuota; // عدد الفيديوهات المسموحة يومياً
+  @HiveField(50)
+  final String carsTier; // 'A', 'B', 'C', 'D' for cars app
+  @HiveField(51)
+  final bool carsExcelEnabled; // استيراد وتصدير إكسل لبرنامج السيارات
+
+  String get effectiveCarsTier => carsTier.isNotEmpty ? carsTier : posTier;
+  bool get isCarsExcelAllowed => carsExcelEnabled || posExcelEnabled || effectiveCarsTier == 'C' || effectiveCarsTier == 'D';
   
   // Loyalty Settings
   @HiveField(14)
@@ -124,6 +159,21 @@ class TenantModel extends Equatable {
     this.carsExpiryDate,
     this.carsActivationCode,
     this.appType = 'retail',
+    this.posTier = 'A',
+    this.posDeviceLimit = 1,
+    this.isTrialActive = false,
+    this.trialStartDate,
+    this.trialEndDate,
+    this.posGraceDays = 14,
+    this.posLanSyncEnabled = false,
+    this.posCloudBackupEnabled = false,
+    this.posRemoteDashEnabled = false,
+    this.posExcelEnabled = false,
+    this.posMultiBranchEnabled = false,
+    this.posVideoGenEnabled = false,
+    this.posDailyVideoQuota = 0,
+    this.carsTier = 'A',
+    this.carsExcelEnabled = true,
   });
 
   @override
@@ -165,6 +215,21 @@ class TenantModel extends Equatable {
         carsExpiryDate,
         carsActivationCode,
         appType,
+        posTier,
+        posDeviceLimit,
+        isTrialActive,
+        trialStartDate,
+        trialEndDate,
+        posGraceDays,
+        posLanSyncEnabled,
+        posCloudBackupEnabled,
+        posRemoteDashEnabled,
+        posExcelEnabled,
+        posMultiBranchEnabled,
+        posVideoGenEnabled,
+        posDailyVideoQuota,
+        carsTier,
+        carsExcelEnabled,
       ];
 
   Map<String, dynamic> toJson() {
@@ -206,6 +271,21 @@ class TenantModel extends Equatable {
       'carsExpiryDate': carsExpiryDate?.toIso8601String(),
       'carsActivationCode': carsActivationCode,
       'appType': appType,
+      'posTier': posTier,
+      'posDeviceLimit': posDeviceLimit,
+      'isTrialActive': isTrialActive,
+      'trialStartDate': trialStartDate?.toIso8601String(),
+      'trialEndDate': trialEndDate?.toIso8601String(),
+      'posGraceDays': posGraceDays,
+      'posLanSyncEnabled': posLanSyncEnabled,
+      'posCloudBackupEnabled': posCloudBackupEnabled,
+      'posRemoteDashEnabled': posRemoteDashEnabled,
+      'posExcelEnabled': posExcelEnabled,
+      'posMultiBranchEnabled': posMultiBranchEnabled,
+      'posVideoGenEnabled': posVideoGenEnabled,
+      'posDailyVideoQuota': posDailyVideoQuota,
+      'carsTier': carsTier,
+      'carsExcelEnabled': carsExcelEnabled,
     };
   }
 
@@ -255,6 +335,21 @@ class TenantModel extends Equatable {
       carsExpiryDate: json['carsExpiryDate'] != null ? _parseDate(json['carsExpiryDate']) : null,
       carsActivationCode: json['carsActivationCode'] as String?,
       appType: json['appType'] as String? ?? 'retail',
+      posTier: json['posTier'] as String? ?? json['pos_tier'] as String? ?? 'A',
+      posDeviceLimit: json['posDeviceLimit'] as int? ?? json['pos_device_limit'] as int? ?? 1,
+      isTrialActive: json['isTrialActive'] as bool? ?? json['is_trial_active'] as bool? ?? false,
+      trialStartDate: json['trialStartDate'] != null ? _parseDate(json['trialStartDate']) : (json['trial_start_date'] != null ? _parseDate(json['trial_start_date']) : null),
+      trialEndDate: json['trialEndDate'] != null ? _parseDate(json['trialEndDate']) : (json['trial_end_date'] != null ? _parseDate(json['trial_end_date']) : null),
+      posGraceDays: json['posGraceDays'] as int? ?? json['pos_grace_days'] as int? ?? 14,
+      posLanSyncEnabled: json['posLanSyncEnabled'] as bool? ?? json['pos_lan_sync_enabled'] as bool? ?? false,
+      posCloudBackupEnabled: json['posCloudBackupEnabled'] as bool? ?? json['pos_cloud_backup_enabled'] as bool? ?? false,
+      posRemoteDashEnabled: json['posRemoteDashEnabled'] as bool? ?? json['pos_remote_dash_enabled'] as bool? ?? false,
+      posExcelEnabled: json['posExcelEnabled'] as bool? ?? json['pos_excel_enabled'] as bool? ?? false,
+      posMultiBranchEnabled: json['posMultiBranchEnabled'] as bool? ?? json['pos_multi_branch_enabled'] as bool? ?? false,
+      posVideoGenEnabled: json['posVideoGenEnabled'] as bool? ?? json['pos_video_gen_enabled'] as bool? ?? false,
+      posDailyVideoQuota: json['posDailyVideoQuota'] as int? ?? json['pos_daily_video_quota'] as int? ?? 0,
+      carsTier: json['carsTier'] as String? ?? json['cars_tier'] as String? ?? json['posTier'] as String? ?? json['pos_tier'] as String? ?? 'A',
+      carsExcelEnabled: json['carsExcelEnabled'] as bool? ?? json['cars_excel_enabled'] as bool? ?? true,
     );
   }
 
@@ -296,6 +391,21 @@ class TenantModel extends Equatable {
     DateTime? carsExpiryDate,
     String? carsActivationCode,
     String? appType,
+    String? posTier,
+    int? posDeviceLimit,
+    bool? isTrialActive,
+    DateTime? trialStartDate,
+    DateTime? trialEndDate,
+    int? posGraceDays,
+    bool? posLanSyncEnabled,
+    bool? posCloudBackupEnabled,
+    bool? posRemoteDashEnabled,
+    bool? posExcelEnabled,
+    bool? posMultiBranchEnabled,
+    bool? posVideoGenEnabled,
+    int? posDailyVideoQuota,
+    String? carsTier,
+    bool? carsExcelEnabled,
   }) {
     return TenantModel(
       id: id ?? this.id,
@@ -335,6 +445,21 @@ class TenantModel extends Equatable {
       carsExpiryDate: carsExpiryDate ?? this.carsExpiryDate,
       carsActivationCode: carsActivationCode ?? this.carsActivationCode,
       appType: appType ?? this.appType,
+      posTier: posTier ?? this.posTier,
+      posDeviceLimit: posDeviceLimit ?? this.posDeviceLimit,
+      isTrialActive: isTrialActive ?? this.isTrialActive,
+      trialStartDate: trialStartDate ?? this.trialStartDate,
+      trialEndDate: trialEndDate ?? this.trialEndDate,
+      posGraceDays: posGraceDays ?? this.posGraceDays,
+      posLanSyncEnabled: posLanSyncEnabled ?? this.posLanSyncEnabled,
+      posCloudBackupEnabled: posCloudBackupEnabled ?? this.posCloudBackupEnabled,
+      posRemoteDashEnabled: posRemoteDashEnabled ?? this.posRemoteDashEnabled,
+      posExcelEnabled: posExcelEnabled ?? this.posExcelEnabled,
+      posMultiBranchEnabled: posMultiBranchEnabled ?? this.posMultiBranchEnabled,
+      posVideoGenEnabled: posVideoGenEnabled ?? this.posVideoGenEnabled,
+      posDailyVideoQuota: posDailyVideoQuota ?? this.posDailyVideoQuota,
+      carsTier: carsTier ?? this.carsTier,
+      carsExcelEnabled: carsExcelEnabled ?? this.carsExcelEnabled,
     );
   }
 }

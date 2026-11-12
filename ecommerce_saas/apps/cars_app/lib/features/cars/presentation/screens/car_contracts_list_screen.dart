@@ -6,6 +6,7 @@ import 'package:shared_models/shared_models.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../../data/car_contracts_repository.dart';
+import '../widgets/car_contracts_excel_dialog.dart';
 import 'car_contract_form_screen.dart';
 import 'car_contract_print_preview.dart';
 
@@ -23,19 +24,44 @@ class CarContractsListScreen extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search Bar
-          TextField(
-            onChanged: (v) => searchQuery.value = v.toLowerCase(),
-            style: GoogleFonts.cairo(),
-            decoration: InputDecoration(
-              hintText: 'بحث باسم البائع، المشتري، أو السيارة...',
-              hintStyle: GoogleFonts.cairo(color: Colors.black38),
-              prefixIcon: const Icon(Icons.search, color: AppColors.lapis),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
+          // Search Bar & Excel Actions
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => searchQuery.value = v.toLowerCase(),
+                  style: GoogleFonts.cairo(),
+                  decoration: InputDecoration(
+                    hintText: 'بحث باسم البائع، المشتري، أو السيارة...',
+                    hintStyle: GoogleFonts.cairo(color: Colors.black38),
+                    prefixIcon: const Icon(Icons.search, color: AppColors.lapis),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (_) => const CarContractsExcelDialog(),
+                ),
+                icon: const Icon(Icons.table_chart, size: 18),
+                label: Text(
+                  'إكسل (استيراد وتصدير)',
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF107C41),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 2,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           // List

@@ -54,13 +54,28 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       carsExpiryDate: fields[35] as DateTime?,
       carsActivationCode: fields[36] as String?,
       appType: fields[33] as String,
+      posTier: fields[37] as String? ?? 'A',
+      posDeviceLimit: (fields[38] as num?)?.toInt() ?? 1,
+      isTrialActive: fields[39] as bool? ?? false,
+      trialStartDate: fields[40] as DateTime?,
+      trialEndDate: fields[41] as DateTime?,
+      posGraceDays: (fields[42] as num?)?.toInt() ?? 14,
+      posLanSyncEnabled: fields[43] as bool? ?? false,
+      posCloudBackupEnabled: fields[44] as bool? ?? false,
+      posRemoteDashEnabled: fields[45] as bool? ?? false,
+      posExcelEnabled: fields[46] as bool? ?? false,
+      posMultiBranchEnabled: fields[47] as bool? ?? false,
+      posVideoGenEnabled: fields[48] as bool? ?? false,
+      posDailyVideoQuota: (fields[49] as num?)?.toInt() ?? 0,
+      carsTier: fields[50] as String? ?? 'A',
+      carsExcelEnabled: fields[51] as bool? ?? true,
     );
   }
 
   @override
   void write(BinaryWriter writer, TenantModel obj) {
     writer
-      ..writeByte(37)
+      ..writeByte(52)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -134,7 +149,37 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       ..writeByte(27)
       ..write(obj.maxDailySharePoints)
       ..writeByte(28)
-      ..write(obj.maxDailyPurchasePoints);
+      ..write(obj.maxDailyPurchasePoints)
+      ..writeByte(37)
+      ..write(obj.posTier)
+      ..writeByte(38)
+      ..write(obj.posDeviceLimit)
+      ..writeByte(39)
+      ..write(obj.isTrialActive)
+      ..writeByte(40)
+      ..write(obj.trialStartDate)
+      ..writeByte(41)
+      ..write(obj.trialEndDate)
+      ..writeByte(42)
+      ..write(obj.posGraceDays)
+      ..writeByte(43)
+      ..write(obj.posLanSyncEnabled)
+      ..writeByte(44)
+      ..write(obj.posCloudBackupEnabled)
+      ..writeByte(45)
+      ..write(obj.posRemoteDashEnabled)
+      ..writeByte(46)
+      ..write(obj.posExcelEnabled)
+      ..writeByte(47)
+      ..write(obj.posMultiBranchEnabled)
+      ..writeByte(48)
+      ..write(obj.posVideoGenEnabled)
+      ..writeByte(49)
+      ..write(obj.posDailyVideoQuota)
+      ..writeByte(50)
+      ..write(obj.carsTier)
+      ..writeByte(51)
+      ..write(obj.carsExcelEnabled);
   }
 
   @override

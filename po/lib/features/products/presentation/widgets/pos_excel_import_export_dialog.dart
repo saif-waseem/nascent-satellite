@@ -137,13 +137,13 @@ class PosExcelImportExportDialog extends HookConsumerWidget {
 
   Future<void> _importProducts(BuildContext context, WidgetRef ref) async {
     try {
-      final files = await FilePicker.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
       );
 
-      if (files.isNotEmpty) {
-        final file = files.first;
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
         final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
         if (bytes == null) throw Exception('الملف فارغ');
 

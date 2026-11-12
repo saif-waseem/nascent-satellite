@@ -314,7 +314,7 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────
-  # Job 6: Car Contracts — Windows EXE
+  # Job 6: Car Contracts (Cars App) — Windows EXE
   # ─────────────────────────────────────────────
   build-car-contracts-windows:
     runs-on: windows-latest
@@ -337,15 +337,15 @@ jobs:
           cd pa/shared_models
           flutter pub get
 
-      - name: Flutter pub get - car_contracts
+      - name: Flutter pub get - cars_app
         run: |
-          cd car_contracts
+          cd ecommerce_saas/apps/cars_app
           flutter clean
           flutter pub get
 
       - name: Build Car Contracts Windows
         run: |
-          cd car_contracts
+          cd ecommerce_saas/apps/cars_app
           flutter build windows --release --no-tree-shake-icons
 
       - name: Package Windows Build
@@ -353,8 +353,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "build-artifacts"
           $candidates = @(
-            "car_contracts/build/windows/x64/runner/Release",
-            "car_contracts/build/windows/runner/Release"
+            "ecommerce_saas/apps/cars_app/build/windows/x64/runner/Release",
+            "ecommerce_saas/apps/cars_app/build/windows/runner/Release"
           )
           $found = $null
           foreach ($c in $candidates) {
@@ -376,7 +376,7 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────
-  # Job 7: Car Contracts — Android APK
+  # Job 7: Car Contracts (Cars App) — Android APK
   # ─────────────────────────────────────────────
   build-car-contracts-android:
     runs-on: ubuntu-latest
@@ -402,21 +402,21 @@ jobs:
           cd pa/shared_models
           flutter pub get
 
-      - name: Flutter pub get - car_contracts
+      - name: Flutter pub get - cars_app
         run: |
-          cd car_contracts
+          cd ecommerce_saas/apps/cars_app
           flutter clean
           flutter pub get
 
       - name: Build Car Contracts APK
         run: |
-          cd car_contracts
+          cd ecommerce_saas/apps/cars_app
           flutter build apk --release --no-tree-shake-icons
 
       - name: Rename & Move APK
         run: |
           mkdir -p build-artifacts
-          find car_contracts/build -name "*.apk" -exec cp {} build-artifacts/car_contracts_android.apk \;
+          find ecommerce_saas/apps/cars_app/build -name "*.apk" -exec cp {} build-artifacts/car_contracts_android.apk \;
 
       - name: Upload Artifact - Car Contracts Android
         uses: actions/upload-artifact@v4

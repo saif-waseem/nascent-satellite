@@ -1,7 +1,6 @@
-# ProGuard Rules for Security & Obfuscation
+﻿# ProGuard Rules for Security & Obfuscation
 # Protects Flutter e-commerce and POS against reverse engineering
 
-# Obfuscate all application classes & code
 -repackageclasses ''
 -allowaccessmodification
 
@@ -26,3 +25,7 @@
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Fix R8 missing class warnings for Google Play Core (used by Flutter deferred components)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }

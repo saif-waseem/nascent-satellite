@@ -229,6 +229,11 @@ jobs:
           flutter clean
           flutter pub get
 
+      - name: Copy google-services.json
+        run: |
+          mkdir -p st/android/app
+          cp Firebase_Credentials/st_google-services.json st/android/app/google-services.json
+
       - name: Build Store Admin APK
         run: |
           cd st
@@ -285,6 +290,11 @@ jobs:
           cd ua
           flutter clean
           flutter pub get
+
+      - name: Copy google-services.json
+        run: |
+          mkdir -p ua/android/app
+          cp Firebase_Credentials/ua_google-services.json ua/android/app/google-services.json
 
       - name: Build User App APK
         run: |

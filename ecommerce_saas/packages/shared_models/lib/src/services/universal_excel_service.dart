@@ -63,7 +63,7 @@ class UniversalExcelService {
     }
 
     // Prepend UTF-8 BOM (\uFEFF) so Excel displays Arabic correctly without garbled text
-    return '\uFEFF' + const ListToCsvConverter().convert(rows);
+    return '\uFEFF' + csv.encode(rows);
   }
 
   /// Parses CSV string into a list of parsed product maps ready to save
@@ -74,7 +74,7 @@ class UniversalExcelService {
       cleanStr = cleanStr.substring(1);
     }
 
-    final rows = const CsvToListConverter().convert(cleanStr);
+    final rows = csv.decode(cleanStr);
     if (rows.length <= 1) return [];
 
     final List<Map<String, dynamic>> result = [];

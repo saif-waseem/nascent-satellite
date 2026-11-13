@@ -42,6 +42,21 @@ final tenantProvider = StreamProvider<TenantModel?>((ref) async* {
     return;
   }
 
+  // Handle local offline / free store mode
+  if (tenantId == 'local_store' || tenantId == 'demo') {
+    yield TenantModel(
+      id: tenantId,
+      name: 'متجر الكاشير (وضع محلي)',
+      adminIds: const ['admin'],
+      isActive: true,
+      isPosEnabled: true,
+      createdAt: DateTime.now(),
+      posTier: 'A',
+      posExcelEnabled: true,
+    );
+    return;
+  }
+
   // 1. First immediate yield from Supabase SQL (New Architecture)
   final supabaseService = ref.read(posSupabaseServiceProvider);
   try {
@@ -53,13 +68,17 @@ final tenantProvider = StreamProvider<TenantModel?>((ref) async* {
     debugPrint('Supabase tenant initial fetch note: $e');
   }
 
-  // 2. Continuous real-time updates via Firestore
-  yield* FirebaseFirestore.instance
-      .collection('tenants')
-      .doc(tenantId)
-      .snapshots()
-      .map((snapshot) {
-        if (!snapshot.exists || snapshot.data() == null) return null;
-        return TenantModel.fromJson({'id': snapshot.id, ...snapshot.data()!});
-      });
+  // 2. Real-time updates via Firestore
+  try {
+    yield* FirebaseFirestore.instance
+        .collection('tenants')
+        .doc(tenantId)
+        .snapshots()
+        .map((snapshot) {
+          if (!snapshot.exists || snapshot.data() == null) return null;
+          return TenantModel.fromJson({'id': snapshot.id, ...snapshot.data()!});
+        });
+  } catch (e) {
+    debugPrint('Firestore tenant stream note: $e');
+  }
 });

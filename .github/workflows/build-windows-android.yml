@@ -424,3 +424,120 @@ jobs:
           name: car-contracts-android
           path: build-artifacts/car_contracts_android.apk
           retention-days: 30
+
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 8: POS / Cashier (pos_app) — Windows EXE
+  # ─────────────────────────────────────────────────────────────────
+  build-pos-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Flutter pub get - shared_models (ecommerce_saas)
+        run: |
+          cd ecommerce_saas/packages/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - pos_app
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter clean
+          flutter pub get
+
+      - name: Build POS Windows
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter build windows --release --no-tree-shake-icons
+
+      - name: Package Windows Build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "build-artifacts"
+          $candidates = @(
+            "ecommerce_saas/apps/pos_app/build/windows/x64/runner/Release",
+            "ecommerce_saas/apps/pos_app/build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if ($found) {
+            Write-Host "Packaging from: $found"
+            Compress-Archive -Path "$found\*" -DestinationPath "build-artifacts/pos_windows.zip" -Force
+          } else {
+            Write-Error "Could not find build output directory!"
+            exit 1
+          }
+
+      - name: Upload Artifact - POS Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-windows
+          path: build-artifacts/pos_windows.zip
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 9: POS / Cashier (pos_app) — Android APK
+  # ─────────────────────────────────────────────────────────────────
+  build-pos-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Flutter pub get - shared_models (ecommerce_saas)
+        run: |
+          cd ecommerce_saas/packages/shared_models
+          flutter pub get
+
+      - name: Flutter pub get - pos_app
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter clean
+          flutter pub get
+
+      - name: Copy google-services.json
+        run: |
+          cp Firebase_Credentials/pos_app_google-services.json ecommerce_saas/apps/pos_app/android/app/google-services.json
+
+      - name: Build POS APK
+        run: |
+          cd ecommerce_saas/apps/pos_app
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename & Move APK
+        run: |
+          mkdir -p build-artifacts
+          find ecommerce_saas/apps/pos_app/build -name "*.apk" -exec cp {} build-artifacts/pos_android.apk \;
+
+      - name: Upload Artifact - POS Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-android
+          path: build-artifacts/pos_android.apk
+          retention-days: 30

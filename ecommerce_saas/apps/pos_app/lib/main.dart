@@ -10,11 +10,15 @@ import 'features/common/presentation/screens/activation_screen.dart';
 import 'core/widgets/license_check_wrapper.dart';
 import 'core/providers/tenant_provider.dart';
 import 'core/widgets/online_orders_listener.dart';
+import 'core/services/supabase_config.dart';
 import 'firebase_options.dart';
 
 void main() async {
   debugPrint('POS Application starting...');
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Initialize Supabase SQL Database Vault
+  await SupabaseConfig.initialize();
   
   try {
     debugPrint('Initializing Firebase...');

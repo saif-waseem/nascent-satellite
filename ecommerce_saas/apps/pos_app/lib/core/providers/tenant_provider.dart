@@ -1,10 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/pos_supabase_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('Initialize sharedPreferencesProvider in main.dart');
+});
+
+final posSupabaseServiceProvider = Provider<PosSupabaseService>((ref) {
+  return PosSupabaseService();
 });
 
 class TenantIdNotifier extends Notifier<String> {
@@ -29,16 +35,31 @@ class TenantIdNotifier extends Notifier<String> {
 
 final tenantIdProvider = NotifierProvider<TenantIdNotifier, String>(TenantIdNotifier.new);
 
-final tenantProvider = StreamProvider<TenantModel?>((ref) {
+final tenantProvider = StreamProvider<TenantModel?>((ref) async* {
   final tenantId = ref.watch(tenantIdProvider);
-  if (tenantId.isEmpty) return Stream.value(null);
-  
-  return FirebaseFirestore.instance
+  if (tenantId.isEmpty) {
+    yield null;
+    return;
+  }
+
+  // 1. First immediate yield from Supabase SQL (New Architecture)
+  final supabaseService = ref.read(posSupabaseServiceProvider);
+  try {
+    final sqlTenant = await supabaseService.getTenant(tenantId);
+    if (sqlTenant != null) {
+      yield sqlTenant;
+    }
+  } catch (e) {
+    debugPrint('Supabase tenant initial fetch note: $e');
+  }
+
+  // 2. Continuous real-time updates via Firestore
+  yield* FirebaseFirestore.instance
       .collection('tenants')
       .doc(tenantId)
       .snapshots()
       .map((snapshot) {
-        if (!snapshot.exists) return null;
-        return TenantModel.fromJson(snapshot.data()!);
+        if (!snapshot.exists || snapshot.data() == null) return null;
+        return TenantModel.fromJson({'id': snapshot.id, ...snapshot.data()!});
       });
 });

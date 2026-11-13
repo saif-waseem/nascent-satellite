@@ -1,13 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../../../../core/providers/tenant_provider.dart';
+import '../../../../core/services/pos_supabase_service.dart';
 
-final productRepositoryProvider = Provider((ref) => ProductRepository(FirebaseFirestore.instance));
+final productRepositoryProvider = Provider((ref) => ProductRepository(
+  FirebaseFirestore.instance,
+  ref.watch(posSupabaseServiceProvider),
+));
 
 class ProductRepository {
   final FirebaseFirestore _firestore;
+  final PosSupabaseService _supabaseService;
 
-  ProductRepository(this._firestore);
+  ProductRepository(this._firestore, this._supabaseService);
 
   // --- Tenant-scoped path ---
   CollectionReference<ProductModel> _productBase(String tenantId) =>
@@ -20,6 +26,15 @@ class ProductRepository {
           );
 
   Future<List<ProductModel>> getProducts(String tenantId) async {
+    // 1. Try Supabase SQL first
+    try {
+      final sqlProducts = await _supabaseService.getProducts(tenantId);
+      if (sqlProducts.isNotEmpty) {
+        return sqlProducts;
+      }
+    } catch (_) {}
+
+    // 2. Fallback to Firestore SDK
     final snapshot = await _productBase(tenantId)
         .where('tenantId', isEqualTo: tenantId)
         .get();
@@ -35,7 +50,16 @@ class ProductRepository {
       id: docRef.id,
       tenantId: tenantId,
     );
-    await docRef.set(updatedProduct);
+
+    // 1. Save to Supabase SQL Database
+    try {
+      await _supabaseService.saveProduct(updatedProduct, tenantId);
+    } catch (_) {}
+
+    // 2. Save to Firestore
+    try {
+      await docRef.set(updatedProduct);
+    } catch (_) {}
   }
 
   Future<void> deleteProduct(String tenantId, String productId, {bool permanent = false}) async {
@@ -71,7 +95,6 @@ class ProductRepository {
   }
 
   Stream<List<ProductModel>> watchProducts(String tenantId) {
-
     return _productBase(tenantId)
         .where('tenantId', isEqualTo: tenantId)
         .snapshots()

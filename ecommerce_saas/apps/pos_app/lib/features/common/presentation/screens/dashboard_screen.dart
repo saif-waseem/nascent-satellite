@@ -24,6 +24,8 @@ import '../../../staff/providers/salary_providers.dart';
 import '../../../../core/services/media_sync_service.dart';
 import '../../../sales/presentation/screens/return_exchange_screen.dart';
 import '../../../staff/data/attendance_repository.dart';
+import '../widgets/tier_badge_widget.dart';
+import '../../../products/presentation/widgets/pos_excel_dialog.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -61,6 +63,17 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('نظام المبيعات POS'),
         actions: [
+          const TierBadgeWidget(compact: true),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'استيراد وتصدير إكسل (Excel)',
+            icon: const Icon(Icons.table_view_rounded, color: Colors.green),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const PosExcelDialog(),
+            ),
+          ),
+          const SizedBox(width: 8),
           staffAsync.when(
             data: (list) => DropdownButton<String>(
               hint: const Text('اختر الموظف'),

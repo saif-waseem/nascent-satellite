@@ -113,6 +113,11 @@ class TenantModel extends Equatable {
   @HiveField(49)
   final int posDailyVideoQuota; // عدد الفيديوهات المسموحة يومياً
 
+  String get effectivePosTier => posTier.isNotEmpty ? posTier : 'A';
+  bool get isPosExcelAllowed => posExcelEnabled || effectivePosTier == 'C' || effectivePosTier == 'D';
+  bool get isPosLanAllowed => posLanSyncEnabled || ['B', 'C', 'D'].contains(effectivePosTier);
+  bool get isPosCloudAllowed => posCloudBackupEnabled || ['C', 'D'].contains(effectivePosTier);
+
   const TenantModel({
     required this.id,
     required this.name,

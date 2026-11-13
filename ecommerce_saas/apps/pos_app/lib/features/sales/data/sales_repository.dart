@@ -1,10 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import '../../../../core/providers/tenant_provider.dart';
+import '../../../../core/services/pos_supabase_service.dart';
+
 class SalesRepository {
   final FirebaseFirestore _firestore;
+  final PosSupabaseService? _supabaseService;
 
-  SalesRepository(this._firestore);
+  SalesRepository(this._firestore, [this._supabaseService]);
 
   CollectionReference<SalesInvoiceModel> _salesRef(String tenantId) =>
       _firestore
@@ -311,8 +315,15 @@ class SalesRepository {
     }
 
     await batch.commit();
+
+    // 4. Sync Invoice to Supabase SQL Database (New Architecture)
+    if (_supabaseService != null) {
+      try {
+        await _supabaseService.saveInvoice(finalInvoice, tenantId);
+      } catch (_) {}
+    }
   }
 }
 
 final salesRepositoryProvider =
-    Provider((ref) => SalesRepository(FirebaseFirestore.instance));
+    Provider((ref) => SalesRepository(FirebaseFirestore.instance, ref.watch(posSupabaseServiceProvider)));

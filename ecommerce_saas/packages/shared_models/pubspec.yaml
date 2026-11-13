@@ -16,6 +16,7 @@ dependencies:
   hive_flutter: ^1.1.0
   chewie: ^1.8.1
   video_player: ^2.8.2
+  csv: ^8.0.0
 
 dev_dependencies:
   flutter_test:

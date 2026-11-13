@@ -6,6 +6,7 @@ import '../providers/product_providers.dart';
 import 'product_form_screen.dart';
 import '../../data/product_repository.dart';
 import '../../../../core/providers/tenant_provider.dart';
+import '../widgets/pos_excel_dialog.dart';
 
 class ProductListScreen extends HookConsumerWidget {
   const ProductListScreen({super.key});
@@ -94,6 +95,14 @@ class ProductListScreen extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('إدارة المنتجات / Products'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.table_view_rounded, color: Colors.green),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const PosExcelDialog(),
+            ),
+            tooltip: 'استيراد وتصدير إكسل (Excel)',
+          ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),
             onPressed: () => _showArchiveDialog(context, ref),

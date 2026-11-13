@@ -17,3 +17,4 @@ export 'src/models/expense_model.dart';
 export 'src/models/staff_member_model.dart';
 export 'src/models/pos_role_model.dart';
 export 'src/models/attendance_model.dart';
+export 'src/services/universal_excel_service.dart';

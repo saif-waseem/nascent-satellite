@@ -58,6 +58,8 @@ class ProductFormScreen extends HookConsumerWidget {
     
     final expiryDate = useState<DateTime?>(product?.expiryDate);
     final images = useState<List<String>>(product?.images ?? []);
+    final videoUrl = useState<String?>(product?.videoUrl);
+    final isUploadingVideo = useState<bool>(false);
     final supplierId = useState<String?>(product?.lastSupplierId);
     final sizes = useState<List<String>>(product?.sizes ?? []);
     final colors = useState<List<String>>(product?.colors ?? []);
@@ -104,6 +106,19 @@ class ProductFormScreen extends HookConsumerWidget {
         return;
       }
 
+      int totalStock = int.tryParse(stockController.text) ?? 0;
+      if (variants.value.isNotEmpty) {
+        final variantTotal = variants.value.fold(0, (sum, v) {
+          if (v.storageLocations.isNotEmpty) {
+            return sum + v.storageLocations.fold(0, (s, loc) => s + loc.quantity);
+          }
+          return sum + v.stock;
+        });
+        if (variantTotal > 0) {
+          totalStock = variantTotal;
+        }
+      }
+
       final newProduct = (product ?? ProductModel(
         id: '', tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
       )).copyWith(
@@ -113,12 +128,13 @@ class ProductFormScreen extends HookConsumerWidget {
         purchasePrice: double.tryParse(purchasePriceController.text) ?? 0.0,
         price: double.tryParse(retailPriceController.text) ?? 0.0,
         wholesalePrice: double.tryParse(wholesalePriceController.text) ?? 0.0,
-        stockQuantity: int.tryParse(stockController.text) ?? 0,
+        stockQuantity: totalStock,
         minStockLevel: int.tryParse(minStockController.text) ?? 0,
         unit: unitController.text.trim(),
         category: categoryController.text.trim(),
         expiryDate: expiryDate.value,
         images: images.value,
+        videoUrl: videoUrl.value,
         sizes: sizes.value,
         colors: colors.value,
         variants: variants.value,
@@ -133,7 +149,7 @@ class ProductFormScreen extends HookConsumerWidget {
         await ref.read(productRepositoryProvider).saveProduct(tenantId, newProduct);
         if (context.mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ المنتج 성공')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ المنتج بنجاح')));
         }
       } catch (e) {
         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
@@ -230,11 +246,11 @@ class ProductFormScreen extends HookConsumerWidget {
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: TextInputType.number)),
+                            Expanded(child: TextField(controller: purchasePriceController, decoration: _inputDecoration('سعر الشراء'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                             const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع (مفرد)'), keyboardType: TextInputType.number)),
+                            Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع (مفرد)'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                             const SizedBox(width: 16),
-                            Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: TextInputType.number)),
+                            Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -300,15 +316,22 @@ class ProductFormScreen extends HookConsumerWidget {
                         ),
                         const SizedBox(height: 32),
                         
-                        _buildSectionHeader('الأحجام والألوان (الأنواع)', Icons.style_outlined),
+                        _buildSectionHeader('الأحجام والألوان (الأنواع والمخازن)', Icons.style_outlined),
                         const SizedBox(height: 16),
                         _buildVariantsSection(context, sizes, colors, variants, retailPriceController),
                         const SizedBox(height: 32),
-                        const SizedBox(height: 32),
 
-                        _buildSectionHeader('الصور', Icons.image_outlined),
+                        _buildSectionHeader('الصور والفيديو', Icons.image_outlined),
                         const SizedBox(height: 16),
                         _buildImageGrid(images, tenantId, ref),
+                        const SizedBox(height: 24),
+                        _buildVideoSection(
+                          videoUrl: videoUrl,
+                          isUploading: isUploadingVideo,
+                          tenantId: tenantId,
+                          context: context,
+                          ref: ref,
+                        ),
                         const SizedBox(height: 32),
 
                         _buildSectionHeader('خيارات متقدمة', Icons.settings_outlined),
@@ -362,6 +385,7 @@ class ProductFormScreen extends HookConsumerWidget {
     TextEditingController priceController,
   ) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -385,26 +409,144 @@ class ProductFormScreen extends HookConsumerWidget {
           ],
         ),
         const SizedBox(height: 16),
-        if (sizes.value.isNotEmpty || colors.value.isNotEmpty)
-          OutlinedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('إضافة نوع (Variant) بسعر مخصص'),
-            onPressed: () => _showAddVariantDialog(context, sizes.value, colors.value, variants, priceController),
-          ),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('إضافة نوع (Variant)'),
+              onPressed: () => _showAddVariantDialog(context, sizes.value, colors.value, variants, priceController),
+            ),
+          ],
+        ),
         if (variants.value.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: variants.value.asMap().entries.map((entry) {
-              final v = entry.value;
-              return Chip(
-                label: Text('${v.size ?? ''} - ${v.color ?? ''} : ${v.price ?? 'سعر افتراضي'}'),
-                onDeleted: () => variants.value = List.from(variants.value)..removeAt(entry.key),
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: variants.value.length,
+            itemBuilder: (context, idx) {
+              final v = variants.value[idx];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey.shade200)),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${v.color} - ${v.size}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 4),
+                            Text('السعر: ${v.price != null ? "${v.price} IQD" : "السعر الأساسي"} | الكمية: ${v.stock} قطعة', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                            if (v.storageLocations.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Wrap(
+                                spacing: 6,
+                                children: v.storageLocations.map((loc) => Chip(
+                                  label: Text('${loc.warehouseName}: ${loc.quantity}', style: const TextStyle(fontSize: 10)),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                )).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_location_alt_outlined, color: Colors.blue),
+                        tooltip: 'إدارة المخازن',
+                        onPressed: () => _showManageLocationsDialog(context, variants, idx),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        tooltip: 'حذف النوع',
+                        onPressed: () => variants.value = List.from(variants.value)..removeAt(idx),
+                      ),
+                    ],
+                  ),
+                ),
               );
-            }).toList(),
+            },
           ),
         ],
       ],
+    );
+  }
+
+  void _showManageLocationsDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants, int vIdx) {
+    List<ProductStorageLocation> localLocations = List.from(variants.value[vIdx].storageLocations);
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('إدارة المخازن والكميات لهذا الصنف'),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...localLocations.asMap().entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: entry.value.warehouseName,
+                            decoration: const InputDecoration(labelText: 'اسم المخزن / الفرع'),
+                            onChanged: (v) => localLocations[entry.key] = entry.value.copyWith(warehouseName: v),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 70,
+                          child: TextFormField(
+                            initialValue: entry.value.quantity.toString(),
+                            decoration: const InputDecoration(labelText: 'الكمية'),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) => localLocations[entry.key] = entry.value.copyWith(quantity: int.tryParse(v) ?? 0),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            localLocations.removeAt(entry.key);
+                            setState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  )),
+                  TextButton.icon(
+                    onPressed: () {
+                      localLocations.add(const ProductStorageLocation(warehouseName: 'مخزن جديد', quantity: 0));
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('إضافة مخزن'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () {
+                final totalQty = localLocations.fold(0, (sum, loc) => sum + loc.quantity);
+                variants.value = List.from(variants.value)..[vIdx] = variants.value[vIdx].copyWith(
+                  storageLocations: localLocations,
+                  stock: totalQty,
+                );
+                Navigator.pop(ctx);
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -460,6 +602,7 @@ class ProductFormScreen extends HookConsumerWidget {
     String? selectedSize = sizes.isNotEmpty ? sizes.first : null;
     String? selectedColor = colors.isNotEmpty ? colors.first : null;
     final pController = TextEditingController(text: priceController.text);
+    final qController = TextEditingController(text: '0');
 
     showDialog(
       context: context,
@@ -475,30 +618,172 @@ class ProductFormScreen extends HookConsumerWidget {
                   items: sizes.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (v) => setState(() => selectedSize = v),
                   decoration: const InputDecoration(labelText: 'الحجم'),
+                )
+              else
+                TextField(
+                  decoration: const InputDecoration(labelText: 'الحجم / القياس (مثال: XL)'),
+                  onChanged: (v) => selectedSize = v,
                 ),
+              const SizedBox(height: 8),
               if (colors.isNotEmpty)
                 DropdownButtonFormField<String>(
                   value: selectedColor,
                   items: colors.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (v) => setState(() => selectedColor = v),
                   decoration: const InputDecoration(labelText: 'اللون'),
+                )
+              else
+                TextField(
+                  decoration: const InputDecoration(labelText: 'اللون (مثال: أسود)'),
+                  onChanged: (v) => selectedColor = v,
                 ),
-              TextField(controller: pController, decoration: const InputDecoration(labelText: 'السعر لهذا النوع'), keyboardType: TextInputType.number),
+              const SizedBox(height: 8),
+              TextField(controller: qController, decoration: const InputDecoration(labelText: 'الكمية'), keyboardType: TextInputType.number),
+              const SizedBox(height: 8),
+              TextField(controller: pController, decoration: const InputDecoration(labelText: 'السعر المخصص (اختياري)'), keyboardType: const TextInputType.numberWithOptions(decimal: true)),
             ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-            TextButton(onPressed: () {
-              variants.value = [...variants.value, ProductVariant(
-                size: selectedSize ?? 'Default',
-                color: selectedColor ?? 'Default',
-                price: double.tryParse(pController.text),
-                stock: 0,
-              )];
-              Navigator.pop(ctx);
-            }, child: const Text('إضافة')),
+            FilledButton(
+              onPressed: () {
+                final qty = int.tryParse(qController.text) ?? 0;
+                variants.value = [...variants.value, ProductVariant(
+                  size: (selectedSize != null && selectedSize!.isNotEmpty) ? selectedSize! : 'Default',
+                  color: (selectedColor != null && selectedColor!.isNotEmpty) ? selectedColor! : 'Default',
+                  price: double.tryParse(pController.text),
+                  stock: qty,
+                  storageLocations: [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: qty)],
+                )];
+                Navigator.pop(ctx);
+              },
+              child: const Text('إضافة'),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVideoSection({
+    required ValueNotifier<String?> videoUrl,
+    required ValueNotifier<bool> isUploading,
+    required String tenantId,
+    required BuildContext context,
+    required WidgetRef ref,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.indigo.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.video_library_rounded, color: Colors.indigo, size: 20),
+              const SizedBox(width: 8),
+              const Text('فيديو المنتج الترويجي (Video Motion):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const Spacer(),
+              if (videoUrl.value != null && videoUrl.value!.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
+                  child: const Text('مرفوع ومفعل ✅', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (videoUrl.value != null && videoUrl.value!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
+              child: Row(
+                children: [
+                  const Icon(Icons.play_circle_fill, color: Colors.indigo, size: 28),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      videoUrl.value!,
+                      style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'إزالة الفيديو',
+                    onPressed: () => videoUrl.value = null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (isUploading.value) ...[
+            const Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 12),
+                Text('جاري رفع الفيديو إلى السحابة... يرجى الانتظار', style: TextStyle(fontSize: 12, color: Colors.indigo)),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                icon: const Icon(Icons.upload_file_rounded),
+                label: const Text('رفع فيديو من الجهاز 📤'),
+                onPressed: isUploading.value
+                    ? null
+                    : () async {
+                        try {
+                          isUploading.value = true;
+                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo(tenantId: tenantId);
+                          if (url != null) {
+                            videoUrl.value = url;
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('تم رفع الفيديو وتعيينه للمنتج بنجاح!'), backgroundColor: Colors.green),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('فشل رفع الفيديو: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        } finally {
+                          isUploading.value = false;
+                        }
+                      },
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: ValueKey(videoUrl.value ?? 'empty_pos_video'),
+            initialValue: videoUrl.value ?? '',
+            decoration: InputDecoration(
+              labelText: 'أو الصق رابط الفيديو المباشر (URL)',
+              hintText: 'https://.../video.mp4',
+              prefixIcon: const Icon(Icons.link, size: 20),
+              isDense: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onChanged: (val) {
+              videoUrl.value = val.trim().isEmpty ? null : val.trim();
+            },
+          ),
+        ],
       ),
     );
   }
@@ -518,18 +803,18 @@ class ProductFormScreen extends HookConsumerWidget {
           secondary: Icon(Icons.local_offer, color: Colors.orange.shade400),
         ),
         SwitchListTile(
-          title: const Text('منتج مميز (Featured Deal)'),
-          subtitle: const Text('سيظهر في الشريط العلوي المميز'),
+          title: const Text('عرض مميز (Featured Deal)'),
+          subtitle: const Text('سيظهر في الشريط الإعلاني العلوي'),
           value: isFeaturedDeal.value,
           onChanged: (v) => isFeaturedDeal.value = v,
-          secondary: Icon(Icons.star, color: Colors.yellow.shade700),
+          secondary: Icon(Icons.star, color: Colors.amber.shade400),
         ),
         SwitchListTile(
-          title: const Text('منتج يومي (Daily Starred)'),
-          subtitle: const Text('تفعيل ميزة النجوم اليومية'),
+          title: const Text('عرض اليوم المميز (Daily Starred)'),
+          subtitle: const Text('تمييز المنتج لليوم الحالي'),
           value: isDailyStarred.value,
           onChanged: (v) => isDailyStarred.value = v,
-          secondary: Icon(Icons.calendar_today, color: Colors.purple.shade400),
+          secondary: Icon(Icons.verified, color: Colors.blue.shade400),
         ),
       ],
     );
@@ -538,50 +823,80 @@ class ProductFormScreen extends HookConsumerWidget {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: Colors.blue.shade700, size: 20),
+        Icon(icon, color: Colors.blue.shade600, size: 24),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
 
   Widget _buildImageGrid(ValueNotifier<List<String>> images, String tenantId, WidgetRef ref) {
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: images.value.length + 1,
-        itemBuilder: (ctx, i) {
-          if (i == images.value.length) {
-            return InkWell(
-              onTap: () async {
-                final url = await ref.read(storageServiceProvider).pickAndUploadImage(tenantId: tenantId, folder: 'products');
-                if (url != null) images.value = [...images.value, url];
-              },
-              child: Container(
-                width: 100,
-                decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade100)),
-                child: Icon(Icons.add_a_photo, color: Colors.blue.shade600),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 120,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              ...images.value.asMap().entries.map((entry) => Stack(
+                children: [
+                  Container(
+                    width: 120,
+                    height: 120,
+                    margin: const EdgeInsets.only(left: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      image: DecorationImage(
+                        image: NetworkImage(entry.value),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 4,
+                    right: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                      onPressed: () {
+                        images.value = List.from(images.value)..removeAt(entry.key);
+                      },
+                    ),
+                  ),
+                ],
+              )),
+              InkWell(
+                onTap: () async {
+                  final url = await ref.read(storageServiceProvider).pickAndUploadImage(tenantId: tenantId);
+                  if (url != null) {
+                    images.value = [...images.value, url];
+                  }
+                },
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200, style: BorderStyle.solid),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo, color: Colors.blue.shade600, size: 32),
+                      const SizedBox(height: 8),
+                      Text('إضافة صورة', style: TextStyle(color: Colors.blue.shade600, fontSize: 12)),
+                    ],
+                  ),
+                ),
               ),
-            );
-          }
-          return Container(
-            width: 100,
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              image: DecorationImage(image: NetworkImage(images.value[i]), fit: BoxFit.cover),
-            ),
-            child: Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                icon: const Icon(Icons.remove_circle, color: Colors.red),
-                onPressed: () => images.value = List.from(images.value)..removeAt(i),
-              ),
-            ),
-          );
-        },
-      ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

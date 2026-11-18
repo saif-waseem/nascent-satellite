@@ -7,7 +7,6 @@ import 'package:store_admin/features/products/presentation/widgets/ai_video_gene
 import 'package:store_admin/features/shared/barcode_scanner_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
-import 'package:store_admin/core/services/storage_service.dart';
 
 class ProductFormScreen extends HookConsumerWidget {
   final ProductModel? product;
@@ -641,7 +640,7 @@ class ProductFormScreen extends HookConsumerWidget {
                     : () async {
                         try {
                           isUploading.value = true;
-                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo();
+                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo(tenantId: tenantId);
                           if (url != null) {
                             videoUrl.value = url;
                             if (context.mounted) {
@@ -697,6 +696,23 @@ class ProductFormScreen extends HookConsumerWidget {
                 },
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: ValueKey(videoUrl.value ?? 'empty_video'),
+            initialValue: videoUrl.value ?? '',
+            decoration: InputDecoration(
+              labelText: 'أو الصق رابط الفيديو المباشر (URL)',
+              hintText: 'https://.../video.mp4',
+              prefixIcon: const Icon(Icons.link, size: 20),
+              isDense: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+            onChanged: (val) {
+              videoUrl.value = val.trim().isEmpty ? null : val.trim();
+            },
           ),
         ],
       ),

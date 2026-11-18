@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
@@ -21,57 +22,169 @@ class AdaptiveVideoPlayer extends StatefulWidget {
 }
 
 class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
-  late VideoPlayerController _videoPlayerController;
+  VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    initializePlayer();
+    _initializePlayer();
   }
 
-  Future<void> initializePlayer() async {
-    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-    
-    await _videoPlayerController.initialize();
-    
-    _chewieController = ChewieController(
-      videoPlayerController: _videoPlayerController,
-      autoPlay: widget.autoPlay,
-      looping: widget.looping,
-      aspectRatio: _videoPlayerController.value.aspectRatio,
-      placeholder: const Center(child: CircularProgressIndicator()),
-      errorBuilder: (context, errorMessage) {
-        return Center(
-          child: Text(
-            errorMessage,
-            style: const TextStyle(color: Colors.white),
-          ),
-        );
-      },
-      materialProgressColors: ChewieProgressColors(
-        playedColor: Colors.red,
-        handleColor: Colors.redAccent,
-        backgroundColor: Colors.grey,
-        bufferedColor: Colors.white,
-      ),
-    );
-    setState(() {});
+  @override
+  void didUpdateWidget(covariant AdaptiveVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _initializePlayer();
+    }
+  }
+
+  Future<void> _initializePlayer() async {
+    if (widget.videoUrl.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'رابط الفيديو غير صالح أو فارغ';
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+        _errorMessage = '';
+      });
+    }
+
+    _disposeControllers();
+
+    try {
+      final uri = Uri.parse(widget.videoUrl.trim());
+      final controller = VideoPlayerController.networkUrl(uri);
+      _videoPlayerController = controller;
+
+      // Initialize with 12 seconds timeout to prevent infinite spinning
+      await controller.initialize().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {
+          throw TimeoutException('استغرق تحميل الفيديو وقتاً أطول من المتوقع');
+        },
+      );
+
+      if (!mounted) return;
+
+      _chewieController = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: widget.autoPlay,
+        looping: widget.looping,
+        aspectRatio: controller.value.aspectRatio > 0 ? controller.value.aspectRatio : 16 / 9,
+        placeholder: _buildPlaceholder(),
+        errorBuilder: (context, errorMessage) {
+          return _buildErrorWidget(errorMessage);
+        },
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Colors.amber.shade700,
+          handleColor: Colors.amber,
+          backgroundColor: Colors.grey.shade700,
+          bufferedColor: Colors.white70,
+        ),
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('AdaptiveVideoPlayer initialization error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'تعذر تشغيل الفيديو: $e';
+        });
+      }
+    }
+  }
+
+  void _disposeControllers() {
+    _chewieController?.dispose();
+    _chewieController = null;
+    _videoPlayerController?.dispose();
+    _videoPlayerController = null;
   }
 
   @override
   void dispose() {
-    _videoPlayerController.dispose();
-    _chewieController?.dispose();
+    _disposeControllers();
     super.dispose();
+  }
+
+  Widget _buildPlaceholder() {
+    if (widget.previewImageUrl != null && widget.previewImageUrl!.isNotEmpty) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(widget.previewImageUrl!, fit: BoxFit.cover),
+          Container(color: Colors.black38),
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
+        ],
+      );
+    }
+    return const Center(child: CircularProgressIndicator(color: Colors.white));
+  }
+
+  Widget _buildErrorWidget(String error) {
+    return Container(
+      color: Colors.black87,
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.videocam_off_rounded, color: Colors.amber, size: 48),
+            const SizedBox(height: 12),
+            const Text(
+              'تعذر تشغيل الفيديو داخل المشغل',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.videoUrl,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _initializePlayer,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('إعادة المحاولة'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_chewieController != null && _chewieController!.videoPlayerController.value.isInitialized) {
-      return Chewie(controller: _chewieController!);
-    } else {
-      return const Center(child: CircularProgressIndicator());
+    if (_hasError) {
+      return _buildErrorWidget(_errorMessage);
     }
+
+    if (_isLoading || _chewieController == null || !_videoPlayerController!.value.isInitialized) {
+      return _buildPlaceholder();
+    }
+
+    return Chewie(controller: _chewieController!);
   }
 }

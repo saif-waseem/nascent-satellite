@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,7 +23,6 @@ class StorageService {
         return _uploadToImgBB(image);
       }
       
-      // Future providers (S3, Cloudinary) can be added here
       return null;
     } catch (e) {
       print('CRITICAL STORAGE ERROR: $e');
@@ -66,86 +68,106 @@ class StorageService {
     }
   }
 
+  /// Picks a video file reliably across all platforms (Windows, Android, iOS, macOS)
+  /// and uploads it to Supabase Storage or Firebase Storage
   Future<String?> pickAndUploadVideo({String folder = 'products_videos', String tenantId = 'store'}) async {
     try {
-      final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
-      if (video == null) return null;
+      // 1. Pick video using FilePicker (Cross-platform Windows Desktop & Mobile support)
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'],
+        allowMultiple: false,
+        withData: true,
+      );
 
-      // 1. First priority: Supabase Storage (Works flawlessly in Iraq via Cloudflare Global CDN)
-      try {
-        final cleanName = video.name.split(RegExp(r'[/\\]')).last;
-        final path = '$tenantId/videos/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
-        final bytes = await video.readAsBytes();
+      if (result == null || result.files.isEmpty) return null;
+      final file = result.files.single;
 
-        await Supabase.instance.client.storage.from('product-media').uploadBinary(
-              path,
-              bytes,
-              fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true),
-            );
-        return Supabase.instance.client.storage.from('product-media').getPublicUrl(path);
-      } catch (supabaseError) {
-        print('Supabase storage not configured yet, trying Bunny or Firebase: $supabaseError');
+      Uint8List? bytes = file.bytes;
+      if (bytes == null && file.path != null) {
+        final f = File(file.path!);
+        if (await f.exists()) {
+          bytes = await f.readAsBytes();
+        }
       }
 
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('تعذر قراءة ملف الفيديو من الجهاز، يرجى المحاولة مع ملف آخر');
+      }
+
+      final cleanName = file.name.split(RegExp(r'[/\\]')).last.replaceAll(' ', '_');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final uploadPath = '$tenantId/videos/${timestamp}_$cleanName';
+
+      // 2. First priority: Supabase Storage (Works flawlessly in Iraq via Cloudflare Global CDN)
+      try {
+        await Supabase.instance.client.storage.from('product-media').uploadBinary(
+          uploadPath,
+          bytes,
+          fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true),
+        );
+        final publicUrl = Supabase.instance.client.storage.from('product-media').getPublicUrl(uploadPath);
+        if (publicUrl.isNotEmpty) {
+          return publicUrl;
+        }
+      } catch (supabaseError) {
+        print('Supabase storage upload note: $supabaseError');
+      }
+
+      // 3. Optional Bunny CDN video service
       if (config.videoService == 'bunny' && config.videoApiKey.isNotEmpty) {
-        return await _uploadToBunny(video);
+        final bunnyUrl = await _uploadBytesToBunny(cleanName, bytes);
+        if (bunnyUrl != null) return bunnyUrl;
       }
       
-      // Fallback: Firebase Storage
-      return await _uploadVideoToFirebaseStorage(video, folder);
+      // 4. Fallback: Firebase Storage
+      try {
+        final fileName = '${timestamp}_$cleanName';
+        final ref = FirebaseStorage.instance.ref().child(folder).child(fileName);
+        final uploadTask = await ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'video/mp4'),
+        );
+        final downloadUrl = await uploadTask.ref.getDownloadURL();
+        return downloadUrl;
+      } catch (firebaseError) {
+        print('Firebase storage upload note: $firebaseError');
+      }
+
+      throw Exception('فشل رفع الفيديو إلى السحابة. يمكنك لصق رابط الفيديو المباشر في الخانة المخصصة.');
     } catch (e) {
       print('CRITICAL VIDEO ERROR: $e');
       rethrow;
     }
   }
 
-  Future<String?> _uploadVideoToFirebaseStorage(XFile video, String folder) async {
+  Future<String?> _uploadBytesToBunny(String title, Uint8List bytes) async {
     try {
-      final cleanName = video.name.split(RegExp(r'[/\\]')).last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_$cleanName';
-      final ref = FirebaseStorage.instance.ref().child(folder).child(fileName);
-
-      final bytes = await video.readAsBytes();
-      final uploadTask = await ref.putData(
-        bytes,
-        SettableMetadata(contentType: 'video/mp4'),
+      final createUrl = 'https://video.bunnycdn.com/library/${config.videoLibraryId}/videos';
+      final createResponse = await http.post(
+        Uri.parse(createUrl),
+        headers: {
+          'AccessKey': config.videoApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'title': title}),
       );
 
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-      return downloadUrl;
+      if (createResponse.statusCode != 200) return null;
+      final videoId = json.decode(createResponse.body)['guid'];
+
+      final uploadUrl = 'https://video.bunnycdn.com/library/${config.videoLibraryId}/videos/$videoId';
+      final uploadResponse = await http.put(
+        Uri.parse(uploadUrl),
+        headers: {'AccessKey': config.videoApiKey},
+        body: bytes,
+      );
+
+      if (uploadResponse.statusCode == 200) {
+        return 'https://iframe.mediadelivery.net/play/${config.videoLibraryId}/$videoId';
+      }
     } catch (e) {
-      print('FIREBASE STORAGE VIDEO UPLOAD ERROR: $e');
-      rethrow;
-    }
-  }
-
-  Future<String?> _uploadToBunny(XFile video) async {
-    // 1. Create Placeholder
-    final createUrl = 'https://video.bunnycdn.com/library/${config.videoLibraryId}/videos';
-    final createResponse = await http.post(
-      Uri.parse(createUrl),
-      headers: {
-        'AccessKey': config.videoApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({'title': video.name}),
-    );
-
-    if (createResponse.statusCode != 200) return null;
-    final videoId = json.decode(createResponse.body)['guid'];
-
-    // 2. Upload Content
-    final uploadUrl = 'https://video.bunnycdn.com/library/${config.videoLibraryId}/videos/$videoId';
-    final bytes = await video.readAsBytes();
-    
-    final uploadResponse = await http.put(
-      Uri.parse(uploadUrl),
-      headers: {'AccessKey': config.videoApiKey},
-      body: bytes,
-    );
-
-    if (uploadResponse.statusCode == 200) {
-      return 'https://iframe.mediadelivery.net/play/${config.videoLibraryId}/$videoId';
+      print('Bunny upload error: $e');
     }
     return null;
   }

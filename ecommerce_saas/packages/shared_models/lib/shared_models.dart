@@ -3,6 +3,7 @@ library;
 export 'src/models/tenant_model.dart';
 export 'src/widgets/adaptive_video_player.dart';
 export 'src/models/product_model.dart';
+export 'src/models/product_storage_location.dart';
 export 'src/models/user_model.dart';
 export 'src/models/order_model.dart';
 export 'src/models/coupon_model.dart';

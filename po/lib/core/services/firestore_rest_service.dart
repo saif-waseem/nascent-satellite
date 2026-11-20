@@ -89,6 +89,7 @@ class FirestoreRestService {
     await _saveToCache(url, data);
 
     if (authToken == null) {
+      if (path.startsWith('products/')) throw NetworkError();
       debugPrint('OFFLINE MODE: Document saved to cache only: $path');
       return;
     }
@@ -126,7 +127,10 @@ class FirestoreRestService {
   }
 
   Future<void> deleteDocument(String path) async {
-    if (authToken == null) return;
+    if (authToken == null) {
+      if (path.startsWith('products/')) throw NetworkError();
+      return;
+    }
     try {
       final response = await http.delete(Uri.parse('$baseUrl/$path?key=$apiKey'), headers: _headers);
       if (response.statusCode != 200 && response.statusCode != 204) {

@@ -78,8 +78,10 @@ class AdminFirestoreService {
     return ProductModel.fromJson(data);
   }
 
+  String newProductId() => _db.collection('products').doc().id;
+
   Future<void> addProduct(ProductModel product, String tenantId) async {
-    final docRef = _db.collection('products').doc();
+    final docRef = _db.collection('products').doc(product.id.isEmpty ? null : product.id);
     final newProduct = product.toJson();
     newProduct['id'] = docRef.id;
     newProduct['tenantId'] = tenantId;

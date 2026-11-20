@@ -28,37 +28,40 @@ class _SharedCartPreviewScreenState extends ConsumerState<SharedCartPreviewScree
   Future<void> _loadItems() async {
     try {
       final minimalItems = await ref.read(firestoreServiceProvider).getSharedCart(widget.shareId);
+      if (!mounted) return;
       if (minimalItems == null) {
         setState(() { _error = 'Link expired or invalid'; _isLoading = false; });
         return;
       }
 
       // We need to fetch full product details for each minimal item
-      final products = ref.read(productsProvider).value ?? [];
+      final tenantId = await ref.read(resolvedTenantIdProvider.future);
+      if (!mounted) return;
+      final products = await ref.read(firestoreServiceProvider).getProducts(tenantId).first;
+      if (!mounted) return;
       final List<Map<String, dynamic>> fullItems = [];
       
       for (var d in minimalItems) {
         try {
           final product = products.firstWhere((p) => p.id == d['id']);
+          final quantity = d['q'] ?? 1;
+          if (quantity is! int || quantity <= 0 || !product.inStock || product.isArchived) continue;
+          final selected = product.variants.where((v) => v.color == (d['c'] ?? 'Default') && v.size == (d['s'] ?? 'Default')).firstOrNull;
+          if (product.variants.isNotEmpty && selected == null) continue;
           fullItems.add({
+            'imageUrl': product.images.firstOrNull,
             ...product.toJson(),
-            'quantity': d['q'] ?? 1,
+            'price': selected?.price ?? product.price,
+            'quantity': quantity,
             'color': d['c'] ?? 'Default',
             'size': d['s'] ?? 'Default',
           });
         } catch (_) {
-          // Fallback if product not in current stream
-          fullItems.add({
-            'id': d['id'],
-            'name': 'Product ${d['id']}',
-            'price': 0.0,
-            'quantity': d['q'] ?? 1,
-            'color': d['c'] ?? 'Default',
-            'size': d['s'] ?? 'Default',
-          });
+          continue;
         }
       }
 
+      if (fullItems.isEmpty) throw StateError('No available products');
       setState(() { _items = fullItems; _isLoading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = 'Failed to load items'; _isLoading = false; });

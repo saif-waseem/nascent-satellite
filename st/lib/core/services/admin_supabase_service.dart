@@ -41,9 +41,18 @@ class AdminSupabaseService {
         .toList();
   }
 
-  Future<void> saveProduct(ProductModel product, String tenantId) async {
+  Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock}) async {
     final row = _mapProductToRow(product, tenantId);
-    await client.from('products').upsert(row);
+    if (previousStock == null) {
+      await client.from('products').upsert(row);
+      return;
+    }
+    final updated = await client.from('products').update(row)
+        .eq('id', product.id).eq('tenant_id', tenantId)
+        .eq('stock_quantity', previousStock).select('id').maybeSingle();
+    if (updated == null) {
+      throw StateError('تغيّر رصيد الصنف أو لم يعد موجوداً. أعد فتحه ثم احفظ التعديل.');
+    }
   }
 
   Future<void> addProduct(ProductModel product, String tenantId) async {

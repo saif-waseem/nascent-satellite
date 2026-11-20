@@ -1,3 +1,4 @@
+import 'package:user_app/core/utils/store_share.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -97,7 +98,7 @@ class LoyaltyScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           
           // Referral Section [NEW]
-          _buildReferralCard(context, user, lang),
+          _buildReferralCard(context, ref, user, lang),
           const SizedBox(height: 24),
 
           // Check-in Section
@@ -478,9 +479,9 @@ class LoyaltyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReferralCard(BuildContext context, UserModel user, String lang) {
+  Widget _buildReferralCard(BuildContext context, WidgetRef ref, UserModel user, String lang) {
     // Generate a code if not present (simplified for UI)
-    final referralCode = user.referralCode ?? '${user.name?.split(' ').first ?? 'USER'}${user.id.substring(user.id.length - 4)}'.toUpperCase();
+    final referralCode = user.referralCode ?? '—';
 
     return Container(
       width: double.infinity,
@@ -532,8 +533,13 @@ class LoyaltyScreen extends ConsumerWidget {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: () {
-                     // Share logic
+                  onPressed: () async {
+                    try {
+                      final code = await ref.read(userActionsProvider).ensureReferralCode(user);
+                      if (context.mounted) await shareStoreRoute(context, '/register?ref=${Uri.encodeQueryComponent(code)}', 'رمز دعوتي: $code');
+                    } catch (_) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذرت مشاركة الدعوة')));
+                    }
                   },
                   icon: const Icon(Icons.share_rounded, size: 18),
                   label: const Text('Share'),

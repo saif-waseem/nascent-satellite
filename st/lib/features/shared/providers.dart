@@ -9,23 +9,14 @@ import 'package:store_admin/core/services/analytics_service.dart';
 import 'package:shared_models/shared_models.dart';
 
 import 'package:store_admin/core/services/local_cache_service.dart';
-import 'package:store_admin/core/services/service_config_service.dart';
+
 
 // --- Services ---
 final adminFirestoreServiceProvider = Provider((ref) => AdminFirestoreService());
 final adminSupabaseServiceProvider = Provider((ref) => AdminSupabaseService());
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
-final storageServiceProvider = Provider((ref) {
-  final config = ref.watch(serviceConfigProvider).value ?? ServiceConfig(
-    imageService: 'imgbb',
-    imageApiKey: '4c2a2e4993d69bf3fe8bf8d09d1a2520',
-    videoService: 'disabled',
-    videoLibraryId: '',
-    videoApiKey: '',
-  );
-  return StorageService(config);
-});
+final storageServiceProvider = Provider((ref) => StorageService(ref.watch(currentTenantIdProvider)));
 
 final notificationServiceProvider = Provider((ref) => NotificationService());
 final analyticsServiceProvider = Provider((ref) => AnalyticsService());

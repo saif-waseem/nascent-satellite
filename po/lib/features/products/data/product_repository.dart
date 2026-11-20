@@ -1,3 +1,4 @@
+import '../../../core/services/cashier_stock_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -102,10 +103,42 @@ class ProductRepository {
       // Cleanup locally deleted products that still exist in Firestore (optional but usually handled by archiving)
       
       remoteProducts.sort((a, b) => a.name.compareTo(b.name));
-      return remoteProducts;
+      return await _sharedBalances(tenantId, remoteProducts);
     } catch (e) {
       debugPrint('Offline/Error fetching products: $e');
       return cached;
+    }
+  }
+
+  Future<List<ProductModel>> _sharedBalances(String tenant, List<ProductModel> products) async {
+    if (tenant == 'local_default' || products.isEmpty) return products;
+    final service = _ref.read(cashierStockProvider);
+    if (!await service.linked(tenant)) return products;
+    try {
+      final balances = await service.balances(tenant, products.where((p) => p.variants.isEmpty).map((p) => p.id));
+      final pending = <String>{};
+      for (final item in LocalDbService.getBox<SyncQueueItem>('sync_queue').values) {
+        final lines = item.data['_stockMovements'];
+        if (lines is List && item.data['tenantId'] == tenant) {
+          for (final line in lines) { pending.add(line['product'] as String); }
+        }
+      }
+      final merged = <ProductModel>[];
+      for (final p in products) {
+        final local = _box.get(p.id) ?? p;
+        final quantity = balances[p.id];
+        if (pending.contains(p.id) || quantity == null || local.variants.isNotEmpty) {
+          merged.add(local);
+        } else {
+          final updated = local.copyWith(stockQuantity: quantity, inStock: quantity > 0);
+          if (local.stockQuantity != quantity || local.inStock != updated.inStock) await _box.put(p.id, updated);
+          merged.add(updated);
+        }
+      }
+      return merged;
+    } catch (e) {
+      debugPrint('Stock balance refresh: $e');
+      return products;
     }
   }
 
@@ -132,7 +165,7 @@ class ProductRepository {
     }
     
     // Sum up all variants for total stock
-    final calculatedTotalStock = updatedVariants.fold(0, (sum, v) => sum + v.stock);
+    final calculatedTotalStock = updatedVariants.isEmpty ? product.stockQuantity : updatedVariants.fold(0, (sum, v) => sum + v.stock);
     
     return product.copyWith(
       stockQuantity: calculatedTotalStock,
@@ -356,7 +389,7 @@ class ProductRepository {
         updatedVariants[0] = v.copyWith(stock: newVStock, storageLocations: updatedLocs);
     }
 
-    final newTotalStock = updatedVariants.fold(0, (sum, v) => sum + v.stock);
+    final newTotalStock = updatedVariants.isEmpty ? (product.stockQuantity + adjustment).clamp(0, 999999).toInt() : updatedVariants.fold(0, (sum, v) => sum + v.stock);
 
     final updatedProduct = product.copyWith(
       stockQuantity: newTotalStock,
@@ -415,7 +448,7 @@ class ProductRepository {
     final chunk = allProducts.skip(startIndex).take(limit).toList();
     final nextLastDocId = chunk.isNotEmpty ? chunk.last.id : null;
 
-    return (products: chunk, lastDocId: nextLastDocId);
+    return (products: await _sharedBalances(tenantId, chunk), lastDocId: nextLastDocId);
   }
 
   Future<void> emptyArchive(String tenantId) async {

@@ -13,7 +13,7 @@ import 'package:user_app/core/services/notification_service.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:user_app/features/shared/widgets/optimized_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:user_app/core/utils/store_share.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -1330,13 +1330,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final user = ref.read(userProvider).value;
-              if (user?.referralCode != null) {
-                Share.share('استخدم كود الدعوة الخاص بي: ${user!.referralCode} عند التسجيل!');
+              if (user == null) { context.push('/login'); return; }
+              try {
+                final code = await ref.read(userActionsProvider).ensureReferralCode(user);
+                if (context.mounted) await shareStoreRoute(context, '/register?ref=${Uri.encodeQueryComponent(code)}', 'رمز دعوتي: $code');
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذرت مشاركة الدعوة')));
               }
-            },
-            style: ElevatedButton.styleFrom(
+            },            style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Colors.deepPurple,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

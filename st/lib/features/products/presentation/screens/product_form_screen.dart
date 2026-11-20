@@ -1,3 +1,4 @@
+import 'package:shared_ui/product_promo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -41,6 +42,10 @@ class ProductFormScreen extends HookConsumerWidget {
     final isEditing = product != null;
     final tenantId = ref.watch(currentTenantIdProvider);
 
+    final productId = useMemoized(
+      () => product?.id ?? ref.read(adminFirestoreServiceProvider).newProductId(),
+      [tenantId, product?.id],
+    );
     final nameController = useTextEditingController(text: product?.name ?? '');
     final barcodeController = useTextEditingController(text: product?.barcode ?? '');
     final purchasePriceController = useTextEditingController(text: product?.purchasePrice?.toString() ?? '');
@@ -111,7 +116,7 @@ class ProductFormScreen extends HookConsumerWidget {
       }
 
       final newProduct = (product ?? ProductModel(
-        id: '', tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
+        id: productId, tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
       )).copyWith(
         name: nameController.text.trim(),
         description: descriptionController.text.trim(),
@@ -137,11 +142,7 @@ class ProductFormScreen extends HookConsumerWidget {
 
       try {
         isLoading.value = true;
-        try {
-          await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId);
-        } catch (supabaseError) {
-          debugPrint('Supabase SQL save: $supabaseError');
-        }
+        await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId, previousStock: product?.stockQuantity);
         final firestore = ref.read(adminFirestoreServiceProvider);
         if (isEditing) {
           await firestore.updateProduct(newProduct, tenantId);
@@ -582,13 +583,12 @@ class ProductFormScreen extends HookConsumerWidget {
             children: [
               const Icon(Icons.video_library_rounded, color: Colors.indigo, size: 20),
               const SizedBox(width: 8),
-              const Text('فيديو المنتج الترويجي (Video Reel / Motion):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const Spacer(),
+              const Text('إعلان المنتج', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               if (videoUrl.value != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
-                  child: const Text('مرفوع ومفعل ✅', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: const Text('تم اختياره', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
@@ -603,7 +603,7 @@ class ProductFormScreen extends HookConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      videoUrl.value!,
+                      ProductPromo.styleOf(videoUrl.value) != null ? 'إعلان من صور المنتج' : videoUrl.value!,
                       style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -640,7 +640,7 @@ class ProductFormScreen extends HookConsumerWidget {
                     : () async {
                         try {
                           isUploading.value = true;
-                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo(tenantId: tenantId);
+                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo();
                           if (url != null) {
                             videoUrl.value = url;
                             if (context.mounted) {
@@ -662,7 +662,7 @@ class ProductFormScreen extends HookConsumerWidget {
               ),
               FilledButton.icon(
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('🎬 توليد فيديو بالذكاء الاصطناعي (AI Motion)'),
+                label: const Text('إنشاء إعلان من صور المنتج'),
                 style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
                 onPressed: () {
                   final dummyProduct = ProductModel(
@@ -700,7 +700,7 @@ class ProductFormScreen extends HookConsumerWidget {
           const SizedBox(height: 12),
           TextFormField(
             key: ValueKey(videoUrl.value ?? 'empty_video'),
-            initialValue: videoUrl.value ?? '',
+            initialValue: ProductPromo.styleOf(videoUrl.value) == null ? videoUrl.value ?? '' : '',
             decoration: InputDecoration(
               labelText: 'أو الصق رابط الفيديو المباشر (URL)',
               hintText: 'https://.../video.mp4',

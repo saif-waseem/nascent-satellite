@@ -21,7 +21,7 @@ allprojects {
     
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            jvmTarget.set(if (project.name == "print_bluetooth_thermal") org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8 else org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 }

@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pos_app/core/services/cashier_stock_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
@@ -39,6 +41,7 @@ class MockTenantIdNotifier extends TenantIdNotifier {
 
 void main() {
   setUpAll(() async {
+    SharedPreferences.setMockInitialValues({'stock_linked_tenant_1': true});
     PathProviderPlatform.instance = MockPathProviderPlatform();
     // Initialize Hive for testing
     Hive.init('.');
@@ -160,6 +163,10 @@ void main() {
 
     final queueItems = syncQueueBox.values.toList();
     final invoiceSyncItem = queueItems.firstWhere((item) => item.collectionPath.startsWith('sales_invoices/'));
+    final movements = invoiceSyncItem.data['_stockMovements'] as List;
+    expect(movements.single['product'], 'prod_1');
+    expect(movements.single['delta'], -2);
+    expect(movements.single['operation'], CashierStockService.movements(savedInvoice, (id) => productBox.get(id)).single['operation']);
     expect(invoiceSyncItem.action, SyncAction.create);
     expect(invoiceSyncItem.data['totalAmount'], 2000);
 

@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/product_repository.dart';
 import '../../../../core/providers/tenant_provider.dart';
 import '../providers/product_providers.dart';
-import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PosExcelImportExportDialog extends HookConsumerWidget {
   const PosExcelImportExportDialog({super.key});
@@ -108,20 +108,20 @@ class PosExcelImportExportDialog extends HookConsumerWidget {
 
   Future<void> _exportProducts(BuildContext context, WidgetRef ref) async {
     try {
-      final tenantId = ref.read(currentTenantIdProvider);
+      final tenantId = ref.read(tenantIdProvider);
       final repo = ref.read(productRepositoryProvider);
-      final products = await repo.getAllProducts(tenantId);
+      final products = repo.box.values.where((p) => p.tenantId == tenantId && !p.isArchived).toList();
 
       final csvData = UniversalExcelService.exportProductsToCsv(products, lang: 'ar');
 
       final bytes = utf8.encode(csvData);
-      final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'pos_inventory_${DateTime.now().millisecondsSinceEpoch}.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-
+      final saved = await FilePicker.saveFile(
+        fileName: 'pos_inventory_${DateTime.now().millisecondsSinceEpoch}.csv',
+        bytes: bytes,
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+      if (!kIsWeb && saved == null) return;
       if (context.mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -140,15 +140,16 @@ class PosExcelImportExportDialog extends HookConsumerWidget {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
+        withData: true,
       );
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
-        final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
+        final bytes = file.bytes;
         if (bytes == null) throw Exception('الملف فارغ');
 
         final csvString = utf8.decode(bytes);
-        final tenantId = ref.read(currentTenantIdProvider);
+        final tenantId = ref.read(tenantIdProvider);
         final parsed = UniversalExcelService.parseProductsFromCsv(csvString, tenantId);
 
         if (parsed.isEmpty) {
@@ -178,7 +179,7 @@ class PosExcelImportExportDialog extends HookConsumerWidget {
             variants: [],
           );
 
-          await repo.addProduct(newProduct, tenantId);
+          await repo.saveProduct(tenantId, newProduct);
           count++;
         }
 

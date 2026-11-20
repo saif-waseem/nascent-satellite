@@ -1,3 +1,4 @@
+import 'package:shared_ui/product_promo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -318,13 +319,16 @@ $productUrl
             if (item.videoUrl != null && item.videoUrl!.isNotEmpty) ...[
               // Video Section First
               Stack(
-                alignment: Alignment.bottomRight,
+                alignment: Alignment.topLeft,
                 children: [
                   Container(
                     height: 380,
                     width: double.infinity,
                     color: Colors.black,
-                    child: AdaptiveVideoPlayer(
+                    child: ProductPromo.styleOf(item.videoUrl) != null
+                        ? ProductPromo(style: ProductPromo.styleOf(item.videoUrl)!,
+                            title: item.name, price: formatCurrency(item.price), images: item.images)
+                        : AdaptiveVideoPlayer(
                       videoUrl: item.videoUrl!,
                       autoPlay: false,
                       looping: true,

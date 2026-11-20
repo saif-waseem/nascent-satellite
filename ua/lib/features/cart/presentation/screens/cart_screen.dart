@@ -1,3 +1,4 @@
+import 'package:user_app/core/utils/store_share.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,17 @@ class CartScreen extends HookConsumerWidget {
         title: Text(AppStrings.get('cart_title', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (cart.isNotEmpty) IconButton(icon: const Icon(Icons.share_outlined),
+            tooltip: 'مشاركة السلة', onPressed: () async {
+              try {
+                final id = await ref.read(cartProvider.notifier).generateCartLink();
+                if (context.mounted) await shareStoreRoute(context, '/share/$id', 'سلة المنتجات');
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذرت مشاركة السلة. تحقق من الاتصال.')));
+              }
+            }),
+        ],
         flexibleSpace: ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -130,6 +142,7 @@ class _CartItemCard extends ConsumerWidget {
     final name = item['name'] ?? 'Product';
     final price = (item['price'] as num?)?.toDouble() ?? 0.0;
     final quantity = item['quantity'] ?? 1;
+    final compact = MediaQuery.sizeOf(context).width < 400;
     final imageUrl = item['imageUrl'] as String?;
 
     return Container(
@@ -151,8 +164,8 @@ class _CartItemCard extends ConsumerWidget {
           children: [
             // Image
             Container(
-              width: 90,
-              height: 90,
+              width: compact ? 54 : 90,
+              height: compact ? 64 : 90,
               decoration: BoxDecoration(
                 color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(16),
@@ -201,7 +214,7 @@ class _CartItemCard extends ConsumerWidget {
                   const SizedBox(height: 8),
                   
                   // Quantity Adjuster
-                  Row(
+                  Wrap(alignment: WrapAlignment.start, crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _qtyBtn(Icons.remove, () {
                         ref.read(cartProvider.notifier).updateQuantity(index, quantity - 1);

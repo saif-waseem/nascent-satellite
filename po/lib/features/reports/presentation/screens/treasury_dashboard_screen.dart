@@ -125,8 +125,8 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          Wrap(spacing: 12,runSpacing: 8,
+            alignment: WrapAlignment.spaceAround,
             children: [
               _buildSimpleStat('المبيعات', report.totalSales, Colors.green.shade300),
               _buildSimpleStat('المصاريف', report.totalExpenses, Colors.red.shade300),
@@ -211,13 +211,13 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('الربح التشغيلي اليوم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Expanded(child: Text('صافي الربح اليوم', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                 Text(
-                  '${(report.totalSales - report.totalExpenses).toStringAsFixed(0)} IQD',
+                  '${report.netProfit.toStringAsFixed(0)} IQD',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: (report.totalSales - report.totalExpenses) >= 0 ? Colors.teal : Colors.red,
+                    color: report.netProfit >= 0 ? Colors.teal : Colors.red,
                   ),
                 ),
               ],
@@ -234,7 +234,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           Text(
             '${amount.toStringAsFixed(0)} IQD',
             style: TextStyle(fontWeight: FontWeight.bold, color: color),
@@ -249,10 +249,10 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       children: [
         Icon(icon, color: Colors.blue.shade700, size: 20),
         const SizedBox(width: 8),
-        Text(
+        Expanded(child: Text(
           title,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-        ),
+        )),
       ],
     );
   }

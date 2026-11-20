@@ -70,28 +70,60 @@ class ReportRepository {
 
   ReportRepository(this._restService);
 
-  Future<BusinessReport> getFinancialReport(String tenantId,
-      {DateTime? start, DateTime? end, String? filterByStaffId}) async {
+  Future<BusinessReport> getFinancialReport(
+    String tenantId, {
+    DateTime? start,
+    DateTime? end,
+    String? filterByStaffId,
+  }) async {
     try {
       final now = DateTime.now();
       final startDate = start ?? DateTime(now.year, now.month, 1);
-      final endDate = end != null
-          ? DateTime(end.year, end.month, end.day, 23, 59, 59)
-          : DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final lastDay = end ?? now;
+      final endExclusive = DateTime(
+        lastDay.year,
+        lastDay.month,
+        lastDay.day + 1,
+      );
 
       // --- 1. Load Data from Local Hive Boxes ---
       final salesBox = LocalDbService.getBox<SalesInvoiceModel>('sales');
       final expensesBox = LocalDbService.getBox<ExpenseModel>('expenses');
-      final purchasesBox = LocalDbService.getBox<PurchaseInvoiceModel>('purchases');
+      final purchasesBox = LocalDbService.getBox<PurchaseInvoiceModel>(
+        'purchases',
+      );
       final productsBox = LocalDbService.getBox<ProductModel>('products');
       final categoriesBox = LocalDbService.getBox<CategoryModel>('categories');
 
-      final salesList = salesBox.values.where((s) => s.tenantId == tenantId || (tenantId.isEmpty && s.tenantId == 'local_default')).toList();
-      final expensesList = expensesBox.values.where((e) => e.tenantId == tenantId || (tenantId.isEmpty && e.tenantId == 'local_default')).toList();
-      final purchasesList = purchasesBox.values.where((p) => p.tenantId == tenantId || (tenantId.isEmpty && p.tenantId == 'local_default')).toList();
+      final salesList = salesBox.values
+          .where(
+            (s) =>
+                s.tenantId == tenantId ||
+                (tenantId.isEmpty && s.tenantId == 'local_default'),
+          )
+          .toList();
+      final expensesList = expensesBox.values
+          .where(
+            (e) =>
+                e.tenantId == tenantId ||
+                (tenantId.isEmpty && e.tenantId == 'local_default'),
+          )
+          .toList();
+      final purchasesList = purchasesBox.values
+          .where(
+            (p) =>
+                p.tenantId == tenantId ||
+                (tenantId.isEmpty && p.tenantId == 'local_default'),
+          )
+          .toList();
 
       final categoryNames = {for (var c in categoriesBox.values) c.id: c.name};
-      final productCosts = {for (var p in productsBox.values) p.id: p.purchasePrice};
+      final productCosts = {
+        for (var p in productsBox.values)
+          if (p.tenantId == tenantId ||
+              (tenantId.isEmpty && p.tenantId == 'local_default'))
+            p.id: p.purchasePrice,
+      };
 
       double totalSales = 0;
       double onlineSales = 0;
@@ -108,76 +140,107 @@ class ReportRepository {
 
       // Process Sales
       for (var invoice in salesList) {
-        if (invoice.date.isBefore(startDate) || invoice.date.isAfter(endDate)) continue;
+        if (invoice.date.isBefore(startDate) ||
+            !invoice.date.isBefore(endExclusive))
+          continue;
 
-        final staffName = (invoice.addedBy?.isNotEmpty ?? false) ? invoice.addedBy! : 'موظف غير معروف';
+        final staffName = (invoice.addedBy?.isNotEmpty ?? false)
+            ? invoice.addedBy!
+            : 'موظف غير معروف';
         final staffId = invoice.addedById ?? '';
 
-        if (filterByStaffId != null && filterByStaffId.isNotEmpty && staffId != filterByStaffId) continue;
-        
-        if (invoice.isReturned) {
-          totalSales -= invoice.totalAmount;
-          returnsByStaff[staffName] = (returnsByStaff[staffName] ?? 0) + invoice.totalAmount;
-        } else {
-          totalSales += invoice.totalAmount;
-          salesCount++;
-          
-          final isOnline = invoice.sessionName?.toLowerCase() == 'online' || invoice.addedById?.startsWith('store_') == true;
-          if (isOnline) onlineSales += invoice.totalAmount;
-          
-          salesByStaff[staffName] = (salesByStaff[staffName] ?? 0) + invoice.totalAmount;
+        if (filterByStaffId != null &&
+            filterByStaffId.isNotEmpty &&
+            staffId != filterByStaffId)
+          continue;
 
-          final dateKey = invoice.date.toString().substring(0, 10);
-          salesTrend[dateKey] = (salesTrend[dateKey] ?? 0) + invoice.totalAmount;
-          
-          double invoiceProfit = 0;
-          for (final item in invoice.items) {
-            // Robust category name resolution
-            String categoryKey = 'غير مصنف';
-            if (item.category != null && item.category!.isNotEmpty) {
-              final cName = categoryNames[item.category];
-              if (cName != null && cName.isNotEmpty) {
-                categoryKey = cName;
-              } else {
-                // If it doesn't look like a Firestore ID (has spaces or is short), it might be a name already
-                final isLikelyId = item.category!.length > 15 && !item.category!.contains(' ');
-                if (!isLikelyId) {
-                  categoryKey = item.category!;
-                }
+        if (invoice.status != SalesInvoiceStatus.finalized) continue;
+        final sign = invoice.isReturned ? -1 : 1;
+        totalSales += sign * invoice.totalAmount;
+        if (invoice.isReturned) {
+          returnsByStaff[staffName] =
+              (returnsByStaff[staffName] ?? 0) + invoice.totalAmount;
+        } else {
+          salesCount++;
+        }
+
+        final isOnline =
+            invoice.sessionName?.toLowerCase() == 'online' ||
+            invoice.addedById?.startsWith('store_') == true;
+        if (isOnline) onlineSales += sign * invoice.totalAmount;
+
+        if (!invoice.isReturned)
+          salesByStaff[staffName] =
+              (salesByStaff[staffName] ?? 0) + invoice.totalAmount;
+
+        final dateKey = invoice.date.toLocal().toString().substring(0, 10);
+        salesTrend[dateKey] =
+            (salesTrend[dateKey] ?? 0) + sign * invoice.totalAmount;
+
+        double invoiceProfit = sign * invoice.totalAmount;
+        final subtotal = invoice.items.fold<double>(
+          0,
+          (sum, item) => sum + item.totalPrice,
+        );
+        final invoiceRatio = subtotal == 0
+            ? 0.0
+            : invoice.totalAmount / subtotal;
+        for (final item in invoice.items) {
+          final itemRevenue = sign * item.totalPrice * invoiceRatio;
+          // Robust category name resolution
+          String categoryKey = 'غير مصنف';
+          if (item.category != null && item.category!.isNotEmpty) {
+            final cName = categoryNames[item.category];
+            if (cName != null && cName.isNotEmpty) {
+              categoryKey = cName;
+            } else {
+              // If it doesn't look like a Firestore ID (has spaces or is short), it might be a name already
+              final isLikelyId =
+                  item.category!.length > 15 && !item.category!.contains(' ');
+              if (!isLikelyId) {
+                categoryKey = item.category!;
               }
             }
-            
-            salesByCategory[categoryKey] = (salesByCategory[categoryKey] ?? 0) + item.totalPrice;
-            salesByProduct[item.productName] = (salesByProduct[item.productName] ?? 0) + item.quantity.toInt();
-            
-            final double unitCost = productCosts[item.productId] ?? 0.0;
-            final double itemProfit = item.totalPrice - (unitCost * item.quantity);
-            totalCOGS += (unitCost * item.quantity);
-            
-            profitByProduct[item.productName] = (profitByProduct[item.productName] ?? 0) + itemProfit;
-            profitByCategory[categoryKey] = (profitByCategory[categoryKey] ?? 0) + itemProfit;
-            invoiceProfit += itemProfit;
           }
-          profitTrend[dateKey] = (profitTrend[dateKey] ?? 0) + invoiceProfit;
+
+          salesByCategory[categoryKey] =
+              (salesByCategory[categoryKey] ?? 0) + itemRevenue;
+          salesByProduct[item.productName] =
+              (salesByProduct[item.productName] ?? 0) +
+              sign * item.quantity.toInt();
+
+          final double unitCost = productCosts[item.productId] ?? 0.0;
+          final double itemProfit =
+              itemRevenue - sign * unitCost * item.quantity;
+          totalCOGS += sign * unitCost * item.quantity;
+
+          profitByProduct[item.productName] =
+              (profitByProduct[item.productName] ?? 0) + itemProfit;
+          profitByCategory[categoryKey] =
+              (profitByCategory[categoryKey] ?? 0) + itemProfit;
+          invoiceProfit -= sign * unitCost * item.quantity;
         }
+        profitTrend[dateKey] = (profitTrend[dateKey] ?? 0) + invoiceProfit;
       }
 
       // Process Expenses
       double totalExpenses = 0;
       for (var expense in expensesList) {
-        if (expense.date.isBefore(startDate) || expense.date.isAfter(endDate)) continue;
+        if (expense.date.isBefore(startDate) ||
+            !expense.date.isBefore(endExclusive))
+          continue;
         totalExpenses += expense.amount;
-        final date = expense.date.toString().substring(0, 10);
+        final date = expense.date.toLocal().toString().substring(0, 10);
         profitTrend[date] = (profitTrend[date] ?? 0) - expense.amount;
       }
 
       // Process Purchases
       double totalPurchases = 0;
       for (var invoice in purchasesList) {
-        if (invoice.date.isBefore(startDate) || invoice.date.isAfter(endDate)) continue;
+        if (invoice.date.isBefore(startDate) ||
+            !invoice.date.isBefore(endExclusive))
+          continue;
         totalPurchases += invoice.totalAmount;
-        final date = invoice.date.toString().substring(0, 10);
-        profitTrend[date] = (profitTrend[date] ?? 0) - invoice.totalAmount;
       }
 
       // Background Sync from remote (optional, to keep local cache updated)
@@ -212,8 +275,18 @@ class ReportRepository {
   }
 }
 
-final reportRepositoryProvider = Provider((ref) => ReportRepository(ref.watch(firestoreRestServiceProvider)));
+final reportRepositoryProvider = Provider(
+  (ref) => ReportRepository(ref.watch(firestoreRestServiceProvider)),
+);
 
-final financialReportProvider = FutureProvider.family<BusinessReport, ReportParams>((ref, params) async {
-  return ref.watch(reportRepositoryProvider).getFinancialReport(params.tenantId, start: params.start, end: params.end, filterByStaffId: params.filterByStaffId);
-});
+final financialReportProvider = FutureProvider.autoDispose
+    .family<BusinessReport, ReportParams>((ref, params) async {
+      return ref
+          .watch(reportRepositoryProvider)
+          .getFinancialReport(
+            params.tenantId,
+            start: params.start,
+            end: params.end,
+            filterByStaffId: params.filterByStaffId,
+          );
+    });

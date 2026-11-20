@@ -187,6 +187,8 @@ class AdminSupabaseService {
       'is_offer': p.isOffer,
       'is_featured_deal': p.isFeaturedDeal,
       'is_daily_starred': p.isDailyStarred,
+      'sizes': p.sizes,
+      'colors': p.colors,
       'variants': p.variants.map((v) => v.toJson()).toList(),
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -214,8 +216,8 @@ class AdminSupabaseService {
       isOffer: r['is_offer'] as bool? ?? false,
       isFeaturedDeal: r['is_featured_deal'] as bool? ?? false,
       isDailyStarred: r['is_daily_starred'] as bool? ?? false,
-      sizes: const [],
-      colors: const [],
+      sizes: List<String>.from(r['sizes'] ?? const []),
+      colors: List<String>.from(r['colors'] ?? const []),
       variants: (r['variants'] as List<dynamic>?)
               ?.map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
               .toList() ??

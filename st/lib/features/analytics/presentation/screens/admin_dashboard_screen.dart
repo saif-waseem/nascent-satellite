@@ -8,7 +8,6 @@ import 'package:store_admin/core/localization/app_settings_controller.dart';
 import 'package:store_admin/core/localization/resources/app_strings.dart';
 import 'package:store_admin/core/utils/formatters.dart';
 import 'package:shared_models/shared_models.dart';
-import 'package:store_admin/core/services/notification_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
@@ -28,7 +27,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final tenantId = ref.read(currentTenantIdProvider);
-      NotificationService().initialize(tenantId);
+      ref.read(notificationServiceProvider).initialize(tenantId);
     });
   }
 
@@ -88,22 +87,23 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 final sortedOrders = [...orders]..sort((a, b) => b.date.compareTo(a.date));
                 final filteredOrders = _filterByTime(sortedOrders, _timeFilter);
                 final totalOrders = filteredOrders.length;
-                final totalRevenue = filteredOrders.fold(0.0, (sum, o) => sum + o.total);
+                final revenueOrders = filteredOrders.where((o) => o.status != OrderStatus.cancelled).toList();
+                final totalRevenue = revenueOrders.fold(0.0, (sum, o) => sum + o.total);
                 
                 double totalCost = 0.0;
                 final allProducts = asyncProducts.value ?? [];
                 final purchasePriceMap = { for (var p in allProducts) p.id : (p.purchasePrice ?? 0.0) };
                 
-                for (var o in filteredOrders) {
+                for (var o in revenueOrders) {
                     for (var item in o.items) {
-                        final productId = item['productId'] as String? ?? '';
+                        final productId = (item['productId'] ?? item['id'])?.toString() ?? '';
                         final qty = (item['quantity'] as num? ?? 1).toInt();
                         final cost = purchasePriceMap[productId] ?? 0.0;
                         totalCost += cost * qty;
                     }
                 }
                 final netProfit = totalRevenue - totalCost;
-                final avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0.0;
+                final avgOrderValue = revenueOrders.isNotEmpty ? totalRevenue / revenueOrders.length : 0.0;
 
                 return Column(
                   children: [
@@ -123,7 +123,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                 flex: 2,
                                 child: _buildModernChartContainer(
                                   title: AppStrings.get('sales_trends', lang),
-                                  child: _buildRevenueChart(filteredOrders, lang),
+                                  child: _buildRevenueChart(revenueOrders, lang),
                                   lang: lang,
                                 ),
                               ),
@@ -144,7 +144,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                             children: [
                               _buildModernChartContainer(
                                 title: AppStrings.get('sales_trends', lang),
-                                child: _buildRevenueChart(filteredOrders, lang),
+                                child: _buildRevenueChart(revenueOrders, lang),
                                 lang: lang,
                               ),
                               const SizedBox(height: 24),
@@ -458,13 +458,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: isMobile ? 2 : 4,
-          childAspectRatio: isMobile ? 1.4 : 1.6,
+          crossAxisCount: constraints.maxWidth < 300 ? 1 : isMobile ? 2 : 4,
+          mainAxisExtent: 152,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           children: [
             _buildPremiumCard(AppStrings.get('revenue', lang), formatCurrency(revenue, lang: lang), Icons.payments_rounded, Colors.blue),
-            _buildPremiumCard(lang == 'ar' ? 'صافي الربح' : 'Net Profit', formatCurrency(profit, lang: lang), Icons.trending_up_rounded, Colors.green),
+            _buildPremiumCard(lang == 'ar' ? 'مجمل الربح' : 'Gross Profit', formatCurrency(profit, lang: lang), Icons.trending_up_rounded, Colors.green),
             _buildPremiumCard(AppStrings.get('orders', lang), '$orders', Icons.shopping_cart_rounded, Colors.purple),
             _buildPremiumCard(AppStrings.get('avg_order', lang), formatCurrency(avg, lang: lang), Icons.query_stats_rounded, Colors.orange),
           ],
@@ -524,7 +524,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
               const Icon(Icons.fullscreen_rounded, color: Colors.grey, size: 20),
             ],
           ),
@@ -577,7 +577,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     } else if (filter == 'Month') {
       return orders.where((o) => o.date.year == now.year && o.date.month == now.month).toList();
     } else if (filter == 'Custom' && _customRange != null) {
-      return orders.where((o) => o.date.isAfter(_customRange!.start.subtract(const Duration(seconds: 1))) && 
+      return orders.where((o) => !o.date.isBefore(_customRange!.start) &&
                                  o.date.isBefore(_customRange!.end.add(const Duration(days: 1)))).toList();
     }
     return orders;
@@ -672,7 +672,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             children: [
               const Icon(Icons.health_and_safety_rounded, color: Colors.amber),
               const SizedBox(width: 12),
-              Text(lang == 'ar' ? 'سلامة البيانات المتقدمة' : 'Advanced Data Integrity', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Expanded(child: Text(lang == 'ar' ? 'سلامة البيانات المتقدمة' : 'Advanced Data Integrity', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
             ],
           ),
           const SizedBox(height: 12),
@@ -749,7 +749,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     // Group revenue by date
     final Map<String, double> dailyRevenue = {};
     for (var o in orders) {
-      final dateKey = DateFormat('MM/dd').format(o.date);
+      final dateKey = DateFormat('yyyy-MM-dd').format(o.date.toLocal());
       dailyRevenue[dateKey] = (dailyRevenue[dateKey] ?? 0) + o.total;
     }
 
@@ -777,7 +777,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 if (sortedKeys.length > 7 && value.toInt() % 2 != 0) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 10.0),
-                  child: Text(sortedKeys[value.toInt()], style: TextStyle(fontSize: 10, color: Colors.grey[400], fontWeight: FontWeight.bold)),
+                  child: Text(sortedKeys[value.toInt()].substring(5), style: TextStyle(fontSize: 10, color: Colors.grey[400], fontWeight: FontWeight.bold)),
                 );
               },
             ),
@@ -819,7 +819,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
     final Map<String, int> dailyOrders = {};
     for (var o in orders) {
-      final dateKey = DateFormat('MM/dd').format(o.date);
+      final dateKey = DateFormat('yyyy-MM-dd').format(o.date.toLocal());
       dailyOrders[dateKey] = (dailyOrders[dateKey] ?? 0) + 1;
     }
 
@@ -842,7 +842,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 if (value.toInt() < 0 || value.toInt() >= sortedKeys.length) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(sortedKeys[value.toInt()], style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  child: Text(sortedKeys[value.toInt()].substring(5), style: const TextStyle(fontSize: 9, color: Colors.grey)),
                 );
               },
             ),

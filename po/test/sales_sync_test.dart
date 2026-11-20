@@ -65,6 +65,8 @@ void main() {
     Hive.registerAdapter(SyncActionAdapter());
     Hive.registerAdapter(SyncQueueItemAdapter());
 
+    Hive.registerAdapter(PurchaseInvoiceModelAdapter());
+    Hive.registerAdapter(PurchaseInvoiceStatusAdapter());
     await Hive.openBox<ExpenseModel>('expenses');
     await Hive.openBox<PurchaseInvoiceModel>('purchases');
     await Hive.openBox<CategoryModel>('categories');
@@ -88,14 +90,21 @@ void main() {
     final day = DateTime(2026, 11, 20);
     final sales = Hive.box<SalesInvoiceModel>('sales');
     await Hive.box<ProductModel>('products').put('p', const ProductModel(id:'p',tenantId:'test',name:'Shirt',description:'',category:'Clothes',price:100,purchasePrice:40,stockQuantity:10));
-    final invoice = SalesInvoiceModel(id:'sale',receiptNumber:'1',tenantId:'test',date:day,sessionName:'online',totalAmount:190,items:const [SalesItem(productId:'p',productName:'Shirt',quantity:2,unitPrice:100)]);
+    final invoice = SalesInvoiceModel(id:'sale',receiptNumber:'1',tenantId:'test',date:day,sessionName:'online',totalAmount:190,paidAmount:150,items:const [SalesItem(productId:'p',productName:'Shirt',quantity:2,unitPrice:100)]);
     await sales.put('sale', invoice);
-    await sales.put('refund', invoice.copyWith(isReturned:true,totalAmount:95,date:DateTime(2026,11,20,23,59,59,999),items:const [SalesItem(productId:'p',productName:'Shirt',quantity:1,unitPrice:100)]));
+    await sales.put('refund', invoice.copyWith(isReturned:true,totalAmount:95,paidAmount:95,date:DateTime(2026,11,20,23,59,59,999),items:const [SalesItem(productId:'p',productName:'Shirt',quantity:1,unitPrice:100)]));
     await sales.put('draft', invoice.copyWith(status:SalesInvoiceStatus.draft));
     await sales.put('tomorrow', invoice.copyWith(date:DateTime(2026,11,21)));
+    final purchases = Hive.box<PurchaseInvoiceModel>('purchases');
+    final purchase = PurchaseInvoiceModel(id:'purchase',tenantId:'test',supplierId:'s',items:[],totalAmount:100,paidAmount:35,date:day);
+    await purchases.put('purchase',purchase);
+    await purchases.put('draft',purchase.copyWith(status:PurchaseInvoiceStatus.draft));
     final result=await ReportRepository(MockFirestoreRestService()).getFinancialReport('test',start:day,end:day);
     expect(result.salesCount,1);
     expect(result.totalSales,95);
+    expect(result.salesPayments,55);
+    expect(result.totalPurchases,100);
+    expect(result.purchasePayments,35);
     expect(result.onlineSales,95);
     expect(result.grossProfit,55);
     expect(result.profitByProduct['Shirt'],55);

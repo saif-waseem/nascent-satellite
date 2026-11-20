@@ -53,7 +53,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
                 }
              }
           }
-          final estimatedCash = totalOpeningToday + report.totalSales - report.totalExpenses - report.totalPurchases;
+          final estimatedCash = totalOpeningToday + report.salesPayments - report.totalExpenses - report.purchasePayments;
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -110,7 +110,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       child: Column(
         children: [
           const Text(
-            'صافي حركة الصندوق (اليوم)',
+            'رصيد الصندوق التقديري اليوم',
             style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -128,9 +128,9 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
           Wrap(spacing: 12,runSpacing: 8,
             alignment: WrapAlignment.spaceAround,
             children: [
-              _buildSimpleStat('المبيعات', report.totalSales, Colors.green.shade300),
+              _buildSimpleStat('المقبوضات', report.salesPayments, Colors.green.shade300),
               _buildSimpleStat('المصاريف', report.totalExpenses, Colors.red.shade300),
-              _buildSimpleStat('المشتريات', report.totalPurchases, Colors.orange.shade300),
+              _buildSimpleStat('المدفوع للموردين', report.purchasePayments, Colors.orange.shade300),
             ],
           ),
         ],
@@ -200,11 +200,11 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
-          _buildSummaryRow('إجمالي الداخل (Sales)', report.totalSales, Colors.green),
+          _buildSummaryRow('المقبوض من المبيعات', report.salesPayments, Colors.green),
           const Divider(height: 1),
           _buildSummaryRow('إجمالي الخارج (Expenses)', report.totalExpenses, Colors.red),
           const Divider(height: 1),
-          _buildSummaryRow('إجمالي الخارج (Purchases)', report.totalPurchases, Colors.orange),
+          _buildSummaryRow('المدفوع للمشتريات', report.purchasePayments, Colors.orange),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(16.0),

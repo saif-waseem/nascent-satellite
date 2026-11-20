@@ -8,6 +8,8 @@ class BusinessReport {
   final double totalSales;
   final double totalExpenses;
   final double totalPurchases;
+  final double salesPayments;
+  final double purchasePayments;
   final double grossProfit;
   final double netProfit;
   final int salesCount;
@@ -28,6 +30,8 @@ class BusinessReport {
     required this.grossProfit,
     required this.netProfit,
     required this.salesCount,
+    this.salesPayments = 0,
+    this.purchasePayments = 0,
     this.onlineSales = 0,
     this.salesByCategory = const {},
     this.salesByStaff = const {},
@@ -126,6 +130,8 @@ class ReportRepository {
       };
 
       double totalSales = 0;
+      double salesPayments = 0;
+      double purchasePayments = 0;
       double onlineSales = 0;
       int salesCount = 0;
       final Map<String, double> salesByCategory = {};
@@ -157,6 +163,7 @@ class ReportRepository {
         if (invoice.status != SalesInvoiceStatus.finalized) continue;
         final sign = invoice.isReturned ? -1 : 1;
         totalSales += sign * invoice.totalAmount;
+        salesPayments += sign * invoice.paidAmount;
         if (invoice.isReturned) {
           returnsByStaff[staffName] =
               (returnsByStaff[staffName] ?? 0) + invoice.totalAmount;
@@ -240,7 +247,9 @@ class ReportRepository {
         if (invoice.date.isBefore(startDate) ||
             !invoice.date.isBefore(endExclusive))
           continue;
+        if (invoice.status != PurchaseInvoiceStatus.finalized) continue;
         totalPurchases += invoice.totalAmount;
+        purchasePayments += invoice.paidAmount;
       }
 
       // Background Sync from remote (optional, to keep local cache updated)
@@ -250,6 +259,8 @@ class ReportRepository {
         totalSales: totalSales,
         totalExpenses: totalExpenses,
         totalPurchases: totalPurchases,
+        salesPayments: salesPayments,
+        purchasePayments: purchasePayments,
         grossProfit: totalSales - totalCOGS,
         netProfit: totalSales - totalCOGS - totalExpenses,
         salesCount: salesCount,

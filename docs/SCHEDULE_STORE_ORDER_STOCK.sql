@@ -1,5 +1,5 @@
 BEGIN;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+CREATE EXTENSION IF NOT EXISTS http WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS supabase_vault CASCADE;
 DO $$ BEGIN
@@ -34,11 +34,19 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.order_stock_worker_session(text), public.save_order_stock_session(text,text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.order_stock_worker_session(text), public.save_order_stock_session(text,text) TO service_role;
-SELECT cron.schedule('confirmed-order-stock', '*/5 * * * *', $job$
-  SELECT net.http_post(
-    url:='https://axcdhxubqzbzjpbhyvvf.supabase.co/functions/v1/confirm-order-stock',
-    headers:=jsonb_build_object('Content-Type','application/json','x-stock-worker',
-      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='order_stock_worker')),
-    body:='{"sweep":true}'::jsonb, timeout_milliseconds:=55000)
-$job$);
+-- Synchronous HTTPS keeps authorization headers out of pg_net's shared queue.
+CREATE OR REPLACE FUNCTION inventory_private.run_stock_worker() RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE response_code integer;
+BEGIN
+  PERFORM set_config('http.curlopt_timeout_ms','50000',true);
+  SELECT status INTO response_code FROM extensions.http((
+    'POST','https://axcdhxubqzbzjpbhyvvf.supabase.co/functions/v1/confirm-order-stock',
+    ARRAY[extensions.http_header('x-stock-worker',
+      (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='order_stock_worker'))],
+    'application/json','{"sweep":true}')::extensions.http_request);
+  IF response_code IS DISTINCT FROM 204 THEN RAISE EXCEPTION 'Stock worker returned %',response_code; END IF;
+END $$;
+REVOKE ALL ON FUNCTION inventory_private.run_stock_worker() FROM PUBLIC, anon, authenticated;
+SELECT cron.schedule('confirmed-order-stock', '*/5 * * * *', 'SELECT inventory_private.run_stock_worker()');
 COMMIT;

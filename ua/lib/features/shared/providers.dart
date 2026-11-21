@@ -651,11 +651,12 @@ class OrderActions {
     double shippingCost = 0.0,
     String? couponCode,
     String? orderId,
+    String? couponId,
     String? landmark,
   }) async {
     final resolvedId = await ref.read(resolvedTenantIdProvider.future);
     
-    final finalOrderId = orderId ?? 'ORD${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final finalOrderId = orderId ?? FirebaseFirestore.instance.collection('orders').doc().id;
     final suffix = userPhone.contains('_') ? userPhone.split('_').last : userPhone;
     final newOrder = OrderModel(
       id: finalOrderId,
@@ -676,7 +677,7 @@ class OrderActions {
     );
 
     print('OrderActions: Saving order and updating stock atomically via Transaction...');
-    await ref.read(firestoreServiceProvider).placeOrder(newOrder);
+    await ref.read(firestoreServiceProvider).placeOrder(newOrder,couponId:couponId);
     
     print('OrderActions: Order placed successfully. Sending notifications...');
     
@@ -789,6 +790,7 @@ class OrderActions {
         .collection('orders')
         .doc(order.id)
         .update({
+      'stockSyncPending': true,
       'items': items,
       'total': newTotal,
     });

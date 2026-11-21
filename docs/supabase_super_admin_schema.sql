@@ -84,7 +84,7 @@ ALTER TABLE public.tenant_video_quotas ENABLE ROW LEVEL SECURITY;
 
 -- Allow Super Admin service role full access
 CREATE POLICY "Super Admin Service Full Access" ON public.tenants
-    FOR ALL USING (true) WITH CHECK (true);
+    FOR ALL TO service_role USING (true) WITH CHECK (true);
     
 CREATE POLICY "Super Admin Subscriptions Log Access" ON public.tenant_subscriptions_log
     FOR ALL USING (true) WITH CHECK (true);

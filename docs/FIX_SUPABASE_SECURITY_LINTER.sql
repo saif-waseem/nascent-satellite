@@ -32,11 +32,8 @@ CREATE POLICY "Allow Update Product Media" ON storage.objects
 
 -- 3. SECURE TABLE POLICIES WITH SCOPED ROLES & NON-TRIVIAL CHECKS
 
--- Tenants: Read is public, modification requires valid tenant ID check
-CREATE POLICY "Allow scoped insert update tenants" ON public.tenants
-    FOR ALL TO anon, authenticated
-    USING (id IS NOT NULL AND length(id) > 0)
-    WITH CHECK (id IS NOT NULL AND length(id) > 0);
+-- Preserve tenant reads and reserve writes for server-side administration.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.tenants FROM PUBLIC, anon, authenticated;
 
 -- Categories: Read is public, write requires valid tenant_id
 CREATE POLICY "Allow scoped write categories" ON public.categories

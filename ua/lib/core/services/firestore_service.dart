@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 
 class FirestoreService {
+  final stockSync = OrderStockSync(() async => FirebaseAuth.instance.currentUser?.getIdToken());
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // --- Users ---
@@ -55,64 +57,75 @@ class FirestoreService {
   }
 
   // --- Orders ---
-  Future<void> placeOrder(OrderModel order) async {
+  Future<void> placeOrder(OrderModel order, {String? couponId}) async {
     try {
       print('FirestoreService: Placing order ${order.id} for tenant ${order.tenantId}');
+      final orderRef = _db.collection('orders').doc(order.id);
       await _db.runTransaction((transaction) async {
-        // 1. Check all items for stock
-        for (var item in order.items) {
-          final productId = (item['productId'] ?? item['id']) as String;
-          final productRef = _db.collection('products').doc(productId);
-          final snapshot = await transaction.get(productRef);
-          
-          if (!snapshot.exists) throw Exception('PRODUCT_NOT_FOUND');
-          
-          final data = snapshot.data()!;
-          final product = ProductModel.fromJson({...data, 'id': productId});
-          final quantity = item['quantity'] as int? ?? 1;
-          final color = item['color'] as String? ?? 'Default';
-          final size = item['size'] as String? ?? 'Default';
-
-          // Variant check
-          if (product.variants.isNotEmpty) {
-             final vIndex = product.variants.indexWhere((v) => v.color == color && v.size == size);
-             if (vIndex < 0) throw Exception('VARIANT_NOT_FOUND');
-             if (product.variants[vIndex].stock < quantity) throw Exception('OUT_OF_STOCK');
-             
-             // Prepare updated variants
-             final updatedVariants = product.variants.map((v) {
-                if (v.color == color && v.size == size) {
-                  return v.copyWith(stock: v.stock - quantity);
-                }
-                return v;
-             }).toList();
-             
-             transaction.update(productRef, {
-               'variants': updatedVariants.map((e) => e.toJson()).toList(),
-               'stockQuantity': FieldValue.increment(-quantity),
-               'inStock': (product.stockQuantity - quantity) > 0,
-               'salesCount': FieldValue.increment(quantity),
-             });
-          } else {
-             if (product.stockQuantity < quantity) throw Exception('OUT_OF_STOCK');
-             transaction.update(productRef, {
-               'stockQuantity': FieldValue.increment(-quantity),
-               'inStock': (product.stockQuantity - quantity) > 0,
-               'salesCount': FieldValue.increment(quantity),
-             });
+        final old = (await transaction.get(orderRef)).data();
+        if (old != null && (old['tenantId'] != order.tenantId || old['userId'] != order.userId || old['status'] != 'active')) {
+          throw StateError('تعذر تعديل هذا الطلب');
+        }
+        final changes = <String, Map<(String,String),int>>{};
+        void count(Iterable<dynamic> items, int sign) {
+          for (final item in items) {
+            final id = (item['productId'] ?? item['id']) as String;
+            final key = ((item['color'] ?? 'Default') as String,(item['size'] ?? 'Default') as String);
+            final qty = item['quantity'] as int;
+            if (qty < 1) throw StateError('كمية غير صالحة');
+            (changes[id] ??= {}).update(key,(n)=>n+sign*qty,ifAbsent:()=>sign*qty);
           }
         }
-
-        // 2. Save the order
-        transaction.set(_db.collection('orders').doc(order.id), order.toJson());
-        
-        // 3. Deduct points if any
-        if (order.pointsRedeemed > 0) {
-          transaction.update(_db.collection('users').doc(order.userId), {
-            'loyaltyPoints': FieldValue.increment(-order.pointsRedeemed),
-          });
+        count(old?['items'] as List? ?? [], -1);
+        count(order.items, 1);
+        final updates = <DocumentReference<Map<String,dynamic>>,Map<String,dynamic>>{};
+        for (final entry in changes.entries) {
+          if (entry.value.values.every((v)=>v == 0)) continue;
+          final productRef = _db.collection('products').doc(entry.key);
+          final data = (await transaction.get(productRef)).data();
+          if (data == null || data['tenantId'] != order.tenantId) throw StateError('PRODUCT_NOT_FOUND');
+          final product = ProductModel.fromJson({...data,'id':entry.key});
+          final variants = [...product.variants];
+          var total = product.stockQuantity;
+          for (final change in entry.value.entries.where((e)=>e.value!=0)) {
+            total -= change.value;
+            if (variants.isEmpty) continue;
+            final index = variants.indexWhere((v)=>v.color == change.key.$1 && v.size == change.key.$2);
+            if(index<0) throw StateError('VARIANT_NOT_FOUND');
+            final quantity=variants[index].stock-change.value;
+            if(quantity<0) throw StateError('OUT_OF_STOCK');
+            variants[index]=variants[index].copyWith(stock:quantity);
+          }
+          if(total<0) throw StateError('OUT_OF_STOCK');
+          updates[productRef]={
+            'stockQuantity':total, 'inStock':total>0,
+            if(variants.isNotEmpty) 'variants':variants.map((v)=>v.toJson()).toList(),
+            'salesCount':FieldValue.increment(product.stockQuantity-total),
+          };
         }
+        final redeemedDifference = order.pointsRedeemed - (old?['pointsRedeemed'] as int? ?? 0);
+        final userRef = _db.collection('users').doc(order.userId);
+        final awardedDifference = order.pointsAwarded - (old?['pointsAwarded'] as int? ?? 0);
+        final customer = (redeemedDifference != 0 || awardedDifference != 0) ? await transaction.get(userRef) : null;
+        if (redeemedDifference > 0) {
+          final balance = customer?.data()?['loyaltyPoints'] as num? ?? 0;
+          if(balance < redeemedDifference) throw StateError('رصيد النقاط غير كافٍ');
+        }
+        for(final entry in updates.entries) { transaction.update(entry.key,entry.value); }
+        if(redeemedDifference != 0) transaction.update(userRef,{'loyaltyPoints':FieldValue.increment(-redeemedDifference)});
+        if (awardedDifference != 0 && customer?.exists == true) {
+          transaction.update(userRef,{'pendingPoints':FieldValue.increment(awardedDifference)});
+          final dateKey = order.date.toIso8601String().substring(0,10);
+          transaction.set(userRef.collection('daily_stats').doc(dateKey),{'purchasePointsAwarded':FieldValue.increment(awardedDifference)},SetOptions(merge:true));
+        }
+        if (couponId != null && (old == null || old['couponCode'] != order.couponCode)) {
+          transaction.update(_db.collection('coupons').doc(couponId),{'usageCount':FieldValue.increment(1)});
+        }
+        final enabled = old == null || old['stockSyncEnabled'] == true;
+        transaction.set(orderRef,{...order.toJson(),if(enabled) 'stockSyncEnabled':true,if(enabled) 'stockSyncPending':true},SetOptions(merge:true));
       });
+      stockSync.enqueue(order.id);
+
       print('FirestoreService: Order ${order.id} placed successfully with stock check');
     } catch (e, stackTrace) {
       print('FirestoreService: Error placing order: $e');
@@ -153,9 +166,11 @@ class FirestoreService {
         .collection('orders')
         .doc(orderId)
         .update({
+      'stockSyncPending': true,
       'status': status.name,
       'tracking': tracking,
     });
+    stockSync.enqueue(orderId);
   }
 
   // --- Reviews ---

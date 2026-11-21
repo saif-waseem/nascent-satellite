@@ -11,19 +11,8 @@ DROP POLICY IF EXISTS "Allow modify products" ON public.products;
 
 -- 2. Re-create write policies restricted strictly to INSERT, UPDATE, DELETE (Excluding SELECT)
 
--- Tenants:
-CREATE POLICY "Allow modify tenants" ON public.tenants
-    FOR INSERT TO anon, authenticated
-    WITH CHECK (id IS NOT NULL AND length(id) > 0);
-
-CREATE POLICY "Allow update tenants" ON public.tenants
-    FOR UPDATE TO anon, authenticated
-    USING (id IS NOT NULL AND length(id) > 0)
-    WITH CHECK (id IS NOT NULL AND length(id) > 0);
-
-CREATE POLICY "Allow delete tenants" ON public.tenants
-    FOR DELETE TO anon, authenticated
-    USING (id IS NOT NULL AND length(id) > 0);
+-- Tenant writes are reserved for server-side administration.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.tenants FROM PUBLIC, anon, authenticated;
 
 -- Categories:
 CREATE POLICY "Allow modify categories" ON public.categories

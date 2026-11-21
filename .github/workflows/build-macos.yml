@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -40,3 +40,4 @@ jobs:
           name: ${{ matrix.package }}-macos
           path: ${{ matrix.dir }}/${{ matrix.package }}-macos.zip
           if-no-files-found: error
+

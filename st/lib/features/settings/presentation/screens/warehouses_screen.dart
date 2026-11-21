@@ -1,3 +1,6 @@
+import 'package:shared_models/src/widgets/stock_record_screen.dart';
+import 'package:store_admin/core/services/supabase_config.dart';
+import 'package:shared_models/src/widgets/inventory_balance_list.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -12,13 +15,16 @@ class WarehousesScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lang = ref.watch(appSettingsProvider).locale.languageCode;
     final tenantId = ref.watch(currentTenantIdProvider);
+    final advanced = useState(false);
     final controller = useTextEditingController();
 
     return Scaffold(
       appBar: AppBar(
+        actions: [TextButton(onPressed: () => advanced.value = !advanced.value,
+          child: Text(advanced.value ? 'العودة إلى المبسّط' : 'المخزون المتقدّم'))],
         title: Text(lang == 'ar' ? 'إدارة المخازن' : 'Warehouses Management'),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
+      body: advanced.value ? ref.watch(adminProductsProvider).when(data: (products) => InventoryBalanceList(products: products, showCost: true, onOpenRecord: (p) => Navigator.push(context, MaterialPageRoute(builder: (_) => StockRecordScreen(product:p,url:SupabaseConfig.url,publishableKey:SupabaseConfig.anonKey,allowCount:true)))), loading: () => const Center(child: CircularProgressIndicator()), error: (e, _) => Center(child: Text(e.toString()))) : StreamBuilder<List<Map<String, dynamic>>>(
         stream: ref.read(adminFirestoreServiceProvider).getWarehouses(tenantId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

@@ -1,3 +1,5 @@
+import 'package:shared_models/src/widgets/product_entry_options.dart';
+import 'package:shared_ui/product_promo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -41,6 +43,10 @@ class ProductFormScreen extends HookConsumerWidget {
     final isEditing = product != null;
     final tenantId = ref.watch(currentTenantIdProvider);
 
+    final productId = useMemoized(
+      () => product?.id ?? ref.read(adminFirestoreServiceProvider).newProductId(),
+      [tenantId, product?.id],
+    );
     final nameController = useTextEditingController(text: product?.name ?? '');
     final barcodeController = useTextEditingController(text: product?.barcode ?? '');
     final purchasePriceController = useTextEditingController(text: product?.purchasePrice?.toString() ?? '');
@@ -57,6 +63,15 @@ class ProductFormScreen extends HookConsumerWidget {
     final isUploadingVideo = useState<bool>(false);
     final variants = useState<List<ProductVariant>>(product?.variants ?? []);
     
+    final advanced = useState(false);
+    final colors = useState(entryValues([...?product?.colors, ...?product?.variants.map((v)=>v.color)]));
+    final sizes = useState(entryValues([...?product?.sizes, ...?product?.variants.map((v)=>v.size)]));
+    final useColors = useState(colors.value.isNotEmpty);
+    final useSizes = useState(sizes.value.isNotEmpty);
+
+    void changeOption(bool isColor, List<String> next) => changeEntryOption(
+        context, isColor, next, colors:colors, sizes:sizes, variants:variants,
+        useColors:useColors.value,useSizes:useSizes.value,baseStock:int.tryParse(stockController.text)??0);
     final isOffer = useState(product?.isOffer ?? false);
     final isFeaturedDeal = useState(product?.isFeaturedDeal ?? false);
     final isDailyStarred = useState(product?.isDailyStarred ?? false);
@@ -102,16 +117,17 @@ class ProductFormScreen extends HookConsumerWidget {
         return;
       }
 
-      int totalStock = int.tryParse(stockController.text) ?? 0;
-      if (variants.value.isNotEmpty) {
-        totalStock = variants.value.fold(0, (sum, v) {
-          final vStock = v.storageLocations.fold(0, (s, loc) => s + loc.quantity);
-          return sum + vStock;
-        });
+      late List<ProductVariant> savedVariants;
+      try {
+        savedVariants = entryVariants(variants.value, useColors.value, useSizes.value);
+      } on FormatException catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+        return;
       }
-
+      final totalStock = savedVariants.isEmpty ? int.tryParse(stockController.text) ?? 0
+          : savedVariants.fold<int>(0,(sum,v)=>sum+v.stock);
       final newProduct = (product ?? ProductModel(
-        id: '', tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
+        id: productId, tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
       )).copyWith(
         name: nameController.text.trim(),
         description: descriptionController.text.trim(),
@@ -125,10 +141,9 @@ class ProductFormScreen extends HookConsumerWidget {
         category: categoryController.text.trim(),
         images: images.value,
         videoUrl: videoUrl.value,
-        variants: variants.value.map((v) {
-          final vStock = v.storageLocations.fold(0, (s, loc) => s + loc.quantity);
-          return v.copyWith(stock: vStock);
-        }).toList(),
+        sizes: useSizes.value ? entryValues([...sizes.value,...savedVariants.map((v)=>v.size)]) : [],
+        colors: useColors.value ? entryValues([...colors.value,...savedVariants.map((v)=>v.color)]) : [],
+        variants: savedVariants,
         isOffer: isOffer.value,
         isFeaturedDeal: isFeaturedDeal.value,
         isDailyStarred: isDailyStarred.value,
@@ -137,17 +152,7 @@ class ProductFormScreen extends HookConsumerWidget {
 
       try {
         isLoading.value = true;
-        try {
-          await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId);
-        } catch (supabaseError) {
-          debugPrint('Supabase SQL save: $supabaseError');
-        }
-        final firestore = ref.read(adminFirestoreServiceProvider);
-        if (isEditing) {
-          await firestore.updateProduct(newProduct, tenantId);
-        } else {
-          await firestore.addProduct(newProduct, tenantId);
-        }
+        await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId, previousStock: product?.stockQuantity);
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ بنجاح')));
@@ -163,6 +168,7 @@ class ProductFormScreen extends HookConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
+        backgroundColor: const Color(0xff428345), foregroundColor: Colors.white,
         title: Text(isEditing ? 'تعديل: ${product?.name}' : 'منتج جديد'),
         centerTitle: true,
       ),
@@ -180,7 +186,7 @@ class ProductFormScreen extends HookConsumerWidget {
                   BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))
                 ],
               ),
-              child: Column(
+              child: Material(type: MaterialType.transparency, child: Column(
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
@@ -188,7 +194,9 @@ class ProductFormScreen extends HookConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildSectionHeader('المعلومات الأساسية', Icons.info_outline),
+                          ProductEntryMode(advanced: advanced.value, onChanged: (v)=>advanced.value=v),
+                        const SizedBox(height:16),
+                        _buildSectionHeader('المعلومات الأساسية', Icons.info_outline),
                           const SizedBox(height: 16),
                           TextField(
                             controller: nameController,
@@ -227,16 +235,27 @@ class ProductFormScreen extends HookConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          _buildSectionHeader('المخزون والأسعار', Icons.inventory_2_outlined),
+                          TextField(controller: descriptionController, decoration: _inputDecoration('وصف المنتج'), maxLines: 2),
+                        ProductOptionValues(label:'الأصناف / الألوان',values:colors.value,enabled:useColors.value,
+                          onToggle:(v)=>useColors.value=v,onChange:(v)=>changeOption(true,v)),
+                        ProductOptionValues(label:'الأحجام',values:sizes.value,enabled:useSizes.value,
+                          onToggle:(v)=>useSizes.value=v,onChange:(v)=>changeOption(false,v)),
+                        const SizedBox(height:16),
+                        if(!advanced.value)
+                          TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'),keyboardType:const TextInputType.numberWithOptions(decimal:true)),
+                        if(advanced.value)...[
+                        _buildSectionHeader('المخزون والأسعار', Icons.inventory_2_outlined),
                           const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
-                                child: TextField(
-                                  controller: stockController,
+                                child: TextFormField(
+                                initialValue: variants.value.isEmpty ? null : variants.value.fold<int>(0,(n,v)=>n+entryStock(v)).toString(),
+                                controller: variants.value.isEmpty ? stockController : null,
+                                key: ValueKey((variants.value.isEmpty, variants.value.fold<int>(0,(n,v)=>n+entryStock(v)))),
                                   decoration: _inputDecoration('الكمية الإجمالية'),
                                   keyboardType: TextInputType.number,
-                                  readOnly: variants.value.length > 1,
+                                  readOnly: variants.value.isNotEmpty,
                                   style: variants.value.length > 1 ? const TextStyle(color: Colors.grey) : null,
                                 ),
                               ),
@@ -269,7 +288,11 @@ class ProductFormScreen extends HookConsumerWidget {
                             ),
                           ],
                       const SizedBox(height: 32),
-                      _buildVariantsSection(context, variants),
+                      Wrap(children:[TextButton.icon(icon:const Icon(Icons.add),label:const Text('إضافة صف للمخزون'),
+                          onPressed:() => _showAddVariantDialog(context,variants,useColors.value,useSizes.value,colors,sizes))]),
+                        EntryInventoryTable(variants:variants.value,onEdit:(i)=>editEntryLocations(context,variants,i),
+                          onPrice:(i)=>editVariantPrice(context,variants,i),onRemove:(i)=>variants.value=List.of(variants.value)..removeAt(i)),
+                        ],
                       const SizedBox(height: 32),
                       _buildSectionHeader('تصنيفات وصور', Icons.category_outlined),
                       const SizedBox(height: 16),
@@ -298,7 +321,7 @@ class ProductFormScreen extends HookConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      TextField(controller: descriptionController, decoration: _inputDecoration('وصف المنتج'), maxLines: 2),
+
                       const SizedBox(height: 24),
                       const Text('صور المنتج:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 12),
@@ -325,10 +348,7 @@ class ProductFormScreen extends HookConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade200))),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+                child: Wrap( alignment: WrapAlignment.end, children: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
                     const SizedBox(width: 16),
                     ElevatedButton(
                       onPressed: _handleSave,
@@ -341,146 +361,13 @@ class ProductFormScreen extends HookConsumerWidget {
             ],
           ),
         ),
-      );
+      ));
     },
   ),
 );
 }
 
-  Widget _buildVariantsSection(BuildContext context, ValueNotifier<List<ProductVariant>> variants) {
-    final isMobile = MediaQuery.of(context).size.width < 650;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('الأصناف والمتغيرات', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-            ElevatedButton.icon(
-              onPressed: () => _showAddVariantDialog(context, variants),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('إضافة صنف'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50, foregroundColor: Colors.blue.shade700, elevation: 0),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (variants.value.isEmpty)
-          const Center(child: Text('لا توجد أصناف مضافة.'))
-        else if (isMobile)
-          Column(
-            children: variants.value.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final variant = entry.value;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('${variant.color} - ${variant.size}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20), onPressed: () => variants.value = List.from(variants.value)..removeAt(idx)),
-                        ],
-                      ),
-                      const Divider(),
-                      ListTile(
-                        dense: true,
-                        title: const Text('المخازن والكميات'),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (variant.storageLocations.isEmpty) const Text('لا يوجد مخازن مسجلة'),
-                            ...variant.storageLocations.map((loc) => Text('${loc.warehouseName}: ${loc.quantity}')),
-                          ],
-                        ),
-                        trailing: const Icon(Icons.edit_location_alt_outlined, color: Colors.blue),
-                        onTap: () => _showManageLocationsDialog(context, variants, idx),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          )
-        else
-          DataTable(
-            columnSpacing: 24,
-            dataRowHeight: 80,
-            headingRowColor: MaterialStateProperty.all(Colors.grey.shade50),
-            columns: const [
-              DataColumn(label: Text('اللون / الحجم', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('المخازن والكميات', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('إجراءات', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: variants.value.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final variant = entry.value;
-              return DataRow(cells: [
-                DataCell(Text('${variant.color} - ${variant.size}')),
-                DataCell(InkWell(
-                  onTap: () => _showManageLocationsDialog(context, variants, idx),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (variant.storageLocations.isEmpty) const Text('لا يوجد مخازن مسجلة', style: TextStyle(fontSize: 10)),
-                      ...variant.storageLocations.take(2).map((loc) => Text('${loc.warehouseName}: ${loc.quantity}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
-                      if (variant.storageLocations.length > 2) Text('... وأخرى', style: const TextStyle(fontSize: 9, color: Colors.blue)),
-                    ],
-                  ),
-                )),
-                DataCell(IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => variants.value = List.from(variants.value)..removeAt(idx))),
-              ]);
-            }).toList(),
-          ),
-      ],
-    );
-  }
-
-  void _showManageLocationsDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants, int vIdx) {
-    List<ProductStorageLocation> localLocations = List.from(variants.value[vIdx].storageLocations);
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('إدارة المخازن'),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ...localLocations.asMap().entries.map((entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Expanded(child: TextFormField(initialValue: entry.value.warehouseName, decoration: const InputDecoration(labelText: 'اسم المخزن'), onChanged: (v) => localLocations[entry.key] = entry.value.copyWith(warehouseName: v))),
-                        const SizedBox(width: 8),
-                        SizedBox(width: 60, child: TextFormField(initialValue: entry.value.quantity.toString(), decoration: const InputDecoration(labelText: 'الكمية'), keyboardType: TextInputType.number, onChanged: (v) => localLocations[entry.key] = entry.value.copyWith(quantity: int.tryParse(v) ?? 0))),
-                        IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () { localLocations.removeAt(entry.key); setState(() {}); }),
-                      ],
-                    ),
-                  )),
-                  TextButton.icon(onPressed: () { localLocations.add(const ProductStorageLocation(warehouseName: 'مخزن جديد', quantity: 0)); setState(() {}); }, icon: const Icon(Icons.add), label: const Text('إضافة مخزن')),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-            FilledButton(onPressed: () { variants.value = List.from(variants.value)..[vIdx] = variants.value[vIdx].copyWith(storageLocations: localLocations); Navigator.pop(ctx); }, child: const Text('حفظ')),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddVariantDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants) {
+  void _showAddVariantDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants, bool useColors, bool useSizes, ValueNotifier<List<String>> colors, ValueNotifier<List<String>> sizes) {
     final colorController = TextEditingController();
     final sizeController = TextEditingController();
     final quantityController = TextEditingController(text: '0');
@@ -491,15 +378,22 @@ class ProductFormScreen extends HookConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: colorController, decoration: const InputDecoration(labelText: 'اللون')),
-            TextField(controller: sizeController, decoration: const InputDecoration(labelText: 'الحجم')),
+            if(useColors) TextField(controller: colorController, decoration: const InputDecoration(labelText: 'اللون')),
+            if(useSizes) TextField(controller: sizeController, decoration: const InputDecoration(labelText: 'الحجم')),
             TextField(controller: quantityController, decoration: const InputDecoration(labelText: 'الكمية'), keyboardType: TextInputType.number),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
           FilledButton(onPressed: () {
-            final qty = int.tryParse(quantityController.text) ?? 0;
+            final qty = int.tryParse(quantityController.text.trim());
+              final color=colorController.text.trim(), size=sizeController.text.trim();
+              if(qty==null || qty<0 || (useColors && color.isEmpty) || (useSizes && size.isEmpty) ||
+                 variants.value.any((v)=>v.color==(color.isEmpty?'Default':color) && v.size==(size.isEmpty?'Default':size))) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل كمية صحيحة وتنويعة غير مكررة.')));return;
+              }
+              if(useColors) colors.value=entryValues([...colors.value,color]);
+              if(useSizes) sizes.value=entryValues([...sizes.value,size]);
             variants.value = [...variants.value, ProductVariant(
               color: colorController.text.isEmpty ? 'Default' : colorController.text.trim(),
               size: sizeController.text.isEmpty ? 'Default' : sizeController.text.trim(),
@@ -524,7 +418,7 @@ class ProductFormScreen extends HookConsumerWidget {
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(children: [Icon(icon, color: Colors.blue.shade700, size: 20), const SizedBox(width: 8), Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]);
+    return Row(children: [Icon(icon, color: Colors.blue.shade700, size: 20), const SizedBox(width: 8), Flexible(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)))]);
   }
 
   Widget _buildImageGrid(ValueNotifier<List<String>> images, String tenantId, WidgetRef ref) {
@@ -582,13 +476,12 @@ class ProductFormScreen extends HookConsumerWidget {
             children: [
               const Icon(Icons.video_library_rounded, color: Colors.indigo, size: 20),
               const SizedBox(width: 8),
-              const Text('فيديو المنتج الترويجي (Video Reel / Motion):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const Spacer(),
+              const Text('إعلان المنتج', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               if (videoUrl.value != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(12)),
-                  child: const Text('مرفوع ومفعل ✅', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: const Text('تم اختياره', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
@@ -603,7 +496,7 @@ class ProductFormScreen extends HookConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      videoUrl.value!,
+                      ProductPromo.styleOf(videoUrl.value) != null ? 'إعلان من صور المنتج' : videoUrl.value!,
                       style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -640,7 +533,7 @@ class ProductFormScreen extends HookConsumerWidget {
                     : () async {
                         try {
                           isUploading.value = true;
-                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo(tenantId: tenantId);
+                          final url = await ref.read(storageServiceProvider).pickAndUploadVideo();
                           if (url != null) {
                             videoUrl.value = url;
                             if (context.mounted) {
@@ -662,7 +555,7 @@ class ProductFormScreen extends HookConsumerWidget {
               ),
               FilledButton.icon(
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('🎬 توليد فيديو بالذكاء الاصطناعي (AI Motion)'),
+                label: const Text('إنشاء إعلان من صور المنتج'),
                 style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
                 onPressed: () {
                   final dummyProduct = ProductModel(
@@ -700,7 +593,7 @@ class ProductFormScreen extends HookConsumerWidget {
           const SizedBox(height: 12),
           TextFormField(
             key: ValueKey(videoUrl.value ?? 'empty_video'),
-            initialValue: videoUrl.value ?? '',
+            initialValue: ProductPromo.styleOf(videoUrl.value) == null ? videoUrl.value ?? '' : '',
             decoration: InputDecoration(
               labelText: 'أو الصق رابط الفيديو المباشر (URL)',
               hintText: 'https://.../video.mp4',

@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 
 class AdminFirestoreService {
+  final stockSync = OrderStockSync(() async => FirebaseAuth.instance.currentUser?.getIdToken());
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // --- Store Settings (Tenant) ---
@@ -78,8 +80,10 @@ class AdminFirestoreService {
     return ProductModel.fromJson(data);
   }
 
+  String newProductId() => _db.collection('products').doc().id;
+
   Future<void> addProduct(ProductModel product, String tenantId) async {
-    final docRef = _db.collection('products').doc();
+    final docRef = _db.collection('products').doc(product.id.isEmpty ? null : product.id);
     final newProduct = product.toJson();
     newProduct['id'] = docRef.id;
     newProduct['tenantId'] = tenantId;
@@ -162,9 +166,11 @@ class AdminFirestoreService {
     final newTotal = subtotal + order.shippingCost - (order.pointsRedeemed / 10.0) - order.discountAmount;
     
     await _db.collection('orders').doc(order.id).update({
+      'stockSyncPending': true,
       'items': items,
       'total': newTotal,
     });
+    stockSync.enqueue(order.id);
   }
 
   Future<void> updateOrderStatus(OrderModel order, OrderStatus newStatus, String tracking) async {
@@ -172,6 +178,7 @@ class AdminFirestoreService {
     final orderRef = _db.collection('orders').doc(order.id);
     
     batch.update(orderRef, {
+      if (order.status != newStatus) 'stockSyncPending': true,
       'status': newStatus.name,
       'tracking': tracking,
     });
@@ -228,6 +235,7 @@ class AdminFirestoreService {
     }
 
     await batch.commit();
+    stockSync.enqueue(order.id);
   }
 
   /// Helper to safely revert stock for an item, including variant-specific stock

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
@@ -10,6 +11,7 @@ final productsFutureProvider = FutureProvider.autoDispose((ref) async {
   final tenantId = ref.watch(tenantIdProvider);
   ref.watch(productStockVersionProvider);
   if (tenantId.isEmpty) return <ProductModel>[];
+  if(tenantId!='local_default'){final refresh=Timer(const Duration(seconds:30),ref.invalidateSelf);ref.onDispose(refresh.cancel);}
   return await repo.getProducts(tenantId, limit: 100);
 });
 
@@ -52,6 +54,7 @@ class PagedInventoryProductsNotifier extends Notifier<PagedProductsState> {
   PagedProductsState build() {
     ref.watch(tenantIdProvider);
     ref.watch(productStockVersionProvider);
+    if(ref.watch(tenantIdProvider)!='local_default'){final refresh=Timer.periodic(const Duration(seconds:30),(_){if(!state.isLoadingMore && state.products.length<=50)loadInitial();});ref.onDispose(refresh.cancel);}
     Future.microtask(() => loadInitial());
     return PagedProductsState(products: []);
   }

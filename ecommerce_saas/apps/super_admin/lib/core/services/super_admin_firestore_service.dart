@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_models/shared_models.dart';
 
 class SuperAdminFirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+  SuperAdminFirestoreService([FirebaseFirestore? firestore]) : _db = firestore ?? FirebaseFirestore.instance;
 
   // --- Tenants Management ---
   Stream<List<TenantModel>> getTenants() {
@@ -56,93 +57,49 @@ class SuperAdminFirestoreService {
   }
 
   Future<void> activateSubscription(String tenantId, int months, String code) async {
-    try {
-      final doc = await _db.collection('tenants').doc(tenantId).get();
-      if (!doc.exists) return;
-      
-      final data = doc.data()!;
-      data['id'] = doc.id;
-      final tenant = TenantModel.fromJson(data);
-      
-      // Determine existing expiry or start fresh
-      final now = DateTime.now();
-      final currentExpiry = tenant.expiryDate;
-      
-      // If no expiry yet, or it's in the past, start from now.
-      // Otherwise, add to the existing future expiry date.
-      final startDate = (currentExpiry == null || currentExpiry.isBefore(now)) 
-          ? now 
-          : currentExpiry;
-          
-      final newExpiry = startDate.add(Duration(days: months * 30));
-      
-      // Also fetch latest subscriber count while we are at it
-      final subscriberCount = await getTenantSubscriberCount(tenantId);
-      
-      final updated = tenant.copyWith(
-        expiryDate: newExpiry,
-        isActive: true,
-        activationCode: code,
-        subscriberCount: subscriberCount,
-      );
-      
-      await updateTenant(updated);
-
-      // Also log the activation
-      await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
-        'date': FieldValue.serverTimestamp(),
-        'months': months,
-        'code': code,
-        'expiryAfter': newExpiry.toIso8601String(),
-        'type': 'RENEWAL_OR_ACTIVATION',
-      });
-      
-      print('DEBUG SUPER_ADMIN: Activation successful for $tenantId. New expiry: $newExpiry');
-    } catch (e, stack) {
-      print('CRITICAL ERROR during activateSubscription: $e');
-      print(stack);
-      rethrow;
+    final issued = code.trim().toUpperCase();
+    if (months <= 0 || issued.isEmpty) {
+      throw ArgumentError('مدة التفعيل أو الكود غير صالح');
     }
+    final subscribers = await getTenantSubscriberCount(tenantId);
+    final doc = _db.collection('tenants').doc(tenantId);
+    final log = _db.collection('activation_logs').doc();
+    await _db.runTransaction((tx) async {
+      final snapshot = await tx.get(doc);
+      if (!snapshot.exists) throw StateError('المتجر غير موجود');
+      final tenant = TenantModel.fromJson({...snapshot.data()!, 'id':tenantId});
+      if (tenant.activationCode == issued && tenant.isStoreEnabled) return;
+      final now = DateTime.now().toUtc();
+      final previous = tenant.expiryDate;
+      final expiry = (previous != null && previous.isAfter(now) ? previous : now)
+          .add(Duration(days:months * 30)).toUtc().toIso8601String();
+      tx.update(doc, {
+        'activationCode':issued, 'isStoreEnabled':true, 'isActive':true,
+        'expiryDate':expiry, 'subscriberCount':subscribers,
+      });
+      tx.set(log, {
+        'tenantId':tenantId, 'type':'STORE', 'months':months,
+        'expiryDate':expiry, 'timestamp':FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Future<void> activatePosSubscription(String tenantId, int months, String code) async {
-    try {
-      final doc = await _db.collection('tenants').doc(tenantId).get();
-      if (!doc.exists) return;
-      
-      final data = doc.data()!;
-      data['id'] = doc.id;
-      final tenant = TenantModel.fromJson(data);
-      
-      final now = DateTime.now();
-      final currentExpiry = tenant.posExpiryDate;
-      final startDate = (currentExpiry == null || currentExpiry.isBefore(now))
-          ? now
-          : currentExpiry;
-          
-      final newExpiry = startDate.add(Duration(days: months * 30));
-      
-      final updated = tenant.copyWith(
-        posExpiryDate: newExpiry,
-        isActive: true,
-        posActivationCode: code,
-      );
-      
-      await updateTenant(updated);
-
-      await _db.collection('tenants').doc(tenantId).collection('activation_logs').add({
-        'activationCode': code,
-        'expiryDate': newExpiry.toIso8601String(),
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'POS_RENEWAL_OR_ACTIVATION',
-      });
-
-      print('DEBUG SUPER_ADMIN: POS Activation successful for $tenantId. New expiry: $newExpiry');
-    } catch (e, stack) {
-      print('CRITICAL ERROR during activatePosSubscription: $e');
-      print(stack);
-      rethrow;
-    }
+    final issued=code.trim().toUpperCase();
+    if(months<=0 || issued.isEmpty)throw ArgumentError('مدة التفعيل أو الكود غير صالح');
+    final doc=_db.collection('tenants').doc(tenantId);
+    final log=_db.collection('activation_logs').doc();
+    await _db.runTransaction((tx) async{
+      final snapshot=await tx.get(doc);
+      if(!snapshot.exists)throw StateError('المتجر غير موجود');
+      final tenant=TenantModel.fromJson({...snapshot.data()!,'id':tenantId});
+      if(tenant.posActivationCode==issued && tenant.isPosEnabled)return;
+      final now=DateTime.now().toUtc();
+      final previous=tenant.posExpiryDate;
+      final expiry=(previous!=null && previous.isAfter(now)?previous:now).add(Duration(days:months*30)).toUtc().toIso8601String();
+      tx.update(doc,{'isActive':true,'isPosEnabled':true,'posActivationCode':issued,'posExpiryDate':expiry});
+      tx.set(log,{'tenantId':tenantId,'type':'POS','expiryDate':expiry,'months':months,'timestamp':FieldValue.serverTimestamp()});
+    });
   }
 
   Future<void> activateCarsModule(String tenantId, String code, int daysToAdd) async {
@@ -231,6 +188,16 @@ class SuperAdminFirestoreService {
     await _db.collection('settings').doc('global').set(settings, SetOptions(merge: true));
   }
 
+  Future<void> enableIssuedPosCode(String tenantId,String issued) async {
+    final doc=_db.collection('tenants').doc(tenantId);
+    await _db.runTransaction((tx) async{
+      final snapshot=await tx.get(doc);
+      if(!snapshot.exists)throw StateError('المتجر غير موجود');
+      final tenant=TenantModel.fromJson({...snapshot.data()!,'id':tenantId});
+      if(!tenant.isActive || issued.trim().isEmpty || tenant.posActivationCode!=issued || tenant.posExpiryDate?.isAfter(DateTime.now())!=true)throw StateError('لا يوجد كود سارٍ قابل للتفعيل');
+      tx.update(doc,{'isPosEnabled':true});
+    });
+  }
   Future<void> activatePosPermanently(String tenantId, String code) async {
     await _db.collection('tenants').doc(tenantId).update({
       'isPosEnabled': true,

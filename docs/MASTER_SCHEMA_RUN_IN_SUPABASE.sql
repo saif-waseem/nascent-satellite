@@ -192,9 +192,7 @@ ALTER TABLE public.tenant_video_quotas ENABLE ROW LEVEL SECURITY;
 
 -- Tenants
 CREATE POLICY "tenants_select" ON public.tenants FOR SELECT USING (true);
-CREATE POLICY "tenants_insert" ON public.tenants FOR INSERT TO anon, authenticated WITH CHECK (id IS NOT NULL AND length(id) > 0);
-CREATE POLICY "tenants_update" ON public.tenants FOR UPDATE TO anon, authenticated USING (id IS NOT NULL AND length(id) > 0) WITH CHECK (id IS NOT NULL AND length(id) > 0);
-CREATE POLICY "tenants_delete" ON public.tenants FOR DELETE TO anon, authenticated USING (id IS NOT NULL AND length(id) > 0);
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.tenants FROM PUBLIC, anon, authenticated;
 
 -- Categories
 CREATE POLICY "categories_select" ON public.categories FOR SELECT USING (true);

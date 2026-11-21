@@ -43,7 +43,7 @@ class FinancialCharts extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Expanded(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
       ],
     );
   }
@@ -173,6 +173,11 @@ class _PieChartWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data.isEmpty) return const SizedBox.shrink();
 
+    if (data.values.any((value) => value < 0) || data.values.every((value) => value == 0)) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (final entry in data.entries) Text('${entry.key} · ${entry.value.toStringAsFixed(0)} IQD'),
+      ]);
+    }
     final colors = [
       Colors.blue, Colors.green, Colors.orange, Colors.purple, 
       Colors.teal, Colors.pink, Colors.amber, Colors.cyan

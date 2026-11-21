@@ -37,7 +37,7 @@ void main() async {
     try {
       final auth = FirebaseAuth.instance;
       if (auth.currentUser == null) {
-        await auth.signInAnonymously();
+        await auth.signInAnonymously().timeout(const Duration(seconds:8));
         debugPrint('Debug: User App signed in anonymously as ${auth.currentUser?.uid}');
       } else {
         debugPrint('Debug: User App already signed in as ${auth.currentUser?.uid}');
@@ -106,8 +106,7 @@ class UserApp extends ConsumerWidget {
     // Force initialization of auth state to check for existing login
     ref.watch(userPhoneProvider);
 
-    return tenantAsync.maybeWhen(
-      data: (tenant) {
+    final tenant=tenantAsync.value;
         final seedColor = tenant != null ? ColorUtils.fromHex(tenant.primaryColor) : Colors.blue;
         
         return MaterialApp.router(
@@ -132,11 +131,5 @@ class UserApp extends ConsumerWidget {
           builder: (context, child) => CheckUpdateWrapper(child: child!),
           debugShowCheckedModeBanner: false,
         );
-      },
-      orElse: () => const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
-      ),
-    );
   }
 }

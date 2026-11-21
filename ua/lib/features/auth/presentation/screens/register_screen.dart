@@ -10,19 +10,30 @@ import 'package:user_app/core/utils/countries_data.dart';
 import 'package:user_app/core/widgets/searchable_list_dialog.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  final String referral;
+  const RegisterScreen({super.key, this.referral = ''});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  late final _referralController = TextEditingController(text: widget.referral);
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _governorateController = TextEditingController();
   final _locationController = TextEditingController();
   final _passwordController = TextEditingController();
   final _landmarkController = TextEditingController(); 
+  @override
+  void dispose() {
+    for (final controller in [_referralController, _phoneController, _nameController,
+      _passwordController, _governorateController, _locationController, _landmarkController]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   String _selectedCountry = 'Iraq';
   String _selectedCountryCode = 'IQ';
   String _selectedPhoneCode = '964';
@@ -155,6 +166,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               decoration: InputDecoration(labelText: AppStrings.get('landmark', lang), prefixIcon: const Icon(Icons.flag), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 24),
+            TextField(controller: _referralController, decoration: const InputDecoration(
+              labelText: 'رمز الدعوة (اختياري)', border: OutlineInputBorder())),
+            const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
                 final name = _nameController.text.trim();
@@ -191,14 +205,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 final fullAddress = '$displayCountry - $displayGov - $loc';
                 
-                await ref.read(userActionsProvider).register(
+                try { await ref.read(userActionsProvider).register(
                   name: name,
                   phone: phone,
                   address: fullAddress,
                   landmark: _landmarkController.text.trim(),
                   password: password,
+                  referredByCode: _referralController.text.trim(),
                 );
                 
+                } catch (error) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+                  return;
+                }
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppStrings.get('account_created', lang))));
                 context.go('/home');
               },

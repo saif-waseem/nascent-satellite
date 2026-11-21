@@ -42,7 +42,7 @@ class AppTheme {
         brightness: Brightness.dark,
         surface: const Color(0xFF121212),
         surfaceContainer: const Color(0xFF1E1E1E),
-        primary: seedColor.withOpacity(0.8),
+
       ),
       scaffoldBackgroundColor: const Color(0xFF121212),
       appBarTheme: const AppBarTheme(
@@ -64,11 +64,7 @@ class AppTheme {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         hintStyle: TextStyle(color: Colors.grey[400]),
       ),
-      textTheme: GoogleFonts.cairoTextTheme(const TextTheme(
-        bodyMedium: TextStyle(color: Color(0xFFE0E0E0)),
-        titleMedium: TextStyle(color: Colors.white),
-        titleLarge: TextStyle(color: Colors.white),
-      )),
+      textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark(useMaterial3: true).textTheme),
       iconTheme: const IconThemeData(color: Colors.white70),
       listTileTheme: const ListTileThemeData(
         iconColor: Colors.white70,

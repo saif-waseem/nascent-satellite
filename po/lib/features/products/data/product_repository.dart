@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
+import '../../../core/services/cashier_stock_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -54,6 +57,9 @@ class ProductRepository {
 
     // 2. Fetch from remote in background (if online)
     try {
+      List<ProductModel> remoteProducts;
+      bool primary=true;
+      try{remoteProducts=await ProductCatalog.read(tenantId);}catch(_){primary=false;
       final query = {
         'where': {
           'compositeFilter': {
@@ -80,16 +86,23 @@ class ProductRepository {
       };
 
       final results = await _restService.runQuery('products', query);
-      final remoteProducts = results.map((data) => ProductModel.fromJson(data)).toList();
+      remoteProducts = results.map(ProductModel.fromJson).toList();
+      }
       
       // Update cache (Merge strategy)
       final syncQueueBox = LocalDbService.getBox<SyncQueueItem>('sync_queue');
+      final pending = <String>{for(final item in syncQueueBox.values)
+        if(item.collectionPath.startsWith('products/') || item.collectionPath.startsWith('catalog/')) item.collectionPath.split('/').last,
+        for(final item in syncQueueBox.values) if(item.data['_stockMovements'] is List)
+          for(final movement in item.data['_stockMovements'] as List) movement['product'] as String};
+      if(primary){
+        final ids=remoteProducts.map((p)=>p.id).toSet();
+        for(final p in _box.values.where((p)=>p.tenantId==tenantId && !ids.contains(p.id) && !pending.contains(p.id)).toList()){
+          await _box.delete(p.id);
+        }
+      }
       for (var p in remoteProducts) {
-        // Skip overwriting local cache if there is a pending sync queue item for this product
-        final hasPendingSync = syncQueueBox.values.any((item) => 
-          item.collectionPath == 'products/${p.id}'
-        );
-        if (hasPendingSync) {
+        if(pending.contains(p.id)){
           continue;
         }
 
@@ -102,10 +115,42 @@ class ProductRepository {
       // Cleanup locally deleted products that still exist in Firestore (optional but usually handled by archiving)
       
       remoteProducts.sort((a, b) => a.name.compareTo(b.name));
-      return remoteProducts;
+      return _box.values.where((p)=>p.tenantId==tenantId&&!p.isArchived).toList()..sort((a,b)=>a.name.compareTo(b.name));
     } catch (e) {
       debugPrint('Offline/Error fetching products: $e');
       return cached;
+    }
+  }
+
+  Future<List<ProductModel>> _sharedBalances(String tenant, List<ProductModel> products) async {
+    if (tenant == 'local_default' || products.isEmpty) return products;
+    final service = _ref.read(cashierStockProvider);
+    if (!await service.linked(tenant)) return products;
+    try {
+      final balances = await service.balances(tenant, products.where((p) => p.variants.isEmpty).map((p) => p.id));
+      final pending = <String>{};
+      for (final item in LocalDbService.getBox<SyncQueueItem>('sync_queue').values) {
+        final lines = item.data['_stockMovements'];
+        if (lines is List && item.data['tenantId'] == tenant) {
+          for (final line in lines) { pending.add(line['product'] as String); }
+        }
+      }
+      final merged = <ProductModel>[];
+      for (final p in products) {
+        final local = _box.get(p.id) ?? p;
+        final quantity = balances[p.id];
+        if (pending.contains(p.id) || quantity == null || local.variants.isNotEmpty) {
+          merged.add(local);
+        } else {
+          final updated = local.copyWith(stockQuantity: quantity, inStock: quantity > 0);
+          if (local.stockQuantity != quantity || local.inStock != updated.inStock) await _box.put(p.id, updated);
+          merged.add(updated);
+        }
+      }
+      return merged;
+    } catch (e) {
+      debugPrint('Stock balance refresh: $e');
+      return products;
     }
   }
 
@@ -132,7 +177,7 @@ class ProductRepository {
     }
     
     // Sum up all variants for total stock
-    final calculatedTotalStock = updatedVariants.fold(0, (sum, v) => sum + v.stock);
+    final calculatedTotalStock = updatedVariants.isEmpty ? product.stockQuantity : updatedVariants.fold(0, (sum, v) => sum + v.stock);
     
     return product.copyWith(
       stockQuantity: calculatedTotalStock,
@@ -152,6 +197,8 @@ class ProductRepository {
       tenantId: tenantId,
     );
     
+    final previous = _box.get(productId);
+    if(tenantId!='local_default') await _queueCatalog(tenantId,productId,previous,updatedProduct);
     // Always save to local first
     await _box.put(productId, updatedProduct);
 
@@ -160,17 +207,19 @@ class ProductRepository {
 
     if (tenantId == 'local_default') return;
 
-    // Push to remote or queue
-    try {
-      await _restService.setDocument('products/$productId', updatedProduct.toJson(), isUpdate: product.id.isNotEmpty);
-    } catch (e) {
-      debugPrint('Queuing product save: $e');
-      await LocalDbService.addToSyncQueue(
-        collectionPath: 'products/$productId', 
-        data: updatedProduct.toJson(), 
-        action: product.id.isNotEmpty ? SyncAction.update : SyncAction.create
-      );
-    }
+  }
+
+  Future<void> _queueCatalog(String tenant,String id,ProductModel? before,ProductModel? after) async {
+    final previous=before==null?<String,dynamic>{}:ProductCatalog.encode(before);
+    final next=after==null?<String,dynamic>{}:ProductCatalog.encode(after);
+    final patch={for(final e in next.entries)
+      if(!{'id','tenant_id','rating','sales_count'}.contains(e.key) && (before==null || jsonEncode(previous[e.key])!=jsonEncode(e.value))) e.key:e.value};
+    if(after!=null && before!=null && patch.isEmpty)return;
+    await LocalDbService.addToSyncQueue(collectionPath:'catalog/$id',action:SyncAction.update,data:{
+      'id':id,'tenantId':tenant,'operation':const Uuid().v4(),'action':after==null?'delete':before==null?'create':'patch',
+      'patch':patch,'before':{if(before!=null)for(final key in patch.keys)key:previous[key]},
+      'backup':after?.toJson(),
+    });
   }
 
   /// Recalculates total stock based on variants and storage locations to ensure integrity
@@ -194,6 +243,9 @@ class ProductRepository {
   }
 
   Future<void> deleteProduct(String tenantId, String productId, {bool permanent = false}) async {
+    final previous=_box.get(productId);
+    if(previous==null || previous.tenantId!=tenantId)return;
+    if(tenantId!='local_default')await _queueCatalog(tenantId,productId,previous,permanent?null:previous.copyWith(isArchived:true));
     // Local delete
     if (permanent) {
       await _box.delete(productId);
@@ -207,26 +259,12 @@ class ProductRepository {
 
     if (tenantId == 'local_default') return;
 
-    // Remote
-    try {
-      if (permanent) {
-        await _restService.deleteDocument('products/$productId');
-      } else {
-        await _restService.setDocument('products/$productId', {'isArchived': true}, isUpdate: true);
-      }
-    } catch (e) {
-      await LocalDbService.addToSyncQueue(
-        collectionPath: 'products/$productId', 
-        data: {'isArchived': true, 'id': productId}, 
-        action: permanent ? SyncAction.delete : SyncAction.update
-      );
-    }
   }
 
   Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {
     // 1. Absolute Priority: Local Search
     try {
-      final localMatch = _box.values.where((p) => p.barcode == barcode && !p.isArchived).firstOrNull;
+      final localMatch = _box.values.where((p) => p.tenantId==tenantId && p.barcode == barcode && !p.isArchived).firstOrNull;
       if (localMatch != null) {
         return _ensureDataIntegrity(localMatch);
       }
@@ -236,7 +274,7 @@ class ProductRepository {
 
     if (tenantId == 'local_default') return null;
       
-    // 2. Online Fallback
+    try {return (await ProductCatalog.read(tenantId,barcode:barcode)).where((p)=>!p.isArchived).firstOrNull;}catch(_){}
     try {
       final query = {
         'where': {
@@ -264,26 +302,10 @@ class ProductRepository {
   }
 
   Future<void> updateProduct(String tenantId, String productId, ProductModel updatedProduct) async {
-    final productWithIntegrity = _ensureDataIntegrity(updatedProduct);
-    await _box.put(productId, productWithIntegrity);
-
-    // Notify UI of local update
-    _notifyStockChanged();
-
-    if (tenantId == 'local_default') return;
-
-    try {
-      await _restService.setDocument('products/$productId', productWithIntegrity.toJson(), isUpdate: true);
-    } catch (e) {
-      await LocalDbService.addToSyncQueue(
-        collectionPath: 'products/$productId', 
-        data: productWithIntegrity.toJson(), 
-        action: SyncAction.update
-      );
-    }
+    await saveProduct(tenantId,updatedProduct.copyWith(id:productId));
   }
 
-  Future<void> updateStock(String tenantId, String productId, int adjustment, {String? color, String? size, String? warehouseName, double? priceOverride}) async {
+  Future<void> updateStock(String tenantId, String productId, int adjustment, {bool invoiceMovement=false,String? color, String? size, String? warehouseName, double? priceOverride}) async {
     final product = _box.get(productId);
     if (product == null) return;
 
@@ -356,7 +378,7 @@ class ProductRepository {
         updatedVariants[0] = v.copyWith(stock: newVStock, storageLocations: updatedLocs);
     }
 
-    final newTotalStock = updatedVariants.fold(0, (sum, v) => sum + v.stock);
+    final newTotalStock = updatedVariants.isEmpty ? (product.stockQuantity + adjustment).clamp(0, 999999).toInt() : updatedVariants.fold(0, (sum, v) => sum + v.stock);
 
     final updatedProduct = product.copyWith(
       stockQuantity: newTotalStock,
@@ -364,13 +386,14 @@ class ProductRepository {
       variants: updatedVariants,
     );
     
+    if(tenantId!='local_default' && (!invoiceMovement || product.variants.isNotEmpty)){
+      await _queueCatalog(tenantId,productId,product,updatedProduct);
+      await _box.put(productId,updatedProduct);
+      _notifyStockChanged();return;
+    }
     await _box.put(productId, updatedProduct);
-
-    // Notify UI of local update
     _notifyStockChanged();
-
     if (tenantId == 'local_default') return;
-
     try {
       await _restService.setDocument('products/$productId', updatedProduct.toJson(), isUpdate: true);
     } catch (e) {
@@ -384,7 +407,7 @@ class ProductRepository {
 
   Future<void> returnStock(String tenantId, String productId, int quantity, {String? color, String? size, String? warehouseName}) async {
     // Simply use updateStock with positive adjustment
-    await updateStock(tenantId, productId, quantity, color: color, size: size, warehouseName: warehouseName);
+    await updateStock(tenantId, productId, quantity, invoiceMovement:true, color: color, size: size, warehouseName: warehouseName);
   }
 
   Future<List<ProductModel>> searchProducts(String tenantId, String query) async {
@@ -403,6 +426,7 @@ class ProductRepository {
   }
 
   Future<({List<ProductModel> products, String? lastDocId})> getProductsPaginated(String tenantId, {int limit = 50, String? lastDocId}) async {
+    if(lastDocId==null && tenantId!='local_default') await getProducts(tenantId);
     final allProducts = _box.values.where((p) => p.tenantId == tenantId && !p.isArchived).toList();
     allProducts.sort((a, b) => a.id.compareTo(b.id));
 
@@ -415,21 +439,12 @@ class ProductRepository {
     final chunk = allProducts.skip(startIndex).take(limit).toList();
     final nextLastDocId = chunk.isNotEmpty ? chunk.last.id : null;
 
-    return (products: chunk, lastDocId: nextLastDocId);
+    return (products: await _sharedBalances(tenantId, chunk), lastDocId: nextLastDocId);
   }
 
   Future<void> emptyArchive(String tenantId) async {
     final archived = _box.values.where((p) => p.tenantId == tenantId && p.isArchived).toList();
-    for (var p in archived) {
-      await _box.delete(p.id);
-      if (tenantId != 'local_default') {
-        await LocalDbService.addToSyncQueue(
-          collectionPath: 'products/${p.id}', 
-          data: {}, 
-          action: SyncAction.delete
-        );
-      }
-    }
+    for(final p in archived){await deleteProduct(tenantId,p.id,permanent:true); }
 
     // Notify UI of local update
     _notifyStockChanged();

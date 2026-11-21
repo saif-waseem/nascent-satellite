@@ -66,6 +66,7 @@ dependencies:
   url_launcher: ^6.3.2
   hive_ce: any
   hive_ce_flutter: any
+  flutter_secure_storage: ^10.3.4
 
 dev_dependencies:
   flutter_test:

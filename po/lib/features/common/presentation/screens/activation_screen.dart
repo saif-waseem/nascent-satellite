@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../../../core/providers/tenant_provider.dart';
-import '../../../../core/services/firestore_rest_service.dart';
+import '../../../../core/services/pos_activation_service.dart';
 
 class ActivationScreen extends HookConsumerWidget {
   const ActivationScreen({super.key});
@@ -18,64 +18,15 @@ class ActivationScreen extends HookConsumerWidget {
       
       isLoading.value = true;
       try {
-        final restService = ref.read(firestoreRestServiceProvider);
-        
-        // Check posActivationCode
-        final query1 = {
-          'where': {
-            'fieldFilter': {
-              'field': {'fieldPath': 'posActivationCode'},
-              'op': 'EQUAL',
-              'value': {'stringValue': code}
-            }
-          },
-          'limit': 1
-        };
-        final results1 = await restService.runQuery('tenants', query1);
-
-        if (results1.isNotEmpty) {
-          await ref.read(tenantIdProvider.notifier).setTenantId(results1.first['id']);
-          return;
-        }
-
-        // Check activationCode
-        final query2 = {
-          'where': {
-            'fieldFilter': {
-              'field': {'fieldPath': 'activationCode'},
-              'op': 'EQUAL',
-              'value': {'stringValue': code}
-            }
-          },
-          'limit': 1
-        };
-        final results2 = await restService.runQuery('tenants', query2);
-        
-        if (results2.isNotEmpty) {
-          await ref.read(tenantIdProvider.notifier).setTenantId(results2.first['id']);
-          return;
-        }
-
-        // Check direct ID
-        final doc = await restService.getDocument('tenants/$code');
-        if (doc != null) {
-          await ref.read(tenantIdProvider.notifier).setTenantId(code);
-          return;
-        }
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('رمز التفعيل غير صحيح أو المتجر غير موجود')),
-          );
-        }
+        await activateCashier(ref,code);
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('حدث خطأ: $e')),
+            SnackBar(content: Text(e is FormatException ? e.message : 'تعذّر التفعيل. تحقق من الاتصال وحاول مجددًا.')),
           );
         }
       } finally {
-        isLoading.value = false;
+        if(context.mounted)isLoading.value = false;
       }
     }
 
@@ -111,15 +62,16 @@ class ActivationScreen extends HookConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'أدخل رمز التفعيل الخاص بك للمتابعة',
+                  'أدخل كود الكاشير من بطاقة المتجر في السوبر أدمن',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 32),
                 TextField(
                   controller: storeIdController,
+                  textDirection: TextDirection.ltr,
                   decoration: InputDecoration(
-                    labelText: 'رمز التفعيل',
+                    labelText: 'كود الكاشير',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

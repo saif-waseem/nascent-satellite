@@ -1,3 +1,5 @@
+import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -33,7 +35,7 @@ class SubscriptionDialog extends HookConsumerWidget {
     final codeController = useTextEditingController(
         text: 'ACT-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
     final posCodeController = useTextEditingController(
-        text: 'POS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+        text: 'POS-${List.generate(12,(_)=>Random.secure().nextInt(16).toRadixString(16)).join().toUpperCase()}');
     final carsCodeController = useTextEditingController(
         text: 'CAR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
 
@@ -328,6 +330,17 @@ class SubscriptionDialog extends HookConsumerWidget {
                 '${tenant.posExpiryDate != null ? DateFormat('yyyy/MM/dd').format(tenant.posExpiryDate!) : 'دائم / غير محدد'}',
               ),
               const SizedBox(height: 8),
+              if(!tenant.isPosEnabled && tenant.isActive && (tenant.posActivationCode??'').isNotEmpty && tenant.posExpiryDate?.isAfter(DateTime.now())==true)
+                OutlinedButton.icon(icon:const Icon(Icons.key),label:const Text('تفعيل الكود الحالي بنفس تاريخ الانتهاء'),onPressed:()async{
+                  final code=tenant.posActivationCode!;
+                  try{
+                    await ref.read(superAdminFirestoreServiceProvider).enableIssuedPosCode(tenant.id,code);
+                    if(!context.mounted)return;
+                    await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تم تفعيل الكود الحالي'),content:SelectableText(code),actions:[
+                      TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:code)),child:const Text('نسخ الكود')),FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('تم'))]));
+                    if(context.mounted)Navigator.pop(context);
+                  }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذّر التفعيل: $e')));}
+                }),
               Row(
                 children: [
                   Expanded(
@@ -344,11 +357,18 @@ class SubscriptionDialog extends HookConsumerWidget {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () async {
-                      final months = int.tryParse(posMonthsController.text) ?? 1;
-                      await ref
-                          .read(superAdminFirestoreServiceProvider)
-                          .activatePosSubscription(tenant.id, months, posCodeController.text.trim());
-                      if (context.mounted) Navigator.pop(context);
+                      final months=int.tryParse(posMonthsController.text);
+                      if(months==null || months<=0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل عدد أشهر أكبر من صفر')));return;}
+                      final code=posCodeController.text.trim();
+                      try{
+                        await ref.read(superAdminFirestoreServiceProvider).activatePosSubscription(tenant.id,months,code);
+                        if(!context.mounted)return;
+                        await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('كود تفعيل الكاشير'),content:SelectableText(code),actions:[
+                          TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:code)),child:const Text('نسخ الكود')),
+                          FilledButton(onPressed:()=>Navigator.pop(ctx),child:const Text('تم'))]));
+                        if(context.mounted)Navigator.pop(context);
+                      }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذّر إصدار الكود: $e')));}
+
                     },
                     child: Text(AppStrings.get('activate', lang)),
                   ),
@@ -385,11 +405,19 @@ class SubscriptionDialog extends HookConsumerWidget {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () async {
-                      final months = int.tryParse(monthsController.text) ?? 1;
-                      await ref
-                          .read(superAdminFirestoreServiceProvider)
-                          .activateSubscription(tenant.id, months, codeController.text.trim());
-                      if (context.mounted) Navigator.pop(context);
+                      final months = int.tryParse(monthsController.text);
+                      if (months == null || months <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل عدد أشهر أكبر من صفر')));
+                        return;
+                      }
+                      try {
+                        await ref.read(superAdminFirestoreServiceProvider)
+                            .activateSubscription(tenant.id, months, codeController.text.trim());
+                        if (context.mounted) Navigator.pop(context);
+                      } catch (_) {
+                        if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content:Text('تعذّر حفظ اشتراك المتجر. تحقق من الاتصال وصلاحية الحساب.')));
+                      }
                     },
                     child: Text(AppStrings.get('activate', lang)),
                   ),

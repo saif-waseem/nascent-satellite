@@ -1,3 +1,4 @@
+import '../../../core/services/cashier_stock_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -97,6 +98,15 @@ class SalesRepository {
     }
   }
 
+  Future<Map<String, dynamic>> _invoiceQueueData(SalesInvoiceModel invoice) async {
+    final data = invoice.toJson();
+    if (await _ref.read(cashierStockProvider).linked(invoice.tenantId)) {
+      final movements = CashierStockService.movements(invoice, (id) => _productBox.get(id));
+      if (movements.isNotEmpty) data['_stockMovements'] = movements;
+    }
+    return data;
+  }
+
   Future<void> saveInvoice(String tenantId, SalesInvoiceModel invoice) async {
     final invoiceId = invoice.id.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : invoice.id;
     final receiptNumber = invoice.receiptNumber.isEmpty 
@@ -120,7 +130,7 @@ class SalesRepository {
     // 3. Queue for sync
     await LocalDbService.addToSyncQueue(
       collectionPath: 'sales_invoices/$invoiceId', 
-      data: finalInvoice.toJson(), 
+      data: await _invoiceQueueData(finalInvoice),
       action: invoice.id.isNotEmpty ? SyncAction.update : SyncAction.create
     );
     
@@ -163,7 +173,7 @@ class SalesRepository {
         await productRepo.updateStock(
           tenantId, 
           item.productId, 
-          -item.quantity.toInt(), // Negative for sale
+          -item.quantity.toInt(), invoiceMovement:true, // Negative for sale
           color: item.variantColor,
           size: item.variantSize,
           warehouseName: item.warehouseName ?? 'المخزن الرئيسي',
@@ -204,6 +214,21 @@ class SalesRepository {
   }) async {
     final productRepo = _ref.read(productRepositoryProvider);
 
+    // Validate the whole return before recording any local or cloud movement.
+    final remaining = <(String, String?, String?), int>{};
+    for (final item in originalInvoice.items) {
+      final key = (item.productId, item.variantColor, item.variantSize);
+      remaining.update(key, (n) => n + item.quantity, ifAbsent: () => item.quantity);
+    }
+    for (final item in returnedItems) {
+      final key = (item.productId, item.variantColor, item.variantSize);
+      final available = remaining[key] ?? 0;
+      if (item.quantity <= 0 || item.quantity > available) {
+        throw StateError('كمية الإرجاع غير صالحة للصنف ${item.productName}');
+      }
+      remaining[key] = available - item.quantity;
+    }
+
     // 1. Create a "Return Invoice" record for financial reports
     if (totalReturnAmount > 0) {
       final returnInvoice = originalInvoice.copyWith(
@@ -221,7 +246,7 @@ class SalesRepository {
       if (tenantId != 'local_default') {
         await LocalDbService.addToSyncQueue(
           collectionPath: 'sales_invoices/${returnInvoice.id}', 
-          data: returnInvoice.toJson(), 
+          data: await _invoiceQueueData(returnInvoice),
           action: SyncAction.create
         );
       }
@@ -231,12 +256,6 @@ class SalesRepository {
     for (final item in returnedItems) {
       if (item.productId.isEmpty) continue;
       
-      // Safety check: Don't allow returning more than original (Server side check)
-      final originalItem = originalInvoice.items.firstWhere((i) => i.productId == item.productId, orElse: () => item);
-      if (item.quantity > originalItem.quantity) {
-        throw 'الكمية المسترجعة (${item.quantity}) أكبر من الكمية المباعة (${originalItem.quantity})';
-      }
-
       await productRepo.returnStock(
         tenantId, 
         item.productId, 

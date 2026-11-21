@@ -24,8 +24,8 @@ class ReportsScreen extends HookConsumerWidget {
     final currentStaff = ref.watch(currentStaffProvider);
     final canViewShifts = ref.hasPermission(PosPermission.viewShifts);
     final canViewAudit = ref.hasPermission(PosPermission.viewAuditLogs);
-    final isAdmin = currentStaff?.roleName.toLowerCase() == 'admin' ||
-        currentStaff?.roleName.toLowerCase() == 'manager';
+    final isAdmin = currentStaff == null || currentStaff.roleName.toLowerCase() == 'admin' ||
+        currentStaff.roleName.toLowerCase() == 'manager';
 
     final period = useState<ReportPeriod>(ReportPeriod.thisMonth);
     final now = DateTime.now();
@@ -159,6 +159,7 @@ class ReportsScreen extends HookConsumerWidget {
                       ...staffList.map((s) => DropdownMenuItem<String?>(value: s.id, child: Text(s.name))),
                     ];
                     return DropdownButtonFormField<String?>(
+                      isExpanded: true,
                       value: selectedStaffId.value,
                       items: items,
                       onChanged: (v) => selectedStaffId.value = v,
@@ -205,7 +206,7 @@ class ReportsScreen extends HookConsumerWidget {
 
                           // --- Online Store Section ---
                           if (showOnline.value && report.onlineSales > 0) ...[
-                            _buildSectionHeader('أرباح المتجر الإلكتروني', Icons.store, Colors.purple),
+                            _buildSectionHeader('مبيعات المتجر الإلكتروني', Icons.store, Colors.purple),
                             const SizedBox(height: 8),
                             _buildOnlineStoreCard(report),
                             const SizedBox(height: 24),
@@ -457,7 +458,7 @@ class ReportsScreen extends HookConsumerWidget {
       children: [
         Icon(icon, color: color, size: 22),
         const SizedBox(width: 8),
-        Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+        Expanded(child: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color))),
       ],
     );
   }
@@ -473,10 +474,7 @@ class ReportsScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('مبيعات المتجر الإلكتروني', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Wrap(spacing: 8, alignment: WrapAlignment.spaceBetween,children: [const Text('مبيعات المتجر الإلكتروني', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 Chip(
                   label: Text('$onlinePercent% من الكل', style: const TextStyle(fontSize: 11, color: Colors.purple)),
                   backgroundColor: Colors.purple.shade100,
@@ -490,7 +488,7 @@ class ReportsScreen extends HookConsumerWidget {
             Text(fmt.format(report.onlineSales), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.purple)),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: report.totalSales > 0 ? report.onlineSales / report.totalSales : 0,
+              value: report.totalSales > 0 ? (report.onlineSales / report.totalSales).clamp(0.0, 1.0) : 0,
               backgroundColor: Colors.purple.shade100,
               color: Colors.purple,
               minHeight: 6,
@@ -590,7 +588,7 @@ class ReportsScreen extends HookConsumerWidget {
               ],
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value: report.totalSales > 0 ? entry.value / (report.totalSales + returns) : 0,
+                value: report.totalSales > 0 ? (entry.value / (report.totalSales + returns)).clamp(0.0, 1.0) : 0,
                 backgroundColor: Colors.grey.shade100,
                 color: Colors.blue,
                 minHeight: 4,
@@ -653,7 +651,7 @@ class ReportsScreen extends HookConsumerWidget {
                 ],
                 const SizedBox(height: 6),
                 LinearProgressIndicator(
-                  value: maxQty > 0 ? entry.value / maxQty : 0,
+                  value: maxQty > 0 ? (entry.value / maxQty).clamp(0.0, 1.0) : 0,
                   backgroundColor: Colors.teal.shade50,
                   color: Colors.teal,
                   minHeight: 4,
@@ -693,8 +691,7 @@ class ReportsScreen extends HookConsumerWidget {
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
-          Text(title, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          const Spacer(),
+          Expanded(child: Text(title, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal))),
           Text('${amount.toStringAsFixed(0)} IQD', style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: isBold ? 16 : 14)),
         ],
       ),
@@ -715,14 +712,14 @@ class ReportsScreen extends HookConsumerWidget {
           children: [
             const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
             const SizedBox(width: 16),
-            const Column(
+            const Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('الصندوق (Treasury)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 Text('انقر لمشاهدة تفاصيل الأرباح والمصاريف اليومية', style: TextStyle(color: Colors.white70, fontSize: 11)),
               ],
             ),
-            const Spacer(),
+            ),
             const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
           ],
         ),

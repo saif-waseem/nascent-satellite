@@ -53,7 +53,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
                 }
              }
           }
-          final estimatedCash = totalOpeningToday + report.totalSales - report.totalExpenses - report.totalPurchases;
+          final estimatedCash = totalOpeningToday + report.salesPayments - report.totalExpenses - report.purchasePayments;
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -110,7 +110,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       child: Column(
         children: [
           const Text(
-            'صافي حركة الصندوق (اليوم)',
+            'رصيد الصندوق التقديري اليوم',
             style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -125,12 +125,12 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
             ),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          Wrap(spacing: 12,runSpacing: 8,
+            alignment: WrapAlignment.spaceAround,
             children: [
-              _buildSimpleStat('المبيعات', report.totalSales, Colors.green.shade300),
+              _buildSimpleStat('المقبوضات', report.salesPayments, Colors.green.shade300),
               _buildSimpleStat('المصاريف', report.totalExpenses, Colors.red.shade300),
-              _buildSimpleStat('المشتريات', report.totalPurchases, Colors.orange.shade300),
+              _buildSimpleStat('المدفوع للموردين', report.purchasePayments, Colors.orange.shade300),
             ],
           ),
         ],
@@ -200,24 +200,24 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
-          _buildSummaryRow('إجمالي الداخل (Sales)', report.totalSales, Colors.green),
+          _buildSummaryRow('المقبوض من المبيعات', report.salesPayments, Colors.green),
           const Divider(height: 1),
           _buildSummaryRow('إجمالي الخارج (Expenses)', report.totalExpenses, Colors.red),
           const Divider(height: 1),
-          _buildSummaryRow('إجمالي الخارج (Purchases)', report.totalPurchases, Colors.orange),
+          _buildSummaryRow('المدفوع للمشتريات', report.purchasePayments, Colors.orange),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('الربح التشغيلي اليوم:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Expanded(child: Text('صافي الربح اليوم', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                 Text(
-                  '${(report.totalSales - report.totalExpenses).toStringAsFixed(0)} IQD',
+                  '${report.netProfit.toStringAsFixed(0)} IQD',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: (report.totalSales - report.totalExpenses) >= 0 ? Colors.teal : Colors.red,
+                    color: report.netProfit >= 0 ? Colors.teal : Colors.red,
                   ),
                 ),
               ],
@@ -234,7 +234,7 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           Text(
             '${amount.toStringAsFixed(0)} IQD',
             style: TextStyle(fontWeight: FontWeight.bold, color: color),
@@ -249,10 +249,10 @@ class TreasuryDashboardScreen extends HookConsumerWidget {
       children: [
         Icon(icon, color: Colors.blue.shade700, size: 20),
         const SizedBox(width: 8),
-        Text(
+        Expanded(child: Text(
           title,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
-        ),
+        )),
       ],
     );
   }

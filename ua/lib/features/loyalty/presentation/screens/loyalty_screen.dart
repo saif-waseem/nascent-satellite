@@ -23,7 +23,7 @@ class LoyaltyScreen extends ConsumerWidget {
     final userAsync = ref.watch(userProvider);
     
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.surface,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(AppStrings.get('my_profile_title', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -96,8 +96,7 @@ class LoyaltyScreen extends ConsumerWidget {
           _buildPremiumIdCard(context, user, lang),
           const SizedBox(height: 24),
           
-          // Referral Section [NEW]
-          _buildReferralCard(context, user, lang),
+
           const SizedBox(height: 24),
 
           // Check-in Section
@@ -264,7 +263,7 @@ class LoyaltyScreen extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
@@ -335,7 +334,7 @@ class LoyaltyScreen extends ConsumerWidget {
               width: 38,
               height: 48,
               decoration: BoxDecoration(
-                color: isCompleted ? Colors.orange[50] : (isNext ? Colors.grey[50] : Colors.transparent),
+                color: isCompleted ? Theme.of(context).colorScheme.secondaryContainer : (isNext ? Theme.of(context).colorScheme.surfaceContainerHigh : Colors.transparent),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isCompleted ? Colors.orange[200]! : (isNext ? Colors.blue[100]! : Colors.grey[200]!)),
               ),
@@ -367,7 +366,7 @@ class LoyaltyScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(24),
               margin: const EdgeInsets.all(32),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(30)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -408,7 +407,7 @@ class LoyaltyScreen extends ConsumerWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surfaceContainer,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
@@ -478,76 +477,4 @@ class LoyaltyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReferralCard(BuildContext context, UserModel user, String lang) {
-    // Generate a code if not present (simplified for UI)
-    final referralCode = user.referralCode ?? '${user.name?.split(' ').first ?? 'USER'}${user.id.substring(user.id.length - 4)}'.toUpperCase();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12)),
-                child: Icon(Icons.people_alt_rounded, color: Colors.blue[600], size: 24),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Invite & Earn', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('Get 50 points for every new friend', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('YOUR REFERRAL CODE', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(referralCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 2)),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () {
-                     // Share logic
-                  },
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  label: const Text('Share'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.1, end: 0);
-  }
 }
-

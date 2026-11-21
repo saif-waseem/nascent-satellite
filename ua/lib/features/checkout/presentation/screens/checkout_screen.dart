@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +19,7 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  final _draftId = FirebaseFirestore.instance.collection('orders').doc().id;
   int _currentStep = 0;
   String _selectedPayment = 'Direct Payment';
   String _address = '';
@@ -191,10 +193,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       appBar: AppBar(
         title: Text(AppStrings.get('checkout', lang)),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Column(
         children: [
           Expanded(
@@ -507,7 +509,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-          Text(value, style: TextStyle(color: isDiscount ? Colors.green : Colors.black, fontWeight: isDiscount ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+          Text(value, style: TextStyle(color: isDiscount ? Colors.green : null, fontWeight: isDiscount ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
         ],
       ),
     );
@@ -517,7 +519,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -588,9 +590,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       final purePhone = rawPhone.contains('_') ? rawPhone.split('_').last : rawPhone;
       final userPhone = user?.id ?? purePhone;
       
-      if (_pointsToRedeem > 0) {
-        await ref.read(userActionsProvider).deductPoints(userPhone, _pointsToRedeem);
-      }
       
       // 4. Calculate points to award (Awarding based on percentage of purchase)
       final tenant = ref.read(tenantProvider).value;
@@ -645,7 +644,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         discountAmount: totalDiscount,
         shippingCost: shipping,
         couponCode: _discountCodeController.text.trim().toUpperCase(),
-        orderId: editingOrderId,
+        orderId: editingOrderId ?? _draftId,
+        couponId: _appliedCouponId,
         landmark: _landmarkController.text.trim(),
       );
 
@@ -654,15 +654,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // Reset editing state
       ref.read(editingOrderIdProvider.notifier).set(null);
       
-      // 6. Award Loyalty Points as PENDING (will be confirmed when order completes)
-      await ref.read(userActionsProvider).addPendingPoints(userPhone, pointsToAward);
-      
-      // 7. Increment Coupon Usage if applied
-      if (_appliedCouponId != null) {
-        final tId = ref.read(tenantProvider).value?.id ?? 'main_store';
-        await ref.read(firestoreServiceProvider).incrementCouponUsage(tId, _appliedCouponId!);
-      }
-
       // Save address, phone and landmark for next time
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_address', _address);

@@ -17,3 +17,6 @@ jobs:
           curl --silent --show-error --fail --retry 2 --retry-all-errors --max-time 10 \
             --header "apikey: $CATALOG_KEY" \
             'https://axcdhxubqzbzjpbhyvvf.supabase.co/rest/v1/products?select=id&limit=1' | jq -e 'type == "array"' >/dev/null
+          curl --silent --show-error --fail --retry 2 --retry-all-errors --max-time 10 \
+            --request POST --header "apikey: $CATALOG_KEY" --header "Content-Type: application/json" --data '{}' \
+            'https://axcdhxubqzbzjpbhyvvf.supabase.co/rest/v1/rpc/order_stock_sync_healthy' | jq -e '. == true' >/dev/null

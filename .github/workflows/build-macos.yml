@@ -1,274 +1,42 @@
 name: Build macOS Apps
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
+  push:
+    branches: [main]
+permissions:
+  contents: read
 jobs:
-
-  # ─────────────────────────────────────────────
-  # Job 1: POS Cashier (po/)
-  # ─────────────────────────────────────────────
-  build-pos-cashier:
-    runs-on: macos-latest
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {dir: po, package: cashier}
+          - {dir: ua, package: store}
+          - {dir: st, package: admin}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          flutter-version: '3.41.6'
+          channel: stable
+          flutter-version: '3.44.8'
           cache: true
-
-      - name: Disable Swift Package Manager
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Install create-dmg
-        run: brew install create-dmg
-
-      - name: Disable Code Signing
+      - run: flutter config --no-enable-swift-package-manager
+      - name: Build and package macOS app
+        working-directory: ${{ matrix.dir }}
         run: |
-          for cfg in \
-            "po/macos/Flutter/Release.xcconfig" \
-            "po/macos/Flutter/Debug.xcconfig"; do
-            if [ -f "$cfg" ]; then
-              echo "CODE_SIGN_IDENTITY=" >> "$cfg"
-              echo "CODE_SIGNING_REQUIRED=NO" >> "$cfg"
-              echo "CODE_SIGNING_ALLOWED=NO" >> "$cfg"
-            fi
-          done
-          pbx="po/macos/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$pbx" ]; then
-            sed -i '' \
-              -e 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' \
-              -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
-              "$pbx"
-          fi
-
-      - name: Remove incompatible packages
-        run: |
-          sed -i '' '/windows_printer/d' po/pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' po/pubspec.yaml
-
-      - name: Force cloud_firestore version
-        run: |
-          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' po/pubspec.yaml
-          rm -f po/pubspec.lock
-
-      - name: Flutter pub get
-        run: |
-          cd po
-          flutter clean
+          set -euo pipefail
           flutter pub get
-
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \; || true
-
-      - name: Build POS Cashier
-        run: |
-          cd po
           flutter build macos --release --no-tree-shake-icons
-
-      - name: Create DMG - POS Cashier
-        run: |
-          mkdir -p build-artifacts
-          create-dmg \
-            --volname "POS Cashier" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 400 200 \
-            "build-artifacts/pos_cashier_macos.dmg" \
-            "po/build/macos/Build/Products/Release/"
-
-      - name: Upload Artifact - POS Cashier
-        uses: actions/upload-artifact@v4
+          apps=(build/macos/Build/Products/Release/*.app)
+          test "${#apps[@]}" = 1
+          test -d "${apps[0]}"
+          codesign --verify --deep "${apps[0]}"
+          ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "${{ matrix.package }}-macos.zip"
+      - uses: actions/upload-artifact@v4
         with:
-          name: pos-cashier-macos
-          path: build-artifacts/pos_cashier_macos.dmg
-
-  # ─────────────────────────────────────────────
-  # Job 2: Dar London - Store Admin (ecommerce_saas)
-  # ─────────────────────────────────────────────
-  build-store-admin:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          flutter-version: '3.41.6'
-          cache: true
-
-      - name: Disable Swift Package Manager
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Install create-dmg
-        run: brew install create-dmg
-
-      - name: Disable Code Signing
-        run: |
-          for cfg in \
-            "ecommerce_saas/apps/store_admin/macos/Flutter/Release.xcconfig" \
-            "ecommerce_saas/apps/store_admin/macos/Flutter/Debug.xcconfig"; do
-            if [ -f "$cfg" ]; then
-              echo "CODE_SIGN_IDENTITY=" >> "$cfg"
-              echo "CODE_SIGNING_REQUIRED=NO" >> "$cfg"
-              echo "CODE_SIGNING_ALLOWED=NO" >> "$cfg"
-            fi
-          done
-          pbx="ecommerce_saas/apps/store_admin/macos/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$pbx" ]; then
-            sed -i '' \
-              -e 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' \
-              -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
-              "$pbx"
-          fi
-
-      - name: Remove incompatible packages
-        run: |
-          sed -i '' '/windows_printer/d' ecommerce_saas/apps/store_admin/pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' ecommerce_saas/apps/store_admin/pubspec.yaml
-
-      - name: Force cloud_firestore version
-        run: |
-          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' ecommerce_saas/apps/store_admin/pubspec.yaml
-          rm -f ecommerce_saas/apps/store_admin/pubspec.lock
-
-      - name: Flutter pub get
-        run: |
-          cd ecommerce_saas/apps/store_admin
-          flutter clean
-          flutter pub get
-
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \; || true
-
-      - name: Build Store Admin
-        run: |
-          cd ecommerce_saas/apps/store_admin
-          flutter build macos --release --no-tree-shake-icons
-
-      - name: Create DMG - Store Admin
-        run: |
-          mkdir -p build-artifacts
-          create-dmg \
-            --volname "Store Admin" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 400 200 \
-            "build-artifacts/store_admin_macos.dmg" \
-            "ecommerce_saas/apps/store_admin/build/macos/Build/Products/Release/"
-
-      - name: Upload Artifact - Store Admin
-        uses: actions/upload-artifact@v4
-        with:
-          name: store-admin-macos
-          path: build-artifacts/store_admin_macos.dmg
-
-  # ─────────────────────────────────────────────
-  # Job 3: Dar London - User App (ecommerce_saas)
-  # ─────────────────────────────────────────────
-  build-user-app:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          flutter-version: '3.41.6'
-          cache: true
-
-      - name: Disable Swift Package Manager
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Install create-dmg
-        run: brew install create-dmg
-
-      - name: Disable Code Signing
-        run: |
-          for cfg in \
-            "ecommerce_saas/apps/user_app/macos/Flutter/Release.xcconfig" \
-            "ecommerce_saas/apps/user_app/macos/Flutter/Debug.xcconfig"; do
-            if [ -f "$cfg" ]; then
-              echo "CODE_SIGN_IDENTITY=" >> "$cfg"
-              echo "CODE_SIGNING_REQUIRED=NO" >> "$cfg"
-              echo "CODE_SIGNING_ALLOWED=NO" >> "$cfg"
-            fi
-          done
-          pbx="ecommerce_saas/apps/user_app/macos/Runner.xcodeproj/project.pbxproj"
-          if [ -f "$pbx" ]; then
-            sed -i '' \
-              -e 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' \
-              -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
-              "$pbx"
-          fi
-
-      - name: Remove incompatible packages
-        run: |
-          sed -i '' '/windows_printer/d' ecommerce_saas/apps/user_app/pubspec.yaml
-          sed -i '' '/print_bluetooth_thermal/d' ecommerce_saas/apps/user_app/pubspec.yaml
-
-      - name: Force cloud_firestore version
-        run: |
-          sed -i '' 's/cloud_firestore:.*/cloud_firestore: ^6.5.0/' ecommerce_saas/apps/user_app/pubspec.yaml
-          rm -f ecommerce_saas/apps/user_app/pubspec.lock
-
-      - name: Flutter pub get
-        run: |
-          cd ecommerce_saas/apps/user_app
-          flutter clean
-          flutter pub get
-
-      - name: Patch connectivity_plus
-        run: |
-          find /Users/runner/.pub-cache/hosted/pub.dev \
-            -name "PathMonitorConnectivityProvider.swift" \
-            -exec sed -i '' \
-            's/if #available(macOS 26\.0, \*), path\.isUltraConstrained {/if false {/g' \
-            {} \; || true
-
-      - name: Build User App
-        run: |
-          cd ecommerce_saas/apps/user_app
-          flutter build macos --release --no-tree-shake-icons
-
-      - name: Create DMG - User App
-        run: |
-          mkdir -p build-artifacts
-          create-dmg \
-            --volname "Dar London User App" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --app-drop-link 400 200 \
-            "build-artifacts/user_app_macos.dmg" \
-            "ecommerce_saas/apps/user_app/build/macos/Build/Products/Release/"
-
-      - name: Upload Artifact - User App
-        uses: actions/upload-artifact@v4
-        with:
-          name: dar-london-user-app-macos
-          path: build-artifacts/user_app_macos.dmg
+          name: ${{ matrix.package }}-macos
+          path: ${{ matrix.dir }}/${{ matrix.package }}-macos.zip
+          if-no-files-found: error

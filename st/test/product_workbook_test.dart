@@ -94,4 +94,61 @@ void main() {
       throwsFormatException,
     );
   });
+  test(
+    'append a row to an exported XLSX and import twice without duplicate products or bins',
+    () {
+      final catalog = {
+        for (final p in [simple, advanced]) p.id: p,
+      };
+      final bytes = ProductWorkbook.export([
+        simple,
+        advanced,
+        simple.copyWith(id: '', name: 'قميص جديد', barcode: '0088'),
+      ]);
+      for (var attempt = 0; attempt < 2; attempt++) {
+        final parsed = ProductWorkbook.parse(
+          bytes,
+          'inventory.xlsx',
+          'test',
+          catalog.values.toList(),
+        );
+        final changed = parsed.where((p) => p != catalog[p.id]).toList();
+        expect(changed.length, attempt == 0 ? 1 : 0);
+        for (final p in changed) {
+          catalog[p.id] = p;
+        }
+        expect(catalog.length, 3);
+        expect(catalog['q']!.variants.single.storageLocations.length, 2);
+      }
+    },
+  );
+  test(
+    'adding a barcode to a uniquely named legacy product preserves its ID',
+    () {
+      final old = ProductModel(
+        id: 'original',
+        tenantId: 'test',
+        name: 'حقيبة  يد',
+        category: 'عام',
+        description: '',
+        price: 9,
+      );
+      final result = ProductWorkbook.parse(
+        Uint8List.fromList(
+          utf8.encode('Name,Barcode,Price\nحقيبة يد,00121,12'),
+        ),
+        'legacy.csv',
+        'test',
+        [old],
+      );
+      expect(result.single.id, old.id);
+      expect(result.single.barcode, '00121');
+    },
+  );
+  test('stale supplied ID cannot duplicate an existing barcode', () {
+    expect(
+      () => parse('id,Name,Barcode,Price\nunknown,shirt,0009,10'),
+      throwsFormatException,
+    );
+  });
 }

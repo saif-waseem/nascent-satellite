@@ -35,6 +35,9 @@ class ProductWorkbook {
     'locationPrice': 'سعر الموقع',
   };
   static const legacy = {
+    'ID': 'id',
+    'Product ID': 'id',
+    'معرّف المنتج': 'id',
     'Name': 'name',
     'Barcode': 'barcode',
     'Price': 'price',
@@ -230,39 +233,76 @@ class ProductWorkbook {
     final byId = {
       for (final p in existing.where((p) => p.tenantId == tenant)) p.id: p,
     };
+    String nameKey(String value) => value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp('[\u200e\u200f\u061c]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ');
+    final names = <String, List<ProductModel>>{};
+    final barcodes = <String, List<ProductModel>>{};
+    for (final product in byId.values) {
+      (names[nameKey(product.name)] ??= []).add(product);
+      final barcode = product.barcode?.trim() ?? '';
+      if (barcode.isNotEmpty) (barcodes[barcode] ??= []).add(product);
+    }
     final barcodeIds = <String, String>{};
     for (final (idx, row) in rows.skip(1).indexed) {
       final n = idx + 2;
       if (row.every((v) => v.isEmpty)) continue;
       final d = {
         for (var j = 0; j < cols.length; j++)
-          if (cols[j] != null) cols[j]!: j < row.length ? row[j] : '',
+          if (cols[j] != null) cols[j]!: j < row.length ? row[j].trim() : '',
       };
       final name = d['name']!,
           code = d['barcode'] ?? '',
           supplied = d['id'] ?? '';
       if (name.isEmpty) throw FormatException('الصف $n: اسم المنتج فارغ');
-      final matches = byId.values
-          .where((p) => code.isNotEmpty ? p.barcode == code : p.name == name)
-          .toList();
-      if (supplied.isEmpty && matches.length > 1)
-        throw FormatException('الصف $n: حدد معرف المنتج لتجنب الالتباس');
-      final id = supplied.isNotEmpty
-          ? supplied
-          : matches.isNotEmpty
-          ? matches.single.id
-          : const Uuid().v5(
-              Uuid.NAMESPACE_URL,
-              jsonEncode([
-                tenant,
-                code.isEmpty ? 'name' : 'barcode',
-                code.isEmpty ? name : code,
-              ]),
-            );
+      final sameBarcode = barcodes[code] ?? const <ProductModel>[];
+      final sameName = names[nameKey(name)] ?? const <ProductModel>[];
+      final candidates = sameBarcode.isNotEmpty ? sameBarcode : sameName;
+      String id;
+      if (supplied.isNotEmpty) {
+        if (!byId.containsKey(supplied) &&
+            candidates.any(
+              (p) =>
+                  code.isEmpty ||
+                  (p.barcode ?? '').isEmpty ||
+                  p.barcode?.trim() == code,
+            )) {
+          throw FormatException(
+            'الصف $n: المعرّف لا يطابق الصنف الموجود. استخدم معرفه من آخر تصدير.',
+          );
+        }
+        id = supplied;
+      } else if (candidates.isNotEmpty) {
+        if (candidates.length != 1)
+          throw FormatException(
+            'الصف $n: أكثر من منتج مطابق. استخدم معرف المنتج من التصدير.',
+          );
+        final match = candidates.single;
+        if (sameBarcode.isEmpty &&
+            code.isNotEmpty &&
+            (match.barcode?.trim() ?? '').isNotEmpty) {
+          throw FormatException(
+            'الصف $n: الاسم موجود بباركود مختلف. استخدم معرف المنتج لتعديل الباركود.',
+          );
+        }
+        id = match.id;
+      } else {
+        id = const Uuid().v5(
+          Uuid.NAMESPACE_URL,
+          jsonEncode([
+            tenant,
+            code.isEmpty ? 'name' : 'barcode',
+            code.isEmpty ? nameKey(name) : code,
+          ]),
+        );
+      }
       if (code.isNotEmpty &&
-          (byId.values.any((p) => p.barcode == code && p.id != id) ||
-              (barcodeIds[code] != null && barcodeIds[code] != id)))
+          (sameBarcode.any((p) => p.id != id) ||
+              (barcodeIds[code] != null && barcodeIds[code] != id))) {
         throw FormatException('الصف $n: الباركود يخص منتجاً آخر');
+      }
       if (code.isNotEmpty) barcodeIds[code] = id;
       (groups[id] ??= []).add((n, d));
     }
@@ -462,15 +502,17 @@ class ProductWorkbook {
       price: number(d['price']!, first, 'price'),
       description: d['description'],
       category: d['category'],
-      barcode: d['barcode'],
-      unit: d['unit'],
+      barcode: has(d, 'barcode') ? d['barcode'] : null,
+      unit: has(d, 'unit') ? d['unit'] : null,
       colors: colors,
       sizes: sizes,
       purchasePrice: optional(d, 'cost', first),
       wholesalePrice: optional(d, 'wholesale', first),
       minStockLevel: has(d, 'min') ? whole(d['min']!, first, 'min') : null,
       stockQuantity: total,
-      inStock: total > 0,
+      inStock: old != null && total == old.stockQuantity
+          ? old.inStock
+          : total > 0,
       variants: kept,
     );
   }

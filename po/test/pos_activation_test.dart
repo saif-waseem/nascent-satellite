@@ -24,6 +24,24 @@ void main() {
     'posExpiryDate': '2099-01-01T00:00:00Z',
   };
   test(
+    'store code points to the cashier code field and never activates a cashier',
+    () async {
+      await expectLater(
+        verifyPosCode(
+          Issuer({...issued, 'activationCode': 'ACT-123456'}),
+          'ACT-123456',
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'guidance',
+            contains('كود الكاشير'),
+          ),
+        ),
+      );
+    },
+  );
+  test(
     'fresh install reads the POS issuer record over the verification transport',
     () async {
       final path = Platform.environment['POS_TEST_ISSUED_RECORD'];

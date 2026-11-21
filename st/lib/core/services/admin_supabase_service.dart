@@ -69,15 +69,16 @@ class AdminSupabaseService {
   }
 
   Future<List<ProductModel>> getProducts(String tenantId) async {
-    final response = await client
-        .from('products')
-        .select()
-        .eq('tenant_id', tenantId)
-        .order('created_at', ascending: false);
-
-    return (response as List<dynamic>)
-        .map((r) => _mapRowToProduct(r as Map<String, dynamic>))
-        .toList();
+    final products = <ProductModel>[];
+    String? after;
+    while (true) {
+      var query = client.from('products').select().eq('tenant_id',tenantId);
+      if (after != null) query = query.gt('id',after);
+      final rows = await query.order('id').limit(250);
+      products.addAll(rows.map(_mapRowToProduct));
+      if (rows.length < 250) return products;
+      after = products.last.id;
+    }
   }
 
   Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock}) async {

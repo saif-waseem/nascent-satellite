@@ -26,8 +26,15 @@ Future<TenantModel> verifyPosCode(
   var rows = await service.lookupPosCode(code);
   if (rows.isEmpty && input.trim() != code)
     rows = await service.lookupPosCode(input.trim());
-  if (rows.length != 1)
-    throw const FormatException('لم يتم العثور على كود كاشير مطابق وفريد');
+  if (rows.isEmpty) {
+    if (code.startsWith('ACT-')) {
+      throw const FormatException('هذا رمز المتجر. انسخ «كود الكاشير» من بطاقة المتجر في السوبر أدمن.');
+    }
+    throw const FormatException('كود الكاشير غير موجود. تأكّد من نجاح الإصدار وانسخ الكود مجددًا.');
+  }
+  if (rows.length > 1) {
+    throw const FormatException('هذا الكود مرتبط بأكثر من متجر. أصدر كود كاشير جديدًا.');
+  }
   final tenant = TenantModel.fromJson(rows.single);
   if (tenant.id.isEmpty ||
       normalizePosCode(tenant.posActivationCode ?? '') != code ||

@@ -25,7 +25,10 @@ void main() {
         (await tenant.get()).data()!['posExpiryDate'],
         issued['posExpiryDate'],
       );
-      expect((await tenant.collection('activation_logs').get()).docs.length, 1);
+      final log = (await db.collection('activation_logs').get()).docs.single;
+      expect(log.data()['tenantId'], tenant.id);
+      expect(log.data()['type'], 'POS');
+      expect(log.data().containsKey('activationCode'), isFalse);
       await tenant.update({'isPosEnabled': false});
       await service.enableIssuedPosCode(tenant.id, 'POS-DEMO-123');
       final repaired = (await tenant.get()).data()!;

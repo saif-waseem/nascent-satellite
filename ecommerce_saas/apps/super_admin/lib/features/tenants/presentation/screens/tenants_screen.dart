@@ -144,12 +144,17 @@ class _TenantCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (tenant.isPosEnabled || tenant.isStoreEnabled || (tenant.activationCode != null && tenant.activationCode!.isNotEmpty)) ...[
-                  _buildInfoRow(context, 'انتهاء الكاشير/المتجر', 
-                    tenant.expiryDate != null ? '${DateFormat('yyyy/MM/dd').format(tenant.expiryDate!)} (${_getRemainingDays(tenant.expiryDate!)})' : 'N/A'),
-                  _buildInfoRow(context, 'كود الكاشير/المتجر', tenant.activationCode ?? '-', isActivationCode: true),
-                  const SizedBox(height: 8),
-                ],
+                _buildInfoRow(context, lang == 'ar' ? 'كود الكاشير' : 'Cashier code',
+                    tenant.posActivationCode ?? '-', isActivationCode: true),
+                _buildInfoRow(context, lang == 'ar' ? 'انتهاء الكاشير' : 'Cashier expiry',
+                    tenant.posExpiryDate != null ? DateFormat('yyyy/MM/dd').format(tenant.posExpiryDate!) :
+                        (tenant.isPosEnabled ? (lang == 'ar' ? 'دائم' : 'Permanent') : '-')),
+                const Divider(),
+                _buildInfoRow(context, lang == 'ar' ? 'كود المتجر' : 'Store code',
+                    tenant.activationCode ?? '-', isActivationCode: true),
+                _buildInfoRow(context, lang == 'ar' ? 'انتهاء المتجر' : 'Store expiry',
+                    tenant.expiryDate != null ? DateFormat('yyyy/MM/dd').format(tenant.expiryDate!) : '-'),
+                const SizedBox(height: 8),
                 if (tenant.isCarsEnabled || (tenant.carsActivationCode != null && tenant.carsActivationCode!.isNotEmpty)) ...[
                   _buildInfoRow(context, 'انتهاء السيارات', 
                     tenant.carsExpiryDate != null ? '${DateFormat('yyyy/MM/dd').format(tenant.carsExpiryDate!)} (${_getRemainingDays(tenant.carsExpiryDate!)})' : 'N/A'),

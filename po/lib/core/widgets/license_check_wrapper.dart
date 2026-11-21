@@ -190,7 +190,7 @@ class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e is FormatException ? e.message : 'تعذّر الاتصال لخدمة التفعيل'), backgroundColor: Colors.red),
         );
       }
     } finally {

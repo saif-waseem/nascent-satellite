@@ -110,7 +110,7 @@ class SuperAdminFirestoreService {
     final issued=code.trim().toUpperCase();
     if(months<=0 || issued.isEmpty)throw ArgumentError('مدة التفعيل أو الكود غير صالح');
     final doc=_db.collection('tenants').doc(tenantId);
-    final log=doc.collection('activation_logs').doc();
+    final log=_db.collection('activation_logs').doc();
     await _db.runTransaction((tx) async{
       final snapshot=await tx.get(doc);
       if(!snapshot.exists)throw StateError('المتجر غير موجود');
@@ -120,7 +120,7 @@ class SuperAdminFirestoreService {
       final previous=tenant.posExpiryDate;
       final expiry=(previous!=null && previous.isAfter(now)?previous:now).add(Duration(days:months*30)).toUtc().toIso8601String();
       tx.update(doc,{'isActive':true,'isPosEnabled':true,'posActivationCode':issued,'posExpiryDate':expiry});
-      tx.set(log,{'type':'POS','activationCode':issued,'expiryDate':expiry,'months':months,'timestamp':FieldValue.serverTimestamp()});
+      tx.set(log,{'tenantId':tenantId,'type':'POS','expiryDate':expiry,'months':months,'timestamp':FieldValue.serverTimestamp()});
     });
   }
 

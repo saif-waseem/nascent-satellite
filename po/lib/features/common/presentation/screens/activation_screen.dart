@@ -22,7 +22,7 @@ class ActivationScreen extends HookConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('حدث خطأ: $e')),
+            SnackBar(content: Text(e is FormatException ? e.message : 'تعذّر التفعيل. تحقق من الاتصال وحاول مجددًا.')),
           );
         }
       } finally {
@@ -62,15 +62,16 @@ class ActivationScreen extends HookConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'أدخل رمز التفعيل الخاص بك للمتابعة',
+                  'أدخل كود الكاشير من بطاقة المتجر في السوبر أدمن',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 32),
                 TextField(
                   controller: storeIdController,
+                  textDirection: TextDirection.ltr,
                   decoration: InputDecoration(
-                    labelText: 'رمز التفعيل',
+                    labelText: 'كود الكاشير',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

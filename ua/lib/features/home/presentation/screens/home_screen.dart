@@ -13,7 +13,6 @@ import 'package:user_app/core/services/notification_service.dart';
 import 'package:shared_ui/shared_ui.dart';
 import 'package:user_app/features/shared/widgets/optimized_image.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:user_app/core/utils/store_share.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -341,8 +340,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _buildFilterBar(lang),
                 const SizedBox(height: 16),
                 
-                // Referral Banner
-                _buildReferralBanner(lang),
+
                 const SizedBox(height: 24),
                 
                 // Flash Sales Section
@@ -579,7 +577,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                         ),
                         child: SizedBox(
@@ -881,9 +879,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Container(
                         height: 200,
                         width: double.infinity,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(19)),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: _buildImageOrIcon(product.imageUrl, size: 200, fit: BoxFit.cover),
@@ -1066,7 +1064,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           height: 200, // Square-ish image
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.grey[50],
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                           ),
                           clipBehavior: Clip.antiAlias,
@@ -1290,64 +1288,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildReferralBanner(String lang) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.deepPurple.shade400, Colors.deepPurple.shade700],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.deepPurple.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.card_giftcard, color: Colors.white, size: 40),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'ادعُ صديقك واحصل على 50 نقطة',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'شارك كود الدعوة الخاص بك الآن!',
-                  style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final user = ref.read(userProvider).value;
-              if (user == null) { context.push('/login'); return; }
-              try {
-                final code = await ref.read(userActionsProvider).ensureReferralCode(user);
-                if (context.mounted) await shareStoreRoute(context, '/register?ref=${Uri.encodeQueryComponent(code)}', 'رمز دعوتي: $code');
-              } catch (_) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذرت مشاركة الدعوة')));
-              }
-            },            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.deepPurple,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-            child: const Text('مشاركة'),
-          ),
-        ],
       ),
     );
   }

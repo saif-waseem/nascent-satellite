@@ -106,23 +106,41 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
     try {
       state = state.copyWith(syncState: SyncState.syncing);
       final box = LocalDbService.getBox<SyncQueueItem>('sync_queue');
-      if (!await ref.read(authRestServiceProvider.notifier).ensureSession())
-        return;
-      final restService = ref.read(firestoreRestServiceProvider);
+
+
 
       final items = box.values.toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
+      for(final item in items) {
+        if(item.data['_primaryDone']==true)continue;
+        final isCatalog=item.collectionPath.startsWith('catalog/');
+        final movements=item.data['_stockMovements'];
+        if(!isCatalog && !(movements is List && item.collectionPath.startsWith('sales_invoices/')))continue;
+        try{
+          final service=ref.read(cashierStockProvider);
+          if(isCatalog){await service.writeProduct(item.id,item.data);}
+          else{await service.submit(item.data['tenantId'] as String,movements as List);}
+          item.data['_primaryDone']=true;
+          await item.save();
+        }catch(e){debugPrint('Supabase sync failed for ${item.collectionPath}: $e');state=state.copyWith(syncState:SyncState.error);return;}
+      }
+      if (!await ref.read(authRestServiceProvider.notifier).ensureSession()) return;
+      final backupService=ref.read(firestoreRestServiceProvider);
       for (final item in items) {
         try {
+          if(item.collectionPath.startsWith('catalog/')){
+            final snapshot=item.data['backup'];
+            if(snapshot==null){await backupService.deleteDocument('products/${item.id}');}
+            else{await backupService.setDocument('products/${item.id}',Map<String,dynamic>.from(snapshot as Map),isUpdate:true);}
+            await box.delete(item.key);continue;
+          }
           if (item.action == SyncAction.create ||
               item.action == SyncAction.update) {
             final data = Map<String, dynamic>.from(item.data);
             final movements = data.remove('_stockMovements');
-            if (movements is List && item.collectionPath.startsWith('sales_invoices/')) {
-              await ref.read(cashierStockProvider).submit(data['tenantId'] as String, movements);
-            }
-            await restService.setDocument(
+            data.remove('_primaryDone');
+            await backupService.setDocument(
               item.collectionPath,
               data,
               isUpdate:
@@ -130,7 +148,7 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
                   item.collectionPath.startsWith('products/'),
             );
           } else if (item.action == SyncAction.delete) {
-            await restService.deleteDocument(item.collectionPath);
+            await backupService.deleteDocument(item.collectionPath);
           }
           await box.delete(item.key);
         } catch (e) {

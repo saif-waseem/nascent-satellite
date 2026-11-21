@@ -1,4 +1,3 @@
-import 'package:user_app/core/utils/store_share.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,21 +29,11 @@ class CartScreen extends HookConsumerWidget {
         title: Text(AppStrings.get('cart_title', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          if (cart.isNotEmpty) IconButton(icon: const Icon(Icons.share_outlined),
-            tooltip: 'مشاركة السلة', onPressed: () async {
-              try {
-                final id = await ref.read(cartProvider.notifier).generateCartLink();
-                if (context.mounted) await shareStoreRoute(context, '/share/$id', 'سلة المنتجات');
-              } catch (_) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذرت مشاركة السلة. تحقق من الاتصال.')));
-              }
-            }),
-        ],
+
         flexibleSpace: ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(color: Colors.white.withOpacity(0.5)),
+            child: Container(color: Theme.of(context).colorScheme.surface.withOpacity(0.9)),
           ),
         ),
       ),
@@ -148,7 +137,7 @@ class _CartItemCard extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -256,7 +245,7 @@ class _CartItemCard extends ConsumerWidget {
           border: Border.all(color: Colors.grey[300]!),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, size: 16, color: Colors.black87),
+        child: Icon(icon, size: 16),
       ),
     );
   }
@@ -278,7 +267,7 @@ class _CartSummaryBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(

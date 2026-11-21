@@ -92,6 +92,17 @@ class CashierStockService {
     return result;
   }
 
+  Future<void> writeProduct(String id, Map<String,dynamic> job) async {
+    final tenant=job['tenantId'] as String;
+    final key=await deviceKey(tenant);
+    if(key==null) throw StateError('اربط جهاز الكاشير بالمتجر لإكمال مزامنة المنتجات');
+    final response=await http.post(Uri.parse('$_url/rest/v1/rpc/write_cashier_catalog'),
+      headers:{'apikey':_publicKey,'Content-Type':'application/json'},
+      body:jsonEncode({'p_tenant':tenant,'p_device_key':key,'p_id':id,'p_operation':job['operation'],
+        'p_action':job['action'],'p_before':job['before'],'p_patch':job['patch']})).timeout(const Duration(seconds:15));
+    if(response.statusCode<200 || response.statusCode>=300) throw StateError('تعذرت مزامنة المنتج $id: ${response.statusCode}');
+  }
+
   Future<void> submit(String tenant, List<dynamic> movements) async {
     final key = await _vault.read(key: 'stock_key_$tenant');
     if (key == null) throw StateError('أعد ربط جهاز الكاشير بالمخزون');

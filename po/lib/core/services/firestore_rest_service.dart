@@ -33,6 +33,16 @@ class FirestoreRestService {
         if (authToken != null) 'Authorization': 'Bearer $authToken',
       };
 
+  /// Activation must consult the issuing store even on the first launch.
+  /// Unlike inventory queries it must never use cached search results.
+  Future<List<Map<String,dynamic>>> lookupPosCode(String code) async{
+    final uri=Uri.parse('$baseUrl:runQuery').replace(queryParameters:{'key':apiKey});
+    final response=await http.post(uri,headers:_headers,body:jsonEncode({
+      'structuredQuery':{'from':[{'collectionId':'tenants'}],'where':{'fieldFilter':{'field':{'fieldPath':'posActivationCode'},'op':'EQUAL','value':{'stringValue':code}}},'limit':2}
+    })).timeout(const Duration(seconds:15));
+    if(response.statusCode!=200)throw StateError('تعذّر الاتصال بخدمة الترخيص (${response.statusCode})');
+    return [for(final row in jsonDecode(response.body) as List) if(row['document']!=null) _fromFirestore(row['document'])];
+  }
   // --- Core CRUD Operations ---
 
   Future<Map<String, dynamic>?> getDocument(String path) async {
@@ -133,11 +143,13 @@ class FirestoreRestService {
     }
     try {
       final response = await http.delete(Uri.parse('$baseUrl/$path?key=$apiKey'), headers: _headers);
-      if (response.statusCode != 200 && response.statusCode != 204) {
+      if (![200,204,404].contains(response.statusCode)) {
+        if(path.startsWith('products/')) throw NetworkError();
         debugPrint('REST ERROR: deleteDocument failed ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('REST ERROR: deleteDocument($path) -> $e');
+      if(path.startsWith('products/')) rethrow;
     }
   }
 

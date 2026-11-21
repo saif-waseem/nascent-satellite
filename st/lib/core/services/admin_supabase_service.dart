@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'admin_firestore_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:image_picker/image_picker.dart';
@@ -5,7 +9,42 @@ import 'package:image_picker/image_picker.dart';
 class AdminSupabaseService {
   final SupabaseClient? _customClient;
 
-  AdminSupabaseService([this._customClient]);
+  final AdminFirestoreService? backup;
+  Timer? _retry;
+  bool _working=false;
+  AdminSupabaseService([this._customClient,this.backup]){
+    if(backup!=null){
+      _retry=Timer.periodic(const Duration(seconds:30),(_)=>_flushBackup());
+      unawaited(_flushBackup());
+    }
+  }
+  void dispose()=>_retry?.cancel();
+
+  Future<void> _markBackup(String tenant,String id)async {
+    if(backup==null)return;
+    final prefs=await SharedPreferences.getInstance();
+    final key='catalog_backup:'+jsonEncode([tenant,id]);
+    if(!await prefs.setString(key,DateTime.now().microsecondsSinceEpoch.toString()))throw StateError('تعذّر تسجيل النسخ الاحتياطي');
+  }
+
+  Future<void> _flushBackup()async {
+    if(_working||backup==null)return;
+    _working=true;
+    try{
+      final prefs=await SharedPreferences.getInstance();
+      for(final k in prefs.getKeys().where((v)=>v.startsWith('catalog_backup:')).toList()){
+        final version=prefs.getString(k);
+        try{
+          final parts=jsonDecode(k.substring('catalog_backup:'.length)) as List;
+          final tenant=parts[0] as String,id=parts[1] as String;
+          final row=await client.from('products').select().eq('tenant_id',tenant).eq('id',id).maybeSingle();
+          if(row==null){await backup!.deleteProduct(id,tenant).timeout(const Duration(seconds:12));}
+          else{await backup!.updateProduct(ProductCatalog.decode(row),tenant).timeout(const Duration(seconds:12));}
+          if(prefs.getString(k)==version)await prefs.remove(k);
+        }catch(_){continue;}
+      }
+    }finally{_working=false;}
+  }
 
   SupabaseClient get client {
     try {
@@ -26,7 +65,7 @@ class AdminSupabaseService {
         .stream(primaryKey: ['id'])
         .eq('tenant_id', tenantId)
         .order('created_at', ascending: false)
-        .map((rows) => rows.map((r) => _mapRowToProduct(r)).toList());
+        .map((rows) => rows.map(_mapRowToProduct).where((p)=>!p.isArchived).toList());
   }
 
   Future<List<ProductModel>> getProducts(String tenantId) async {
@@ -44,8 +83,8 @@ class AdminSupabaseService {
   Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock}) async {
     final row = _mapProductToRow(product, tenantId);
     if (previousStock == null) {
-      await client.from('products').upsert(row);
-      return;
+      await client.from('products').insert(row);
+      await _markBackup(tenantId,product.id);unawaited(_flushBackup());return;
     }
     final updated = await client.from('products').update(row)
         .eq('id', product.id).eq('tenant_id', tenantId)
@@ -53,14 +92,21 @@ class AdminSupabaseService {
     if (updated == null) {
       throw StateError('تغيّر رصيد الصنف أو لم يعد موجوداً. أعد فتحه ثم احفظ التعديل.');
     }
+    await _markBackup(tenantId,product.id);unawaited(_flushBackup());
   }
 
   Future<void> addProduct(ProductModel product, String tenantId) async {
     await saveProduct(product, tenantId);
   }
 
-  Future<void> deleteProduct(String productId) async {
-    await client.from('products').delete().eq('id', productId);
+  Future<void> updateProductPrice(String productId,double price,String tenantId) async {
+    await client.from('products').update({'price':price,'old_price':null}).eq('tenant_id',tenantId).eq('id',productId);
+    await _markBackup(tenantId,productId);unawaited(_flushBackup());
+  }
+
+  Future<void> deleteProduct(String productId,String tenantId) async {
+    await client.from('products').delete().eq('tenant_id',tenantId).eq('id', productId);
+    await _markBackup(tenantId,productId);unawaited(_flushBackup());
   }
 
   Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {
@@ -165,63 +211,7 @@ class AdminSupabaseService {
   }
 
   // --- Helpers for SQL Mapping ---
-  Map<String, dynamic> _mapProductToRow(ProductModel p, String tenantId) {
-    return {
-      'id': p.id.isNotEmpty ? p.id : DateTime.now().millisecondsSinceEpoch.toString(),
-      'tenant_id': tenantId,
-      'name': p.name,
-      'category': p.category,
-      'description': p.description,
-      'price': p.price,
-      'purchase_price': p.purchasePrice ?? 0.0,
-      'wholesale_price': p.wholesalePrice ?? 0.0,
-      'stock_quantity': p.stockQuantity,
-      'min_stock_level': p.minStockLevel ?? 5,
-      'unit': p.unit ?? 'قطعة',
-      'barcode': p.barcode,
-      'images': p.images,
-      'video_url': p.videoUrl,
-      'rating': p.rating,
-      'sales_count': p.salesCount,
-      'in_stock': p.inStock,
-      'is_offer': p.isOffer,
-      'is_featured_deal': p.isFeaturedDeal,
-      'is_daily_starred': p.isDailyStarred,
-      'sizes': p.sizes,
-      'colors': p.colors,
-      'variants': p.variants.map((v) => v.toJson()).toList(),
-      'updated_at': DateTime.now().toIso8601String(),
-    };
-  }
-
-  ProductModel _mapRowToProduct(Map<String, dynamic> r) {
-    return ProductModel(
-      id: r['id'] as String? ?? '',
-      tenantId: r['tenant_id'] as String? ?? '',
-      name: r['name'] as String? ?? '',
-      category: r['category'] as String? ?? 'عام',
-      description: r['description'] as String? ?? '',
-      price: (r['price'] as num? ?? 0.0).toDouble(),
-      purchasePrice: (r['purchase_price'] as num? ?? 0.0).toDouble(),
-      wholesalePrice: (r['wholesale_price'] as num? ?? 0.0).toDouble(),
-      stockQuantity: r['stock_quantity'] as int? ?? 0,
-      minStockLevel: r['min_stock_level'] as int? ?? 5,
-      unit: r['unit'] as String? ?? 'قطعة',
-      barcode: r['barcode'] as String?,
-      images: (r['images'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-      videoUrl: r['video_url'] as String?,
-      rating: (r['rating'] as num? ?? 5.0).toDouble(),
-      salesCount: r['sales_count'] as int? ?? 0,
-      inStock: r['in_stock'] as bool? ?? true,
-      isOffer: r['is_offer'] as bool? ?? false,
-      isFeaturedDeal: r['is_featured_deal'] as bool? ?? false,
-      isDailyStarred: r['is_daily_starred'] as bool? ?? false,
-      sizes: List<String>.from(r['sizes'] ?? const []),
-      colors: List<String>.from(r['colors'] ?? const []),
-      variants: (r['variants'] as List<dynamic>?)
-              ?.map((v) => ProductVariant.fromJson(v as Map<String, dynamic>))
-              .toList() ??
-          [],
-    );
-  }
+  Map<String,dynamic> _mapProductToRow(ProductModel product,String tenantId) =>
+    {...ProductCatalog.encode(product),'tenant_id':tenantId,'updated_at':DateTime.now().toUtc().toIso8601String()};
+  ProductModel _mapRowToProduct(Map<String,dynamic> row)=>ProductCatalog.decode(row);
 }

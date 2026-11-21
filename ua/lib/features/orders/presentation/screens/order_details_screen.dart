@@ -45,12 +45,12 @@ class OrderDetailsScreen extends ConsumerWidget {
     final shipping = (order.total - subtotal + pointsDiscount + order.discountAmount).clamp(0, double.infinity).toDouble();
     
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Text('${AppStrings.get('orders', lang)} #$orderId'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        foregroundColor: Colors.black,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
@@ -75,7 +75,7 @@ class OrderDetailsScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
@@ -153,7 +153,7 @@ class OrderDetailsScreen extends ConsumerWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5, offset: const Offset(0, 2)),
@@ -224,7 +224,7 @@ class OrderDetailsScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
@@ -345,7 +345,7 @@ class OrderDetailsScreen extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isNegative ? Colors.green : Colors.black)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isNegative ? Colors.green : null)),
       ],
     );
   }
@@ -388,7 +388,7 @@ class OrderDetailsScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
@@ -405,128 +405,11 @@ class OrderDetailsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _buildVisualTimeline(lang, currentIndex),
+          OrderTrackingTimeline(lang:lang,current:currentIndex),
         ],
       ),
     );
   }
-
-  Widget _buildVisualTimeline(String lang, int currentIndex) {
-    final statusIcons = [
-      Icons.inventory_2_outlined,
-      Icons.restaurant_menu_outlined, 
-      Icons.moped_outlined,           
-      Icons.home_outlined,            
-    ];
-    
-    final labels = [
-      'tracking_pending',
-      'tracking_processing',
-      'tracking_shipped',
-      'tracking_delivered',
-    ];
-
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Background Track
-                Container(
-                  height: 6,
-                  width: width,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                // Progress Track
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 800),
-                  height: 6,
-                  width: (currentIndex / (statusIcons.length - 1)) * width,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                // Nodes
-                ...List.generate(statusIcons.length, (index) {
-                  final isReached = index <= currentIndex;
-                  final leftPos = index * (width - 16) / (statusIcons.length - 1);
-                  
-                  return Positioned(
-                    left: leftPos,
-                    top: -5,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: isReached ? Colors.blue : Colors.white,
-                        border: Border.all(color: isReached ? Colors.blue : Colors.grey[300]!, width: 2),
-                        shape: BoxShape.circle,
-                        boxShadow: isReached ? [BoxShadow(color: Colors.blue.withOpacity(0.2), blurRadius: 4)] : [],
-                      ),
-                      child: isReached ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
-                    ),
-                  );
-                }),
-                // Moving Icon
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 1500),
-                  curve: Curves.easeInOutCubic,
-                  left: (currentIndex * (width - 48) / (statusIcons.length - 1)),
-                  top: -55,
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
-                          ],
-                        ),
-                        child: Icon(statusIcons[currentIndex], color: Colors.white, size: 28),
-                      ).animate(onPlay: (controller) => controller.repeat(reverse: true))
-                       .moveY(begin: -3, end: 3, duration: 1200.ms, curve: Curves.easeInOut),
-                      const Icon(Icons.arrow_drop_down, color: Colors.blue, size: 24),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(labels.length, (index) {
-             final isActive = index == currentIndex;
-             final isReached = index <= currentIndex;
-             return Expanded(
-               child: Text(
-                 AppStrings.get(labels[index], lang),
-                 textAlign: TextAlign.center,
-                 style: TextStyle(
-                   fontSize: 11,
-                   fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
-                   color: isActive ? Colors.blue : (isReached ? Colors.black87 : Colors.grey[400]),
-                 ),
-               ),
-             );
-          }),
-        ),
-      ],
-    );
-  }
-
 
   void _showEditInfoDialog(BuildContext context, WidgetRef ref, OrderModel order, String lang) {
     final addressController = TextEditingController(text: order.address);
@@ -706,5 +589,31 @@ class OrderDetailsScreen extends ConsumerWidget {
     final newTotal = order.total + diff;
 
     ref.read(orderActionsProvider).updateOrderItems(order, newItems, newTotal);
+  }
+}
+
+class OrderTrackingTimeline extends StatelessWidget {
+  final String lang;
+  final int current;
+  const OrderTrackingTimeline({super.key,required this.lang,required this.current});
+  @override Widget build(BuildContext context){
+    const icons=[Icons.inventory_2_outlined,Icons.restaurant_menu_outlined,Icons.moped_outlined,Icons.home_outlined];
+    const labels=['tracking_pending','tracking_processing','tracking_shipped','tracking_delivered'];
+    final colors=Theme.of(context).colorScheme;
+    return Directionality(textDirection:lang=='ar'?TextDirection.rtl:TextDirection.ltr,
+      child:LayoutBuilder(builder:(context,box){
+        final step=box.maxWidth/icons.length;
+        return Stack(children:[
+          PositionedDirectional(start:step/2,end:step/2,top:18,child:Container(height:3,color:colors.outlineVariant)),
+          AnimatedPositionedDirectional(duration:const Duration(milliseconds:300),start:step/2,top:18,width:step*current.clamp(0,3),child:Container(height:3,color:colors.primary)),
+          Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            for(var i=0;i<icons.length;i++) Expanded(child:Semantics(selected:current==i,child:Column(children:[
+              CircleAvatar(radius:19,backgroundColor:i<=current?colors.primary:colors.surfaceContainerHighest,
+                child:Icon(icons[i],size:20,color:i<=current?colors.onPrimary:colors.onSurfaceVariant)),
+              const SizedBox(height:8),Text(AppStrings.get(labels[i],lang),textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:colors.onSurface,fontWeight:i==current?FontWeight.bold:FontWeight.normal)),
+            ]))),
+          ]),
+        ]);
+      }));
   }
 }

@@ -173,7 +173,7 @@ class SalesRepository {
         await productRepo.updateStock(
           tenantId, 
           item.productId, 
-          -item.quantity.toInt(), // Negative for sale
+          -item.quantity.toInt(), invoiceMovement:true, // Negative for sale
           color: item.variantColor,
           size: item.variantSize,
           warehouseName: item.warehouseName ?? 'المخزن الرئيسي',

@@ -241,9 +241,8 @@ class ProductListScreen extends HookConsumerWidget {
           TextButton(
             onPressed: () async {
               final tenantId = ref.read(currentTenantIdProvider);
-              final service = ref.read(adminFirestoreServiceProvider);
               for (var id in ids) {
-                await service.deleteProduct(id, tenantId);
+                await ref.read(adminSupabaseServiceProvider).deleteProduct(id, tenantId);
               }
               mode.value = false;
               Navigator.pop(ctx);
@@ -273,9 +272,8 @@ class ProductListScreen extends HookConsumerWidget {
               final newPrice = double.tryParse(controller.text);
               if (newPrice != null) {
                 final tenantId = ref.read(currentTenantIdProvider);
-                final service = ref.read(adminFirestoreServiceProvider);
                 for (var id in ids) {
-                   await service.updateProductPrice(id, newPrice, tenantId);
+                   await ref.read(adminSupabaseServiceProvider).updateProductPrice(id, newPrice, tenantId);
                 }
                 mode.value = false;
                 Navigator.pop(ctx);
@@ -299,8 +297,7 @@ class ProductListScreen extends HookConsumerWidget {
           TextButton(
             onPressed: () async {
               final tenantId = ref.read(currentTenantIdProvider);
-              final service = ref.read(adminFirestoreServiceProvider);
-              await service.deleteProduct(product.id, tenantId);
+              await ref.read(adminSupabaseServiceProvider).deleteProduct(product.id, tenantId);
               if (context.mounted) Navigator.pop(ctx);
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),

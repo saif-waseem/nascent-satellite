@@ -153,12 +153,6 @@ class ProductFormScreen extends HookConsumerWidget {
       try {
         isLoading.value = true;
         await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId, previousStock: product?.stockQuantity);
-        final firestore = ref.read(adminFirestoreServiceProvider);
-        if (isEditing) {
-          await firestore.updateProduct(newProduct, tenantId);
-        } else {
-          await firestore.addProduct(newProduct, tenantId);
-        }
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ بنجاح')));

@@ -24,6 +24,7 @@ class AdaptiveVideoPlayer extends StatefulWidget {
 class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
+  int _attempt=0;
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
@@ -43,6 +44,7 @@ class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
   }
 
   Future<void> _initializePlayer() async {
+    final attempt=++_attempt;
     if (widget.videoUrl.trim().isEmpty) {
       if (mounted) {
         setState(() {
@@ -71,13 +73,13 @@ class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
 
       // Initialize with 12 seconds timeout to prevent infinite spinning
       await controller.initialize().timeout(
-        const Duration(seconds: 12),
+        const Duration(seconds: 30),
         onTimeout: () {
           throw TimeoutException('استغرق تحميل الفيديو وقتاً أطول من المتوقع');
         },
       );
 
-      if (!mounted) return;
+      if (!mounted || attempt!=_attempt) return;
 
       _chewieController = ChewieController(
         videoPlayerController: controller,
@@ -100,6 +102,7 @@ class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
         _isLoading = false;
       });
     } catch (e) {
+      if(!mounted || attempt!=_attempt)return;
       debugPrint('AdaptiveVideoPlayer initialization error: $e');
       if (mounted) {
         setState(() {

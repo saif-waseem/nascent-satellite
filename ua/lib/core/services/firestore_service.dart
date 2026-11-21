@@ -33,16 +33,9 @@ class FirestoreService {
 
   // --- Products ---
   Stream<List<ProductModel>> getProducts(String tenantId) {
-    return _db
-        .collection('products')
-        .where('tenantId', isEqualTo: tenantId)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return ProductModel.fromJson(data);
-      }).toList();
+    return ProductCatalog.watch(tenantId, () async {
+      final snapshot = await _db.collection('products').where('tenantId',isEqualTo:tenantId).get();
+      return snapshot.docs.map((doc)=>ProductModel.fromJson({...doc.data(),'id':doc.id})).toList();
     });
   }
 

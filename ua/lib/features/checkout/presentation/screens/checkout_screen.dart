@@ -191,10 +191,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       appBar: AppBar(
         title: Text(AppStrings.get('checkout', lang)),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Column(
         children: [
           Expanded(
@@ -507,7 +507,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-          Text(value, style: TextStyle(color: isDiscount ? Colors.green : Colors.black, fontWeight: isDiscount ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+          Text(value, style: TextStyle(color: isDiscount ? Colors.green : null, fontWeight: isDiscount ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
         ],
       ),
     );
@@ -517,7 +517,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),

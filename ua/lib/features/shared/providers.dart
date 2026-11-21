@@ -361,13 +361,13 @@ final productsProvider = StreamProvider<List<ProductModel>>((ref) async* {
   final firestore = ref.watch(firestoreServiceProvider);
   
   // 1. Yield cached data immediately
-  final cached = cache.getCachedProducts();
+  final id = await ref.watch(resolvedTenantIdProvider.future);
+  final cached = cache.getCachedProducts().where((p)=>p.tenantId==id && !p.isArchived).toList();
   if (cached.isNotEmpty) {
     yield cached;
   }
 
-  // 2. Resolve tenant ID and listen to Firestore
-  final id = await ref.watch(resolvedTenantIdProvider.future);
+
   
   await for (final products in firestore.getProducts(id)) {
     // 3. Update cache in background

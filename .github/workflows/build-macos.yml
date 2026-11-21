@@ -1,12 +1,18 @@
 name: Build macOS Apps
 on:
   workflow_dispatch:
+    inputs:
+      verify_run:
+        description: Verify packaged apps from a completed build run
+        type: string
+        required: false
   push:
     branches: [main]
 permissions:
   contents: read
 jobs:
   build:
+    if: inputs.verify_run == ''
     runs-on: macos-26
     timeout-minutes: 60
     strategy:
@@ -40,4 +46,42 @@ jobs:
           name: ${{ matrix.package }}-macos
           path: ${{ matrix.dir }}/${{ matrix.package }}-macos.zip
           if-no-files-found: error
-
+  verify-packages:
+    if: inputs.verify_run != ''
+    runs-on: macos-26
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 12
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.verify_run }}
+          github-token: ${{ github.token }}
+          pattern: '*-macos'
+          path: packages
+      - name: Launch all three packaged apps on macOS
+        run: |
+          set -euo pipefail
+          for name in cashier store admin; do
+            dir="$RUNNER_TEMP/$name"
+            mkdir -p "$dir"
+            ditto -x -k "packages/$name-macos/$name-macos.zip" "$dir"
+            apps=("$dir"/*.app)
+            test "${#apps[@]}" = 1
+            app="${apps[0]}"
+            codesign --verify --deep "$app"
+            binary="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
+            exe="$app/Contents/MacOS/$binary"
+            archs="$(lipo -archs "$exe")"
+            "$exe" >"$dir/startup.log" 2>&1 &
+            pid=$!
+            sleep 18
+            if ! kill -0 "$pid" 2>/dev/null || grep -Eq 'Unhandled Exception|Failed to create platform view|Failed to launch engine' "$dir/startup.log"; then
+              grep -E 'Unhandled Exception|Failed to create platform view|Failed to launch engine' "$dir/startup.log" | head -n 1 || true
+              exit 1
+            fi
+            kill "$pid"
+            wait "$pid" || true
+            echo "$name: started on $(uname -m), app architectures: $archs" >> "$GITHUB_STEP_SUMMARY"
+          done

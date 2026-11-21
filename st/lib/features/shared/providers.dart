@@ -9,23 +9,14 @@ import 'package:store_admin/core/services/analytics_service.dart';
 import 'package:shared_models/shared_models.dart';
 
 import 'package:store_admin/core/services/local_cache_service.dart';
-import 'package:store_admin/core/services/service_config_service.dart';
+
 
 // --- Services ---
 final adminFirestoreServiceProvider = Provider((ref) => AdminFirestoreService());
-final adminSupabaseServiceProvider = Provider((ref) => AdminSupabaseService());
+final adminSupabaseServiceProvider = Provider((ref){final service=AdminSupabaseService(null,ref.watch(adminFirestoreServiceProvider));ref.onDispose(service.dispose);return service;});
 final localCacheServiceProvider = Provider((ref) => LocalCacheService());
 
-final storageServiceProvider = Provider((ref) {
-  final config = ref.watch(serviceConfigProvider).value ?? ServiceConfig(
-    imageService: 'imgbb',
-    imageApiKey: '4c2a2e4993d69bf3fe8bf8d09d1a2520',
-    videoService: 'disabled',
-    videoLibraryId: '',
-    videoApiKey: '',
-  );
-  return StorageService(config);
-});
+final storageServiceProvider = Provider((ref) => StorageService(ref.watch(currentTenantIdProvider)));
 
 final notificationServiceProvider = Provider((ref) => NotificationService());
 final analyticsServiceProvider = Provider((ref) => AnalyticsService());
@@ -143,7 +134,7 @@ final adminProductsProvider = StreamProvider<List<ProductModel>>((ref) async* {
   final tenantId = ref.watch(currentTenantIdProvider);
   
   // 1. Yield cached data immediately (instant zero-latency display)
-  final cached = cache.getCachedProducts();
+  final cached = cache.getCachedProducts().where((p)=>p.tenantId==tenantId && !p.isArchived).toList();
   if (cached.isNotEmpty) {
     yield cached;
   }
@@ -157,7 +148,7 @@ final adminProductsProvider = StreamProvider<List<ProductModel>>((ref) async* {
       }
     } catch (_) {
       // Fallback to Firestore if offline or during transition
-      await for (final products in firestore.getProducts(tenantId)) {
+      await for(final products in ProductCatalog.watch(tenantId,()=>firestore.getProducts(tenantId).first)){
         await cache.saveProducts(products);
         yield products;
       }

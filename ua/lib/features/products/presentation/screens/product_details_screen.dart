@@ -1,7 +1,7 @@
+import 'package:shared_ui/product_promo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:user_app/features/shared/providers.dart';
 import 'package:user_app/core/utils/formatters.dart';
@@ -48,8 +48,8 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     super.dispose();
   }
 
-  void _initializeSelection() {
-    final item = widget.product;
+  void _initializeSelection([ProductModel? resolved]) {
+    final item = resolved ?? widget.product;
     if (item == null) return;
 
     setState(() {
@@ -186,7 +186,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
           final full = products.firstWhere((p) => p.id == item.id);
           // If we had no variants before, but now we do, re-initialize
           if ((widget.product == null || widget.product!.variants.isEmpty) && full.variants.isNotEmpty) {
-            _initializeSelection();
+            _initializeSelection(full);
           }
         } catch (_) {}
       });
@@ -207,65 +207,6 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         actions: [
-          IconButton(
-            onPressed: () {
-              final tenant = ref.read(tenantProvider).value;
-              final categories = ref.read(categoriesProvider).value ?? [];
-              final storeName = tenant?.name ?? 'متجرنا';
-              
-              // Get Category Name instead of ID
-              final category = categories.firstWhere(
-                (c) => c.id == item.category,
-                orElse: () => CategoryModel(id: 'All', name: AppStrings.get('cat_all', lang), icon: ''),
-              );
-
-              // Format Colors and Sizes
-              final colors = item.colors.where((c) => c != 'Default' && c != 'none').join(', ');
-              final sizes = item.sizes.where((s) => s != 'Default' && s != 'none').join(', ');
-              
-              // GitHub Pages URL for product sharing
-              const githubPagesUrl = 'https://saif-waseem.github.io/store';
-              final productUrl = '$githubPagesUrl/?p=${item.id}';
-              
-              // Create share message with product link
-              final priceInfo = item.oldPrice != null 
-                ? '💰 ${formatCurrency(item.price)} (كان ${formatCurrency(item.oldPrice!)})'
-                : '💰 ${formatCurrency(item.price)}';
-              
-              final msg = '''
-🛍️ ${item.name}
-
-📁 القسم: ${category.name}
-$priceInfo
-${item.discountPercentage != null ? '🏷️ خصم ${item.discountPercentage}%' : ''}
-${colors.isNotEmpty ? '🎨 الألوان: $colors' : ''}
-${sizes.isNotEmpty ? '📏 المقاسات: $sizes' : ''}
-
-📦 من متجر: $storeName
-
-🔗 شاهد المنتج:
-$productUrl
-
-سيفتح التطبيق تلقائياً إذا كان مثبتاً لديك!
-''';
-              Share.share(msg.trim());
-
-              // Award share points
-              final userData = ref.read(userProvider).value;
-              if (userData != null) {
-                final points = tenant?.sharesRewardPoints ?? 10;
-                final limit = tenant?.maxDailySharePoints ?? 50;
-                ref.read(firestoreServiceProvider).awardSharePoints(userData.id, points, limit).then((awarded) {
-                  if (awarded > 0 && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(AppStrings.get('reward_points_msg', lang).replaceFirst('{points}', awarded.toString()))
-                    ));
-                  }
-                });
-              }
-            },
-            icon: const Icon(Icons.share),
-          ),
           Consumer(builder: (context, ref, _) {
             final tenant = ref.watch(tenantProvider).value;
             if (tenant == null || tenant.whatsappNumber.isEmpty) return const SizedBox.shrink();
@@ -318,13 +259,16 @@ $productUrl
             if (item.videoUrl != null && item.videoUrl!.isNotEmpty) ...[
               // Video Section First
               Stack(
-                alignment: Alignment.bottomRight,
+                alignment: Alignment.topLeft,
                 children: [
                   Container(
                     height: 380,
                     width: double.infinity,
                     color: Colors.black,
-                    child: AdaptiveVideoPlayer(
+                    child: ProductPromo.styleOf(item.videoUrl) != null
+                        ? ProductPromo(style: ProductPromo.styleOf(item.videoUrl)!,
+                            title: item.name, price: formatCurrency(item.price), images: item.images)
+                        : AdaptiveVideoPlayer(
                       videoUrl: item.videoUrl!,
                       autoPlay: false,
                       looping: true,
@@ -794,7 +738,7 @@ $productUrl
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isPurchaser ? Colors.amber.shade50.withOpacity(0.3) : Colors.white,
+        color: isPurchaser ? Theme.of(context).colorScheme.secondaryContainer : Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: isPurchaser 
             ? Border.all(color: Colors.amber.shade700, width: 2) 

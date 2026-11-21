@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,10 +5,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:store_admin/features/shared/providers.dart';
 import 'package:store_admin/core/localization/app_settings_controller.dart';
-import 'package:uuid/uuid.dart';
-import 'dart:io' show File, Platform;
-import 'dart:typed_data' show Uint8List;
-import 'package:path_provider/path_provider.dart';
 
 class CsvImportExportDialog extends HookConsumerWidget {
   const CsvImportExportDialog({super.key});
@@ -88,7 +83,7 @@ class CsvImportExportDialog extends HookConsumerWidget {
 
             // Export Button
             FilledButton.icon(
-              onPressed: () => _exportProducts(context, ref, lang),
+              onPressed: () => _exportProducts(context, ref),
               icon: const Icon(Icons.file_download_outlined),
               label: Text(isArabic ? 'تصدير المنتجات إلى ملف إكسل' : 'Export Products to Excel'),
               style: FilledButton.styleFrom(
@@ -119,108 +114,39 @@ class CsvImportExportDialog extends HookConsumerWidget {
     );
   }
 
-  Future<void> _exportProducts(BuildContext context, WidgetRef ref, String lang) async {
-    try {
-      final products = await ref.read(adminProductsProvider.future);
-      final csvData = UniversalExcelService.exportProductsToCsv(products, lang: lang);
-      
-      // Save file cross-platform
-      final bytes = utf8.encode(csvData);
-      final fileName = 'products_inventory_${DateTime.now().millisecondsSinceEpoch}.csv';
-
-      if (kIsWeb) {
-        // Web: not supported in this build
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('التصدير غير مدعوم على الويب'), backgroundColor: Colors.orange),
-          );
-        }
-        return;
-      }
-
-      final savedUri = await FilePicker.saveFile(
-        fileName: fileName,
-        bytes: Uint8List.fromList(bytes),
-      );
-      if (savedUri == null) return;
-
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تنزيل ملف الإكسل بنجاح! 🎉'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء التصدير: $e')));
-      }
-    }
+  Future<void> _exportProducts(BuildContext context, WidgetRef ref) async {
+    try{
+      final tenant=ref.read(currentTenantIdProvider);
+      final products=await ref.read(adminSupabaseServiceProvider).getProducts(tenant);
+      final bytes=ProductWorkbook.export(products.where((p)=>!p.isArchived).toList());
+      final path=await FilePicker.saveFile(fileName:'products.xlsx',bytes:bytes,type:FileType.custom,allowedExtensions:['xlsx']);
+      if(context.mounted && (kIsWeb || path!=null)) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تصدير ملف المنتجات')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذّر التصدير: $e')));}
   }
 
-  Future<void> _importProducts(BuildContext context, WidgetRef ref) async {
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
-      );
+  Future<void> _importProducts(BuildContext context,WidgetRef ref) async {
+    var saved=0;
+    try{
+      final result=await FilePicker.pickFiles(type:FileType.custom,allowedExtensions:['xlsx','csv'],withData:true);
+      if(result==null || !context.mounted)return;
+      final file=result.files.single;
+      final bytes=file.bytes;
+      if(bytes==null)throw const FormatException('تعذّرت قراءة الملف');
+      final tenant=ref.read(currentTenantIdProvider);
+      final repo=ref.read(adminSupabaseServiceProvider);
+      final existing=await repo.getProducts(tenant);
+      final products=ProductWorkbook.parse(bytes,file.name,tenant,existing);
+      if(!context.mounted)return;
+      final existingIds={for(final p in existing)p.id:p};
+      final updates=products.where((p)=>existingIds.containsKey(p.id)).length;
+      final proceed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('مراجعة الاستيراد'),content:Text('إضافة ${products.length-updates} منتج وتحديث $updates. هل تريد الحفظ؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
+      if(proceed!=true || !context.mounted)return;
+      for(final product in products){
+        await repo.saveProduct(product,tenant,previousStock:existingIds[product.id]?.stockQuantity);
 
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
-        if (bytes == null) throw Exception('الملف فارغ');
-
-        final csvString = utf8.decode(bytes);
-        final tenantId = ref.read(currentTenantIdProvider);
-        final parsed = UniversalExcelService.parseProductsFromCsv(csvString, tenantId);
-
-        if (parsed.isEmpty) {
-          throw Exception('لم يتم العثور على صفوف صالحة في الملف');
-        }
-
-        int count = 0;
-        final supabaseService = ref.read(adminSupabaseServiceProvider);
-
-        for (var p in parsed) {
-          final newProduct = ProductModel(
-            id: const Uuid().v4(),
-            tenantId: tenantId,
-            name: p['name'],
-            barcode: p['barcode'],
-            price: p['price'],
-            purchasePrice: p['purchasePrice'],
-            stockQuantity: p['stockQuantity'],
-            category: p['category'],
-            unit: p['unit'],
-            minStockLevel: p['minStockLevel'],
-            description: p['description'],
-            inStock: (p['stockQuantity'] as int) > 0,
-            images: [],
-            sizes: [],
-            colors: [],
-            variants: [],
-          );
-
-          // Save to Supabase SQL directly
-          await supabaseService.addProduct(newProduct, tenantId);
-          // And dual-sync to Firestore during transition
-          await ref.read(adminFirestoreServiceProvider).addProduct(newProduct, tenantId);
-          count++;
-        }
-
-        if (context.mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تم استيراد $count منتج مع تفاصيل المخازن بنجاح! ✅'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        saved++;
       }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء الاستيراد: $e'), backgroundColor: Colors.red));
-      }
-    }
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ $saved منتج')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ $saved منتج. $e')));}
   }
 }

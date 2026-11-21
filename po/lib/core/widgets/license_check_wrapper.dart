@@ -1,7 +1,4 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_models/shared_models.dart';
-import '../services/local_db_service.dart';
+import '../services/pos_activation_service.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../providers/tenant_provider.dart';
@@ -46,7 +43,7 @@ class LicenseCheckWrapper extends ConsumerWidget {
 
         final isExpired = tenant.posExpiryDate != null && tenant.posExpiryDate!.isBefore(DateTime.now());
         
-        if (!tenant.isPosEnabled || isExpired) {
+        if (!tenant.isActive || !tenant.isPosEnabled || isExpired) {
           return _ActivationScreen(tenantId: tenant.id, isExpired: isExpired);
         }
 
@@ -189,57 +186,11 @@ class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('https://us-central1-my-store-b0723.cloudfunctions.net/verifyActivationCode'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'data': {
-            'tenantId': widget.tenantId,
-            'code': code,
-            'appType': 'pos',
-          }
-        }),
-      );
-
-      Map<String, dynamic>? body;
-      try {
-        body = json.decode(response.body) as Map<String, dynamic>?;
-      } catch (_) {
-        // Not JSON
-      }
-
-      if (body != null && body.containsKey('error')) {
-        final error = body['error'];
-        final message = error['message'] ?? 'كود التفعيل غير صحيح أو فشل التحقق.';
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطأ: $message'), backgroundColor: Colors.red),
-          );
-        }
-        return;
-      }
-
-      if (response.statusCode == 200 && body != null && body.containsKey('result')) {
-        // Delete old cached tenant so the next provider run fetches fresh from the network
-        final box = LocalDbService.getBox<TenantModel>('tenants');
-        await box.delete(widget.tenantId);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم تفعيل تطبيق المبيعات بنجاح!'), backgroundColor: Colors.green),
-          );
-          // Invalidate the tenantProvider to force reload
-          ref.invalidate(tenantProvider);
-        }
-      } else {
-        throw Exception('فشل الاتصال بالسيرفر (${response.statusCode})');
-      }
+      await activateCashier(ref,code,expectedTenant:widget.tenantId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ في الاتصال: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('$e'), backgroundColor: Colors.red),
         );
       }
     } finally {

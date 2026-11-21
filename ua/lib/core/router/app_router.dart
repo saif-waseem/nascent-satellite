@@ -122,7 +122,7 @@ final appRouterProvider = Provider((ref) {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) => RegisterScreen(referral: state.uri.queryParameters['ref'] ?? ''),
       ),
       GoRoute(
         path: '/order-details/:orderId',

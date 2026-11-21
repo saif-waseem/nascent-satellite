@@ -129,10 +129,8 @@ class UserActions {
     
     final compositeId = '${resolvedId}_$cleanPhone';
     
-    // Generate a unique referral code (e.g., last 4 digits of phone + ms)
-    final referralCode = cleanPhone.length >= 4 
-        ? '${cleanPhone.substring(cleanPhone.length - 4)}${DateTime.now().millisecond}'
-        : 'REF${DateTime.now().millisecondsSinceEpoch.toString().substring(10)}';
+    final users = FirebaseFirestore.instance.collection('users');
+    final referralCode = users.doc().id;
 
     var newUser = UserModel(
       id: compositeId,
@@ -163,13 +161,30 @@ class UserActions {
       // Ignore and use default 50
     }
 
-    await ref.read(firestoreServiceProvider).saveUser(newUser);
-
-    // Apply referral reward to the referrer
-    if (referredByCode != null && referredByCode.isNotEmpty) {
-      _applyReferralReward(resolvedId, referredByCode);
+    final code = referredByCode?.trim() ?? '';
+    DocumentReference<Map<String, dynamic>>? sponsor;
+    if (code.isNotEmpty) {
+      final matches = await users.where('tenantId', isEqualTo: resolvedId)
+          .where('referralCode', isEqualTo: code).limit(2).get();
+      if (matches.docs.length != 1 || matches.docs.single.id == compositeId) {
+        throw StateError('رمز الدعوة غير صالح لهذا المتجر');
+      }
+      sponsor = matches.docs.single.reference;
     }
-
+    final account = users.doc(compositeId);
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      if ((await tx.get(account)).exists) throw StateError('رقم الهاتف مسجل بالفعل');
+      final target = sponsor;
+      if (target != null) {
+        final data = (await tx.get(target)).data();
+        if (data?['tenantId'] != resolvedId || data?['referralCode'] != code) {
+          throw StateError('رمز الدعوة غير صالح');
+        }
+        tx.update(target, {'loyaltyPoints': FieldValue.increment(50),
+          'referralCount': FieldValue.increment(1)});
+      }
+      tx.set(account, newUser.toJson());
+    });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_phone', cleanPhone);
     await prefs.setString('user_address', address);
@@ -177,29 +192,19 @@ class UserActions {
     ref.read(userPhoneProvider.notifier).setPhone(cleanPhone);
   }
 
-  Future<void> _applyReferralReward(String tenantId, String code) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('tenantId', isEqualTo: tenantId)
-          .where('referralCode', isEqualTo: code)
-          .limit(1)
-          .get();
-      
-      if (snapshot.docs.isNotEmpty) {
-        final doc = snapshot.docs.first;
-        final currentPoints = doc.data()['loyaltyPoints'] as int? ?? 0;
-        await doc.reference.update({
-          'loyaltyPoints': currentPoints + 50,
-          'referralCount': FieldValue.increment(1),
-        });
-        debugPrint('Referral Reward: 50 points awarded to ${doc.id}');
-      }
-    } catch (e) {
-      debugPrint('Referral Reward Error: $e');
-    }
+  Future<String> ensureReferralCode(UserModel user) async {
+    final users = FirebaseFirestore.instance.collection('users');
+    final account = users.doc(user.id);
+    final generated = users.doc().id;
+    return FirebaseFirestore.instance.runTransaction((tx) async {
+      final data = (await tx.get(account)).data();
+      if (data == null) throw StateError('تعذر العثور على الحساب');
+      final current = data['referralCode'] as String?;
+      if (current != null && current.isNotEmpty) return current;
+      tx.update(account, {'referralCode': generated});
+      return generated;
+    });
   }
-
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_phone');
@@ -356,13 +361,13 @@ final productsProvider = StreamProvider<List<ProductModel>>((ref) async* {
   final firestore = ref.watch(firestoreServiceProvider);
   
   // 1. Yield cached data immediately
-  final cached = cache.getCachedProducts();
+  final id = await ref.watch(resolvedTenantIdProvider.future);
+  final cached = cache.getCachedProducts().where((p)=>p.tenantId==id && !p.isArchived).toList();
   if (cached.isNotEmpty) {
     yield cached;
   }
 
-  // 2. Resolve tenant ID and listen to Firestore
-  final id = await ref.watch(resolvedTenantIdProvider.future);
+
   
   await for (final products in firestore.getProducts(id)) {
     // 3. Update cache in background
@@ -646,11 +651,12 @@ class OrderActions {
     double shippingCost = 0.0,
     String? couponCode,
     String? orderId,
+    String? couponId,
     String? landmark,
   }) async {
     final resolvedId = await ref.read(resolvedTenantIdProvider.future);
     
-    final finalOrderId = orderId ?? 'ORD${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final finalOrderId = orderId ?? FirebaseFirestore.instance.collection('orders').doc().id;
     final suffix = userPhone.contains('_') ? userPhone.split('_').last : userPhone;
     final newOrder = OrderModel(
       id: finalOrderId,
@@ -671,7 +677,7 @@ class OrderActions {
     );
 
     print('OrderActions: Saving order and updating stock atomically via Transaction...');
-    await ref.read(firestoreServiceProvider).placeOrder(newOrder);
+    await ref.read(firestoreServiceProvider).placeOrder(newOrder,couponId:couponId);
     
     print('OrderActions: Order placed successfully. Sending notifications...');
     
@@ -784,6 +790,7 @@ class OrderActions {
         .collection('orders')
         .doc(order.id)
         .update({
+      'stockSyncPending': true,
       'items': items,
       'total': newTotal,
     });

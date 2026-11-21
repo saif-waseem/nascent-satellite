@@ -1,8 +1,23 @@
+import 'package:flutter/material.dart';
+import 'package:shared_ui/product_promo.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:store_admin/core/services/ai_video_service.dart';
 
 void main() {
+  testWidgets('local promo displays product data and pauses playback', (tester) async {
+    expect(ProductPromo.styleOf(ProductPromo.reference('forest')), 'forest');
+    expect(ProductPromo.styleOf('https://example.com/movie.mp4'), isNull);
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: ProductPromo(
+      style: 'forest', title: 'منتج تجريبي', price: '5000', images: [],
+    ))));
+    expect(find.text('منتج تجريبي'), findsOneWidget);
+    expect(find.text('5000'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.pause));
+    await tester.pump();
+    expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+  });
+
   group('AI Promo Video & Media Features Verification', () {
     final aiVideoService = AiVideoService();
 

@@ -26,12 +26,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
       icon: Icons.stars_rounded,
       position: Alignment.bottomCenter,
     ),
-    OnboardingStep(
-      title: 'شارك واكسب',
-      subtitle: 'ادعُ أصدقاءك وسجل نقاط إضافية فور انضمامهم.',
-      icon: Icons.share_rounded,
-      position: Alignment.topRight,
-    ),
+
   ];
 
   @override

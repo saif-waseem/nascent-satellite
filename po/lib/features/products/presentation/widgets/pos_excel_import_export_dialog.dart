@@ -1,13 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_models/shared_models.dart';
-import 'package:uuid/uuid.dart';
 import '../../data/product_repository.dart';
 import '../../../../core/providers/tenant_provider.dart';
-import '../providers/product_providers.dart';
-import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PosExcelImportExportDialog extends HookConsumerWidget {
   const PosExcelImportExportDialog({super.key});
@@ -107,95 +104,37 @@ class PosExcelImportExportDialog extends HookConsumerWidget {
   }
 
   Future<void> _exportProducts(BuildContext context, WidgetRef ref) async {
-    try {
-      final tenantId = ref.read(currentTenantIdProvider);
-      final repo = ref.read(productRepositoryProvider);
-      final products = await repo.getAllProducts(tenantId);
-
-      final csvData = UniversalExcelService.exportProductsToCsv(products, lang: 'ar');
-
-      final bytes = utf8.encode(csvData);
-      final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', 'pos_inventory_${DateTime.now().millisecondsSinceEpoch}.csv')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تنزيل كشف الجرد الإكسل بنجاح! 📊'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء التصدير: $e')));
-      }
-    }
+    try{
+      final tenant=ref.read(tenantIdProvider);
+      final products=await ref.read(productRepositoryProvider).getProducts(tenant);
+      final bytes=ProductWorkbook.export(products.where((p)=>!p.isArchived).toList());
+      final path=await FilePicker.saveFile(fileName:'products.xlsx',bytes:bytes,type:FileType.custom,allowedExtensions:['xlsx']);
+      if(context.mounted && (kIsWeb || path!=null)) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تصدير ملف المنتجات')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذّر التصدير: $e')));}
   }
 
-  Future<void> _importProducts(BuildContext context, WidgetRef ref) async {
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
-      );
-
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
-        if (bytes == null) throw Exception('الملف فارغ');
-
-        final csvString = utf8.decode(bytes);
-        final tenantId = ref.read(currentTenantIdProvider);
-        final parsed = UniversalExcelService.parseProductsFromCsv(csvString, tenantId);
-
-        if (parsed.isEmpty) {
-          throw Exception('لم يتم العثور على سجلات صالحة في الملف');
-        }
-
-        final repo = ref.read(productRepositoryProvider);
-        int count = 0;
-
-        for (var p in parsed) {
-          final newProduct = ProductModel(
-            id: const Uuid().v4(),
-            tenantId: tenantId,
-            name: p['name'],
-            barcode: p['barcode'],
-            price: p['price'],
-            purchasePrice: p['purchasePrice'],
-            stockQuantity: p['stockQuantity'],
-            category: p['category'],
-            unit: p['unit'],
-            minStockLevel: p['minStockLevel'],
-            description: p['description'],
-            inStock: (p['stockQuantity'] as int) > 0,
-            images: [],
-            sizes: [],
-            colors: [],
-            variants: [],
-          );
-
-          await repo.addProduct(newProduct, tenantId);
-          count++;
-        }
-
-        // Invalidate product stream
-        ref.read(pagedGeneralProductsProvider.notifier).loadInitial();
-
-        if (context.mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('تم استيراد $count منتج بنجاح في الكاشير! ✅'), backgroundColor: Colors.green),
-          );
-        }
+  Future<void> _importProducts(BuildContext context,WidgetRef ref) async {
+    var saved=0;
+    try{
+      final result=await FilePicker.pickFiles(type:FileType.custom,allowedExtensions:['xlsx','csv'],withData:true);
+      if(result==null || !context.mounted)return;
+      final file=result.files.single;
+      final bytes=file.bytes;
+      if(bytes==null)throw const FormatException('تعذّرت قراءة الملف');
+      final tenant=ref.read(tenantIdProvider);
+      final repo=ref.read(productRepositoryProvider);
+      final existing=await repo.getProducts(tenant);
+      final products=ProductWorkbook.parse(bytes,file.name,tenant,existing);
+      if(!context.mounted)return;
+      final existingIds={for(final p in existing)p.id:p};
+      final updates=products.where((p)=>existingIds.containsKey(p.id)).length;
+      final proceed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('مراجعة الاستيراد'),content:Text('إضافة ${products.length-updates} منتج وتحديث $updates. هل تريد الحفظ؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
+      if(proceed!=true || !context.mounted)return;
+      for(final product in products){
+        await repo.saveProduct(tenant,product);
+        saved++;
       }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ أثناء الاستيراد: $e'), backgroundColor: Colors.red));
-      }
-    }
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ $saved منتج')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ $saved منتج. $e')));}
   }
 }

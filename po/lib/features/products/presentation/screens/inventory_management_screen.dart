@@ -1,3 +1,6 @@
+import 'package:shared_models/src/widgets/stock_record_screen.dart';
+import '../../../../core/services/cashier_stock_service.dart';
+import 'package:shared_models/src/widgets/inventory_balance_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -13,6 +16,9 @@ import '../../../common/data/notification_repository.dart';
 import '../../../reports/data/audit_repository.dart';
 import '../../../../core/providers/permissions_provider.dart';
 import 'product_form_screen.dart';
+import '../../../suppliers/presentation/screens/supplier_list_screen.dart';
+import '../../../suppliers/presentation/screens/purchase_invoice_screen.dart';
+import '../../../suppliers/presentation/screens/purchase_history_screen.dart';
 import '../providers/category_provider.dart';
 
 enum InventoryFilter { all, lowStock, nearExpiry, slowMoving, overstocked }
@@ -23,6 +29,11 @@ class InventoryManagementScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final advanced = useState(false);
+    final canViewSuppliers = ref.hasPermission(PosPermission.viewSuppliers);
+    final canManageSuppliers = ref.hasPermission(PosPermission.manageSuppliers);
+    final canCount = ref.hasPermission(PosPermission.manageProducts);
+    final canViewCost = ref.hasPermission(PosPermission.viewReports);
     final pagedState = ref.watch(pagedInventoryProductsProvider);
     final products = pagedState.products;
     final analysisAsync = ref.watch(inventoryAnalysisProvider);
@@ -76,7 +87,9 @@ class InventoryManagementScreen extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إدارة المخزون (Inventory)'),
+        title: const Text('المخزون'),
+        actions: [TextButton(onPressed: () => advanced.value = !advanced.value,
+          child: Text(advanced.value ? 'العودة إلى المبسّط' : 'المخزون المتقدّم'))],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(110),
           child: Column(
@@ -134,7 +147,25 @@ class InventoryManagementScreen extends HookConsumerWidget {
           ),
         ),
       ),
-      body: LayoutBuilder(
+      body: advanced.value ? Column(children: [
+        Wrap(alignment: WrapAlignment.center, children: [
+          if (canViewSuppliers) TextButton(onPressed: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const SupplierListScreen())), child: const Text('المورّدون')),
+          if (canViewSuppliers) TextButton(onPressed: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const PurchaseHistoryScreen())), child: const Text('سجل المشتريات')),
+          if (canManageSuppliers) TextButton(onPressed: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const PurchaseInvoiceScreen())), child: const Text('فاتورة شراء')),
+        ]),
+        Expanded(child: InventoryBalanceList(products: filtered, showCost: canViewCost, onOpenRecord: (p) async {
+          final service = ref.read(cashierStockProvider);
+          await Navigator.push(context, MaterialPageRoute(builder: (_) => StockRecordScreen(
+            product: p, url: service.url, publishableKey: service.publishableKey, allowCount: canCount,
+            readDeviceKey: () => service.deviceKey(tenantId))));
+          if(context.mounted) ref.invalidate(pagedInventoryProductsProvider);
+        })),
+        if (pagedState.hasMore) TextButton(onPressed: pagedState.isLoadingMore ? null :
+          () => ref.read(pagedInventoryProductsProvider.notifier).loadMore(), child: const Text('عرض المزيد')),
+      ]) : LayoutBuilder(
         builder: (context, constraints) {
           final isMobile = constraints.maxWidth < 600;
           final horizontalPadding = isMobile ? 0.0 : (constraints.maxWidth - 900).clamp(16.0, 500.0);

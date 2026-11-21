@@ -405,11 +405,19 @@ class SubscriptionDialog extends HookConsumerWidget {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () async {
-                      final months = int.tryParse(monthsController.text) ?? 1;
-                      await ref
-                          .read(superAdminFirestoreServiceProvider)
-                          .activateSubscription(tenant.id, months, codeController.text.trim());
-                      if (context.mounted) Navigator.pop(context);
+                      final months = int.tryParse(monthsController.text);
+                      if (months == null || months <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل عدد أشهر أكبر من صفر')));
+                        return;
+                      }
+                      try {
+                        await ref.read(superAdminFirestoreServiceProvider)
+                            .activateSubscription(tenant.id, months, codeController.text.trim());
+                        if (context.mounted) Navigator.pop(context);
+                      } catch (_) {
+                        if(context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content:Text('تعذّر حفظ اشتراك المتجر. تحقق من الاتصال وصلاحية الحساب.')));
+                      }
                     },
                     child: Text(AppStrings.get('activate', lang)),
                   ),

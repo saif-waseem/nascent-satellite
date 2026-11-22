@@ -12,6 +12,7 @@ class AppStrings {
       'all_products': 'All Products',
       'categories': 'Categories',
       'view_all': 'View All',
+      'location_details': 'Street / Area / Address Details',
       'filter': 'Filter',
       'cart': 'Cart',
       'login': 'Login',
@@ -291,6 +292,7 @@ class AppStrings {
       'all_products': 'جميع المنتجات',
       'categories': 'الأقسام',
       'view_all': 'عرض الكل',
+      'location_details': 'الشارع / المنطقة / تفاصيل السكن',
       'filter': 'فلتر',
       'cart': 'السلة',
       'login': 'تسجيل الدخول',
@@ -673,6 +675,7 @@ class AppStrings {
       'featured_tag': '🎯',
       'contact_support_whatsapp_error': 'WhatsApp nehat vekirin. Ji kerema xwe kontrol bikin ka sepana li ser amûrê heye.',
       'connected_to_store': 'Girêdayî firotgeha Bi ID: {id}',
+      'location_details': 'Kolan / Navçe / Hûrguliyên Navnîşanê',
     },
   };
 

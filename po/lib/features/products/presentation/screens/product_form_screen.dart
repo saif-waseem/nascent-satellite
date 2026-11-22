@@ -59,10 +59,11 @@ class ProductFormScreen extends HookConsumerWidget {
     final barcodeController = useTextEditingController(text: product?.barcode ?? '');
     final purchasePriceController = useTextEditingController(text: product?.purchasePrice?.toString() ?? '');
     final retailPriceController = useTextEditingController(text: product?.price.toString() ?? '');
-    final secondaryPriceController = useTextEditingController(text: product?.secondaryPrice != null ? product!.secondaryPrice.toString() : '');
-    final secondaryCurrency = useState<String?>(product?.secondaryCurrency ?? '\$');
+    
+    
     final wholesalePriceController = useTextEditingController(text: product?.wholesalePrice?.toString() ?? '');
     final stockController = useTextEditingController(text: product?.stockQuantity.toString() ?? '0');
+    final productCurrency = useState<String>(product?.unit ?? 'د.ع');
     final minStockController = useTextEditingController(text: product?.minStockLevel?.toString() ?? '5');
     final unitController = useTextEditingController(text: product?.unit ?? 'قطعة');
     final categoryController = useTextEditingController(text: product?.category ?? 'عام');
@@ -192,8 +193,8 @@ class ProductFormScreen extends HookConsumerWidget {
         barcode: barcodeController.text.trim(),
         purchasePrice: double.tryParse(purchasePriceController.text) ?? 0.0,
         price: double.tryParse(retailPriceController.text) ?? 0.0,
-        secondaryPrice: double.tryParse(secondaryPriceController.text),
-        secondaryCurrency: secondaryPriceController.text.isNotEmpty ? secondaryCurrency.value : null,
+        
+        
         wholesalePrice: double.tryParse(wholesalePriceController.text) ?? 0.0,
         stockQuantity: totalStock,
         minStockLevel: int.tryParse(minStockController.text) ?? 0,
@@ -410,31 +411,33 @@ class ProductFormScreen extends HookConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: TextField(
-                                  controller: secondaryPriceController,
-                                  decoration: _inputDecoration('سعر إضافي (عملة ثانوية - اختياري)'),
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 2,
-                                child: DropdownButtonFormField<String>(
-                                  value: ['\$', 'د.ع', 'ر.س', 'AED', 'EUR'].contains(secondaryCurrency.value) ? secondaryCurrency.value : '\$',
-                                  decoration: _inputDecoration('العملة'),
-                                  items: const [
-                                    DropdownMenuItem(value: '\$', child: Text('\$ دولار')),
-                                    DropdownMenuItem(value: 'د.ع', child: Text('د.ع دينار')),
-                                    DropdownMenuItem(value: 'ر.س', child: Text('ر.س ريال')),
-                                    DropdownMenuItem(value: 'AED', child: Text('AED درهم')),
-                                    DropdownMenuItem(value: 'EUR', child: Text('€ يورو')),
-                                  ],
-                                  onChanged: (val) => secondaryCurrency.value = val,
-                                ),
+                          DropdownButtonFormField<String>(
+                            value: ['د.ع', '$', 'ر.س', 'د.إ', 'د.ك', 'ج.م', '€', '£', 'TL', 'ر.ق', 'ر.ع', 'د.ب', 'د.أ'].contains(productCurrency.value)
+                                ? productCurrency.value
+                                : 'د.ع',
+                            decoration: _inputDecoration('عملة تسعير المنتج'),
+                            items: const [
+                              DropdownMenuItem(value: 'د.ع', child: Text('د.ع - دينار عراقي')),
+                              DropdownMenuItem(value: '$', child: Text('$ - دولار أمريكي')),
+                              DropdownMenuItem(value: 'ر.س', child: Text('ر.س - ريال سعودي')),
+                              DropdownMenuItem(value: 'د.إ', child: Text('د.إ - درهم إماراتي')),
+                              DropdownMenuItem(value: 'د.ك', child: Text('د.ك - دينار كويتي')),
+                              DropdownMenuItem(value: 'ج.م', child: Text('ج.م - جنيه مصري')),
+                              DropdownMenuItem(value: '€', child: Text('€ - يورو أوروبي')),
+                              DropdownMenuItem(value: '£', child: Text('£ - جنيه إسترليني')),
+                              DropdownMenuItem(value: 'TL', child: Text('TL - ليرة تركية')),
+                              DropdownMenuItem(value: 'ر.ق', child: Text('ر.ق - ريال قطري')),
+                              DropdownMenuItem(value: 'ر.ع', child: Text('ر.ع - ريال عماني')),
+                              DropdownMenuItem(value: 'د.ب', child: Text('د.ب - دينار بحريني')),
+                              DropdownMenuItem(value: 'د.أ', child: Text('د.أ - دينار أردني')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                productCurrency.value = val;
+                                unitController.text = val;
+                              }
+                            },
+                          )
                               ),
                             ],
                           ),
@@ -478,23 +481,7 @@ class ProductFormScreen extends HookConsumerWidget {
                           Row(
                             children: [
                               Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                flex: 2,
-                                child: TextField(
-                                  controller: secondaryPriceController,
-                                  decoration: _inputDecoration('سعر ثانوي'),
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 85,
-                                child: DropdownButtonFormField<String>(
-                                  value: ['\$', 'د.ع', 'ر.س', 'AED', 'EUR'].contains(secondaryCurrency.value) ? secondaryCurrency.value : '\$',
-                                  decoration: _inputDecoration('العملة'),
-                                  items: const [
-                                    DropdownMenuItem(value: '\$', child: Text('\$')),
+                              
                                     DropdownMenuItem(value: 'د.ع', child: Text('د.ع')),
                                     DropdownMenuItem(value: 'ر.س', child: Text('ر.س')),
                                     DropdownMenuItem(value: 'AED', child: Text('AED')),
@@ -513,22 +500,7 @@ class ProductFormScreen extends HookConsumerWidget {
                               Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                               const SizedBox(width: 16),
                               Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: TextField(
-                                  controller: secondaryPriceController,
-                                  decoration: _inputDecoration('سعر ثانوي (اختياري)'),
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 100,
-                                child: DropdownButtonFormField<String>(
-                                  value: ['\$', 'د.ع', 'ر.س', 'AED', 'EUR'].contains(secondaryCurrency.value) ? secondaryCurrency.value : '\$',
-                                  decoration: _inputDecoration('العملة'),
-                                  items: const [
-                                    DropdownMenuItem(value: '\$', child: Text('\$')),
+                              
                                     DropdownMenuItem(value: 'د.ع', child: Text('د.ع')),
                                     DropdownMenuItem(value: 'ر.س', child: Text('ر.س')),
                                     DropdownMenuItem(value: 'AED', child: Text('AED')),

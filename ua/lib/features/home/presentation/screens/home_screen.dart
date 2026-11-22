@@ -713,9 +713,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               fit: BoxFit.scaleDown,
                               alignment: lang == 'ar' ? Alignment.centerRight : Alignment.centerLeft,
                               child: Text(
-                                product.secondaryPrice != null && product.secondaryPrice! > 0
-                                    ? '${formatCurrency(product.price)} / ${product.secondaryPrice! % 1 == 0 ? product.secondaryPrice!.toInt() : product.secondaryPrice!} ${product.secondaryCurrency ?? '\$'}'
-                                    : formatCurrency(product.price), 
+                                formatCurrency(product.price, unitOverride: product.unit ?? currencyUnit), 
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   color: hasSpecialBorder ? Colors.deepOrange : Theme.of(context).colorScheme.primary,
@@ -972,10 +970,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            product.secondaryPrice != null && product.secondaryPrice! > 0
-                                ? '${formatCurrency(product.price, unitOverride: currencyUnit)} / ${product.secondaryPrice! % 1 == 0 ? product.secondaryPrice!.toInt() : product.secondaryPrice!} ${product.secondaryCurrency ?? '\$'}'
-                                : formatCurrency(product.price, unitOverride: currencyUnit),
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Theme.of(context).primaryColor),
+                            formatCurrency(product.price, unitOverride: product.unit ?? currencyUnit),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
                           ),
                           Container(
                             padding: const EdgeInsets.all(6),

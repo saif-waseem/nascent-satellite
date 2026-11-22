@@ -45,6 +45,42 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     'eg': ['Cairo', 'Alexandria', 'Giza'],
   };
 
+  static String getLocalizedCountry(String code, String fallback, String lang) {
+    if (lang != 'ar') return fallback;
+    const map = {
+      'iq': 'العراق', 'sa': 'المملكة العربية السعودية', 'ae': 'الإمارات العربية المتحدة',
+      'kw': 'الكويت', 'qa': 'قطر', 'om': 'سلطنة عمان', 'bh': 'البحرين',
+      'eg': 'مصر', 'jo': 'الأردن', 'lb': 'لبنان', 'sy': 'سوريا',
+      'ps': 'فلسطين', 'ye': 'اليمن', 'tr': 'تركيا', 'gb': 'المملكة المتحدة',
+    };
+    return map[code.toLowerCase()] ?? fallback;
+  }
+
+  String? _getMatchingGovernorateValue(String currentText, String countryCode, String lang) {
+    if (currentText.isEmpty) return null;
+    final list = _countryData[countryCode.toLowerCase()] ?? [];
+    for (final g in list) {
+      if (g.toLowerCase() == currentText.toLowerCase()) return g;
+      final key = 'gov_${g.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_')}';
+      final localized = AppStrings.get(key, lang);
+      if (localized == currentText || localized.toLowerCase() == currentText.toLowerCase()) {
+        return g;
+      }
+    }
+    return list.contains(currentText) ? currentText : null;
+  }
+
+  Future<void> _persistAddressLocally() async {
+    final prefs = await SharedPreferences.getInstance();
+    final full = '$_selectedCountryName - ${_governorateController.text.trim()} - ${_locationController.text.trim()}';
+    await prefs.setString('user_address', full);
+    await prefs.setString('user_country_code', _selectedCountry);
+    await prefs.setString('user_country_name', _selectedCountryName);
+    await prefs.setString('user_governorate', _governorateController.text.trim());
+    await prefs.setString('user_location', _locationController.text.trim());
+    await prefs.setString('user_landmark', _landmarkController.text.trim());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,17 +133,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
       if (savedPayment != null) _selectedPayment = savedPayment;
       
+      final lang = ref.read(appSettingsProvider).locale.languageCode;
       if (savedCountryName != null && savedCountryName.isNotEmpty) {
-        _selectedCountryName = savedCountryName;
-        _selectedCountry = savedCountryCode ?? 'iq';
-        if (savedGov != null) _governorateController.text = savedGov;
-        if (savedLoc != null) _locationController.text = savedLoc;
+        _selectedCountry = (savedCountryCode ?? 'iq').toLowerCase();
+        _selectedCountryName = getLocalizedCountry(_selectedCountry, savedCountryName, lang);
+        if (savedGov != null && savedGov.isNotEmpty) _governorateController.text = savedGov;
+        if (savedLoc != null && savedLoc.isNotEmpty) {
+          _locationController.text = savedLoc;
+        } else if (savedAddress != null && savedAddress.contains(' - ')) {
+          _locationController.text = savedAddress.split(' - ').last;
+        }
         _isPredefinedCountry = _countryData.containsKey(_selectedCountry);
       } else if (effectiveAddress != null && effectiveAddress.isNotEmpty) {
         _address = effectiveAddress;
         final parts = effectiveAddress.split(' - ');
         if (parts.length >= 3) {
-          _selectedCountryName = parts[0];
           final nameToCode = {
             'Iraq': 'iq', 'العراق': 'iq',
             'Saudi Arabia': 'sa', 'المملكة العربية السعودية': 'sa', 'السعودية': 'sa',
@@ -121,7 +161,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             'Turkey': 'tr', 'تركيا': 'tr',
             'United Kingdom': 'gb', 'المملكة المتحدة': 'gb'
           };
-          _selectedCountry = nameToCode[parts[0]] ?? 'iq';
+          _selectedCountry = (nameToCode[parts[0]] ?? 'iq').toLowerCase();
+          _selectedCountryName = getLocalizedCountry(_selectedCountry, parts[0], lang);
           _governorateController.text = parts[1];
           _locationController.text = parts.sublist(2).join(' - ');
           _isPredefinedCountry = _countryData.containsKey(_selectedCountry);
@@ -131,6 +172,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         } else {
           _locationController.text = effectiveAddress;
         }
+      } else {
+        _selectedCountry = 'iq';
+        _selectedCountryName = getLocalizedCountry('iq', 'العراق', lang);
       }
 
       if (user != null) {
@@ -274,13 +318,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 showCountryPicker(
                   context: context,
                   showPhoneCode: false,
+                  countryListTheme: CountryListThemeData(
+                    bottomSheetHeight: 520,
+                    borderRadius: BorderRadius.circular(20),
+                    inputDecoration: InputDecoration(
+                      labelText: lang == 'ar' ? 'بحث عن دولة...' : 'Search country...',
+                      hintText: lang == 'ar' ? 'اكتب اسم الدولة' : 'Type country name',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                   onSelect: (Country country) {
                     setState(() {
                       _selectedCountry = country.countryCode.toLowerCase();
-                      _selectedCountryName = country.name;
+                      _selectedCountryName = getLocalizedCountry(_selectedCountry, country.name, lang);
                       _selectedPhoneCode = country.phoneCode;
                       _isPredefinedCountry = _countryData.containsKey(_selectedCountry);
                       _governorateController.clear();
+                      _persistAddressLocally();
                     });
                   },
                 );
@@ -294,7 +349,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(_selectedCountryName),
+                    Text(getLocalizedCountry(_selectedCountry, _selectedCountryName, lang)),
                     const Icon(Icons.arrow_drop_down),
                   ],
                 ),
@@ -308,12 +363,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   prefixIcon: const Icon(Icons.map_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                initialValue: _governorateController.text.isEmpty ? null : _governorateController.text,
+                value: _getMatchingGovernorateValue(_governorateController.text, _selectedCountry, lang),
                 items: (_countryData[_selectedCountry] ?? []).map((g) {
                   final key = 'gov_${g.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_')}';
                   return DropdownMenuItem(value: g, child: Text(AppStrings.get(key, lang)));
                 }).toList(),
-                onChanged: (v) => setState(() => _governorateController.text = v ?? ''),
+                onChanged: (v) {
+                  setState(() => _governorateController.text = v ?? '');
+                  _persistAddressLocally();
+                },
               )
             else
               TextField(
@@ -323,6 +381,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   prefixIcon: const Icon(Icons.map_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                onChanged: (_) => _persistAddressLocally(),
               ),
             const SizedBox(height: 12),
             TextField(
@@ -332,6 +391,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 prefixIcon: const Icon(Icons.location_on_outlined),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              onChanged: (_) => _persistAddressLocally(),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -341,6 +401,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 prefixIcon: const Icon(Icons.flag_outlined),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
+              onChanged: (_) => _persistAddressLocally(),
             ),
             const SizedBox(height: 12),
             TextField(

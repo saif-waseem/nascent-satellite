@@ -41,8 +41,6 @@ class ProductCatalog {
     'lastSupplierId': 'last_supplier_id',
     'expiryDate': 'expiry_date',
     'discountPercentage': 'discount_percentage',
-    'secondaryPrice': 'secondary_price',
-    'secondaryCurrency': 'secondary_currency',
   };
   static ProductModel decode(Map<String, dynamic> row) => ProductModel.fromJson(
     {for (final e in columns.entries) e.key: row[e.value]},

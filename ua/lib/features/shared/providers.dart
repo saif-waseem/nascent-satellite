@@ -155,6 +155,20 @@ class UserActions {
       return generated;
     });
   }
+  Future<void> deleteAccount(String phone) async {
+    final tenantId = await ref.read(resolvedTenantIdProvider.future);
+    final users = FirebaseFirestore.instance.collection('users');
+    String cleanPhone = phone.trim();
+    if (cleanPhone.startsWith('0') && cleanPhone.length == 11) {
+      cleanPhone = cleanPhone.substring(1);
+    }
+    try {
+      await users.doc('${tenantId}_$cleanPhone').delete();
+      await users.doc('${tenantId}_0$cleanPhone').delete();
+    } catch (_) {}
+    await logout();
+  }
+
   Future<void> logout() async {
     await ref.read(localCacheServiceProvider).clearBuyer(ref.read(currentTenantIdProvider));
     final prefs = await SharedPreferences.getInstance();

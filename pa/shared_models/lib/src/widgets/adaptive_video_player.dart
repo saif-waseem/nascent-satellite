@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AdaptiveVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -163,14 +164,37 @@ class _AdaptiveVideoPlayerState extends State<AdaptiveVideoPlayer> {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _initializePlayer,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('إعادة المحاولة'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amber.shade700,
-                foregroundColor: Colors.black,
-              ),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _initializePlayer,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('إعادة المحاولة'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber.shade700,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.tryParse(widget.videoUrl.trim());
+                    if (uri != null) {
+                      try {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      } catch (_) {}
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('فتح في مشغل خارجي'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white70),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

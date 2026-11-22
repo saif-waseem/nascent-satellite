@@ -208,16 +208,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 final fullAddress = '$displayCountry - $displayGov - $loc';
                 
-                try { final email=_emailController.text.trim(); await verifiedBuyer(email,password,create:true);
-                  if(!mounted)return;
-                  await ref.read(userActionsProvider).register(email:email,
-                  name: name,
-                  phone: phone,
-                  address: fullAddress,
-                  landmark: _landmarkController.text.trim(),
-                  password: password,
-                  referredByCode: _referralController.text.trim(),
-                );
+                try {
+                  final email = _emailController.text.trim();
+                  if (!mounted) return;
+                  await ref.read(userActionsProvider).register(
+                    email: email,
+                    name: name,
+                    phone: phone,
+                    address: fullAddress,
+                    landmark: _landmarkController.text.trim(),
+                    password: password,
+                    referredByCode: _referralController.text.trim(),
+                  );
                 
                 } catch (error) {
                   if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));

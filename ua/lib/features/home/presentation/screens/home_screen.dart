@@ -559,6 +559,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final lang = ref.watch(appSettingsProvider).locale.languageCode;
+        final asyncTenant = ref.watch(currentTenantProvider);
+        final currencyUnit = asyncTenant.value?.currencyUnit;
         final asyncReviews = ref.watch(productReviewsProvider(product.id));
         double rating = product.rating;
         asyncReviews.whenData((reviews) {

@@ -358,8 +358,9 @@ class ProductFormScreen extends HookConsumerWidget {
                                 Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                                 const SizedBox(width: 16),
                                 Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                                const SizedBox(width: 16),
-                                Expanded(
+                              ],
+                            ),
+                          ],
                       const SizedBox(height: 32),
                       Wrap(children:[TextButton.icon(icon:const Icon(Icons.add),label:const Text('إضافة صف للمخزون'),
                           onPressed:() => _showAddVariantDialog(context,variants,useColors.value,useSizes.value,colors,sizes))]),

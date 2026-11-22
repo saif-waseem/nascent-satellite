@@ -481,15 +481,6 @@ class ProductFormScreen extends HookConsumerWidget {
                           Row(
                             children: [
                               Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                              
-                                    DropdownMenuItem(value: 'د.ع', child: Text('د.ع')),
-                                    DropdownMenuItem(value: 'ر.س', child: Text('ر.س')),
-                                    DropdownMenuItem(value: 'AED', child: Text('AED')),
-                                    DropdownMenuItem(value: 'EUR', child: Text('€')),
-                                  ],
-                                  onChanged: (val) => secondaryCurrency.value = val,
-                                ),
-                              ),
                             ],
                           ),
                         ] else ...[
@@ -500,15 +491,6 @@ class ProductFormScreen extends HookConsumerWidget {
                               Expanded(child: TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
                               const SizedBox(width: 16),
                               Expanded(child: TextField(controller: wholesalePriceController, decoration: _inputDecoration('سعر الجملة'), keyboardType: const TextInputType.numberWithOptions(decimal: true))),
-                              
-                                    DropdownMenuItem(value: 'د.ع', child: Text('د.ع')),
-                                    DropdownMenuItem(value: 'ر.س', child: Text('ر.س')),
-                                    DropdownMenuItem(value: 'AED', child: Text('AED')),
-                                    DropdownMenuItem(value: 'EUR', child: Text('€')),
-                                  ],
-                                  onChanged: (val) => secondaryCurrency.value = val,
-                                ),
-                              ),
                             ],
                           ),
                         ],

@@ -33,6 +33,17 @@ class SelectedWarehouse extends Notifier<String?> {
   void set(String? val) => state = val;
 }
 
+final activeBranchCurrencyProvider = NotifierProvider<ActiveBranchCurrency, String>(ActiveBranchCurrency.new);
+
+class ActiveBranchCurrency extends Notifier<String> {
+  @override
+  String build() {
+    final tenant = ref.watch(tenantProvider).value;
+    return tenant?.currencyUnit ?? 'د.ع';
+  }
+  void set(String val) => state = val;
+}
+
 final availableWarehousesProvider = FutureProvider<List<String>>((ref) async {
   final tenantId = ref.watch(tenantIdProvider);
   final products = await ref.watch(productRepositoryProvider).getProducts(tenantId);

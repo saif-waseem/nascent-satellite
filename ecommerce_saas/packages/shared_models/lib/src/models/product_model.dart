@@ -286,6 +286,34 @@ class ProductModel extends Equatable {
       secondaryCurrency: secondaryCurrency ?? this.secondaryCurrency,
     );
   }
+
+  double getPriceForCurrency(String? targetCurrency) {
+    if (targetCurrency != null &&
+        targetCurrency.isNotEmpty &&
+        secondaryCurrency == targetCurrency &&
+        secondaryPrice != null &&
+        secondaryPrice! > 0) {
+      return secondaryPrice!;
+    }
+    return price;
+  }
+
+  String formatPriceForCurrency(String? targetCurrency, {String defaultUnit = 'د.ع'}) {
+    if (targetCurrency != null &&
+        targetCurrency.isNotEmpty &&
+        secondaryCurrency == targetCurrency &&
+        secondaryPrice != null &&
+        secondaryPrice! > 0) {
+      final s = secondaryPrice! % 1 == 0
+          ? secondaryPrice!.toInt().toString()
+          : secondaryPrice!.toStringAsFixed(2);
+      return '$s $targetCurrency';
+    }
+    final p = price % 1 == 0
+        ? price.toInt().toString()
+        : price.toStringAsFixed(2);
+    return '$p ${targetCurrency?.isNotEmpty == true ? targetCurrency! : defaultUnit}';
+  }
 }
 
 

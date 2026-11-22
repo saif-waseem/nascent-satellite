@@ -263,6 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                    tenant?.name ?? AppStrings.get('store', lang),
                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                    overflow: TextOverflow.ellipsis,
+                   maxLines: 1,
                  ),
                ),
             ],

@@ -245,8 +245,79 @@ class ProductFormScreen extends HookConsumerWidget {
                         ProductOptionValues(label:'الأحجام',values:sizes.value,enabled:useSizes.value,
                           onToggle:(v)=>useSizes.value=v,onChange:(v)=>changeOption(false,v)),
                         const SizedBox(height:16),
-                        if(!advanced.value)
-                          TextField(controller: retailPriceController, decoration: _inputDecoration('سعر البيع'),keyboardType:const TextInputType.numberWithOptions(decimal:true)),
+                        if(!advanced.value) ...[
+                          const SizedBox(height: 16),
+                          _buildSectionHeader('الأسعار والمخزون الأولي', Icons.price_change_outlined),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: purchasePriceController,
+                                  decoration: _inputDecoration('سعر الشراء (التكلفة)'),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextField(
+                                  controller: retailPriceController,
+                                  decoration: _inputDecoration('سعر البيع'),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: stockController,
+                                  decoration: _inputDecoration('الكمية الأولية (المخزون)'),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextField(
+                                  controller: minStockController,
+                                  decoration: _inputDecoration('حد التنبيه (النواقص)'),
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: secondaryPriceController,
+                                  decoration: _inputDecoration('سعر إضافي (عملة ثانوية - اختياري)'),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: DropdownButtonFormField<String>(
+                                  value: ['\$', 'د.ع', 'ر.س', 'AED', 'EUR'].contains(secondaryCurrency.value) ? secondaryCurrency.value : '\$',
+                                  decoration: _inputDecoration('العملة'),
+                                  items: const [
+                                    DropdownMenuItem(value: '\$', child: Text('\$ دولار')),
+                                    DropdownMenuItem(value: 'د.ع', child: Text('د.ع دينار')),
+                                    DropdownMenuItem(value: 'ر.س', child: Text('ر.س ريال')),
+                                    DropdownMenuItem(value: 'AED', child: Text('AED درهم')),
+                                    DropdownMenuItem(value: 'EUR', child: Text('€ يورو')),
+                                  ],
+                                  onChanged: (val) => secondaryCurrency.value = val,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         if(advanced.value)...[
                         _buildSectionHeader('المخزون والأسعار', Icons.inventory_2_outlined),
                           const SizedBox(height: 16),

@@ -388,15 +388,25 @@ class AdminFirestoreService {
     });
   }
 
-  Future<void> addWarehouse(String tenantId, String name) async {
+  Future<void> addWarehouse(String tenantId, String name, {String currency = 'د.ع'}) async {
     await _db
         .collection('tenants')
         .doc(tenantId)
         .collection('warehouses')
         .add({
       'name': name,
+      'currency': currency,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> updateWarehouse(String tenantId, String warehouseId, Map<String, dynamic> data) async {
+    await _db
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('warehouses')
+        .doc(warehouseId)
+        .update(data);
   }
 
   Future<void> deleteWarehouse(String tenantId, String warehouseId) async {

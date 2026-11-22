@@ -273,6 +273,30 @@ class POSCheckoutView extends HookConsumerWidget {
             loading: () => const SizedBox(width: 20, height: 20, child: Padding(padding: EdgeInsets.all(4), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
             error: (_, __) => const SizedBox(),
           ),
+          const VerticalDivider(width: 1, color: Colors.white24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Icon(Icons.monetization_on_outlined, size: 16, color: Colors.white.withOpacity(0.7)),
+          ),
+          Consumer(builder: (context, ref, _) {
+            final activeCurrency = ref.watch(activeBranchCurrencyProvider);
+            return DropdownButton<String>(
+              value: ['د.ع', '\$', 'ر.س', 'AED', 'EUR'].contains(activeCurrency) ? activeCurrency : 'د.ع',
+              dropdownColor: Colors.blueGrey[900],
+              underline: const SizedBox(),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              items: const [
+                DropdownMenuItem(value: 'د.ع', child: Text('د.ع', style: TextStyle(fontSize: 12))),
+                DropdownMenuItem(value: '\$', child: Text('\$', style: TextStyle(fontSize: 12))),
+                DropdownMenuItem(value: 'ر.س', child: Text('ر.س', style: TextStyle(fontSize: 12))),
+                DropdownMenuItem(value: 'AED', child: Text('AED', style: TextStyle(fontSize: 12))),
+              ],
+              onChanged: (val) {
+                if (val != null) ref.read(activeBranchCurrencyProvider.notifier).set(val);
+              },
+            );
+          }),
           const SizedBox(width: 8),
         ],
       ),
@@ -438,6 +462,8 @@ class _ProductSelectionPanel extends HookConsumerWidget {
 
     final tenantId = ref.watch(tenantIdProvider);
     final stockVersion = ref.watch(productStockVersionProvider);
+    final activeCurrency = ref.watch(activeBranchCurrencyProvider);
+    final tenant = ref.watch(tenantProvider).value;
 
     Future<void> loadProducts({bool reset = false}) async {
       if (isLoading.value || (!hasMore.value && !reset)) return;
@@ -455,7 +481,7 @@ class _ProductSelectionPanel extends HookConsumerWidget {
           // AUTO-ADD logic for Barcode scans
           if (matches.length == 1 && matches.first.barcode == query) {
             final product = matches.first;
-            final currentPrice = isWholesale.value ? (product.wholesalePrice ?? product.price) : product.price;
+            final currentPrice = isWholesale.value ? (product.wholesalePrice ?? product.price) : product.getPriceForCurrency(activeCurrency);
 
             if (product.variants.isNotEmpty) {
               if (context.mounted) {
@@ -592,7 +618,7 @@ class _ProductSelectionPanel extends HookConsumerWidget {
                   );
                 }
                     final product = results.value[index];
-                    final currentPrice = isWholesale.value ? (product.wholesalePrice ?? product.price) : product.price;
+                    final currentPrice = isWholesale.value ? (product.wholesalePrice ?? product.price) : product.getPriceForCurrency(activeCurrency);
                     
                     final currentStaff = ref.watch(currentStaffProvider);
                     final isAdmin = currentStaff?.roleName.toLowerCase() == 'admin' || currentStaff?.roleName.toLowerCase() == 'manager';
@@ -632,7 +658,7 @@ class _ProductSelectionPanel extends HookConsumerWidget {
                               loading: () => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
                               error: (_, __) => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
                             ),
-                            Text('السعر: $currentPrice | المتوفر: ${product.stockQuantity}', style: TextStyle(fontSize: isMobile ? 12 : 10)),
+                            Text('السعر: ${product.formatPriceForCurrency(activeCurrency, defaultUnit: tenant?.currencyUnit ?? 'د.ع')} | المتوفر: ${product.stockQuantity}', style: TextStyle(fontSize: isMobile ? 12 : 10)),
                             if (profit != null && marginPct != null) 
                               Text(
                                 'الربح: ${profit.toStringAsFixed(0)} IQD (${marginPct.toStringAsFixed(1)}%)', 

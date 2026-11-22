@@ -7,7 +7,6 @@ import 'package:store_admin/features/shared/providers.dart';
 import 'package:store_admin/core/localization/app_settings_controller.dart';
 import 'package:store_admin/core/localization/resources/app_strings.dart';
 import 'package:store_admin/core/utils/formatters.dart';
-import 'package:store_admin/core/utils/formatters.dart';
 import 'package:shared_models/shared_models.dart';
 import 'package:store_admin/features/shared/barcode_scanner_dialog.dart';
 import 'package:store_admin/features/products/presentation/widgets/csv_import_export_dialog.dart';
@@ -60,10 +59,24 @@ class ProductListScreen extends HookConsumerWidget {
               ),
             ]
           : [
-              IconButton(tooltip:'التراجع عن آخر تعديل', icon:const Icon(Icons.undo),onPressed:(){
-                final repo=ref.read(adminSupabaseServiceProvider), tenant=ref.read(currentTenantIdProvider);
-                repo.undo.show(context,tenant,(entry)=>repo.undoEntry(tenant,entry));
-              }),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.amber.shade100,
+                    foregroundColor: Colors.brown.shade900,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.history_rounded, size: 18),
+                  label: const Text('تراجع عن آخر تعديل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    final repo = ref.read(adminSupabaseServiceProvider), tenant = ref.read(currentTenantIdProvider);
+                    repo.undo.show(context, tenant, (entry) => repo.undoEntry(tenant, entry));
+                  },
+                ),
+              ),
               IconButton(
                 onPressed: () => context.push('/settings'),
                 icon: const Icon(Icons.settings_outlined),

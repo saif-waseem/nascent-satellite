@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../auth/presentation/widgets/buyer_account_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:user_app/core/localization/app_settings_controller.dart';
@@ -442,6 +443,28 @@ class LoyaltyScreen extends ConsumerWidget {
                 color: Colors.green,
                 title: AppStrings.get('currency', lang),
                 value: AppStrings.get('curr_iqd', lang),
+              ),
+              const Divider(indent: 50, height: 1),
+              _buildSettingTile(
+                icon: Icons.logout_rounded,
+                color: Colors.orange,
+                title: AppStrings.get('sign_out', lang),
+                value: '',
+                onTap: () {
+                  ref.read(userActionsProvider).logout();
+                  context.go('/login');
+                },
+              ),
+              const Divider(indent: 50, height: 1),
+              _buildSettingTile(
+                icon: Icons.person_remove_rounded,
+                color: Colors.red,
+                title: 'حذف حسابي نهائياً',
+                value: '',
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => BuyerAccountDialog(phone: ref.read(userPhoneProvider)),
+                ),
               ),
             ],
           ),

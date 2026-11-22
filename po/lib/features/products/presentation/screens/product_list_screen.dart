@@ -152,10 +152,25 @@ class ProductListScreen extends HookConsumerWidget {
           ],
         ),
         actions: [
-              if(ref.hasPermission(PosPermission.manageProducts)) IconButton(tooltip:'التراجع عن آخر تعديل', icon:const Icon(Icons.undo),onPressed:(){
-                final repo=ref.read(productRepositoryProvider), tenant=ref.read(tenantIdProvider);
-                repo.undo.show(context,tenant,(entry)=>repo.undoEntry(tenant,entry));
-              }),
+          if (ref.hasPermission(PosPermission.manageProducts))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber.shade100,
+                  foregroundColor: Colors.brown.shade900,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.history_rounded, size: 18),
+                label: const Text('تراجع عن آخر تعديل', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  final repo = ref.read(productRepositoryProvider), tenant = ref.read(tenantIdProvider);
+                  repo.undo.show(context, tenant, (entry) => repo.undoEntry(tenant, entry));
+                },
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.table_view_rounded, color: Colors.green),
             onPressed: () => showDialog(

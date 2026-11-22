@@ -408,12 +408,28 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     const SizedBox(height: 4),
                   ],
 
-                  Text(
-                    formatCurrency(_getCurrentPrice(item)), 
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: (item.oldPrice != null && item.oldPrice! > _getCurrentPrice(item)) ? Colors.red : Theme.of(context).colorScheme.primary, 
-                      fontWeight: FontWeight.bold
-                    )
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        formatCurrency(_getCurrentPrice(item)), 
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: (item.oldPrice != null && item.oldPrice! > _getCurrentPrice(item)) ? Colors.red : Theme.of(context).colorScheme.primary, 
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                      if (item.secondaryPrice != null && item.secondaryPrice! > 0) ...[
+                        const SizedBox(width: 10),
+                        Text(
+                          '(${item.secondaryPrice! % 1 == 0 ? item.secondaryPrice!.toInt() : item.secondaryPrice!} ${item.secondaryCurrency ?? '\$'})',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: Colors.blueGrey,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   
                   const SizedBox(height: 16),

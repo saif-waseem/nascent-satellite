@@ -128,6 +128,16 @@ class UserActions {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_phone', cleanPhone);
     await prefs.setString('user_address', address);
+    if (landmark != null && landmark.isNotEmpty) await prefs.setString('user_landmark', landmark);
+    final parts = address.split(' - ');
+    if (parts.length >= 3) {
+      await prefs.setString('user_country_name', parts[0]);
+      await prefs.setString('user_governorate', parts[1]);
+      await prefs.setString('user_location', parts.sublist(2).join(' - '));
+    } else if (parts.length == 2) {
+      await prefs.setString('user_governorate', parts[0]);
+      await prefs.setString('user_location', parts[1]);
+    }
     
     ref.read(userPhoneProvider.notifier).setPhone(cleanPhone);
   }

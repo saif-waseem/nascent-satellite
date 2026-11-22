@@ -15,3 +15,6 @@
 }
 
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+-dontwarn com.google.android.play.core.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**

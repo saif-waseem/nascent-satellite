@@ -250,6 +250,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: asyncTenant.when(
           data: (tenant) => Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
                CircleAvatar(
                  radius: 16,
@@ -257,7 +258,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                  child: _buildImageOrIcon(tenant?.logoUrl, size: 20),
                ),
                const SizedBox(width: 8),
-               Text(tenant?.name ?? AppStrings.get('store', lang), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+               Flexible(
+                 child: Text(
+                   tenant?.name ?? AppStrings.get('store', lang),
+                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                   overflow: TextOverflow.ellipsis,
+                 ),
+               ),
             ],
           ),
           error: (_, __) => Text(AppStrings.get('store', lang)),
@@ -446,13 +453,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               final cat = allCats[index];
               final isCatSelected = _selectedCategories.contains(cat.id) || (_selectedCategories.isEmpty && cat.id == 'All');
               
-              IconData iconData = Icons.category_outlined;
+              IconData iconData;
               if (cat.id == 'All') {
-                iconData = Icons.grid_view;
+                iconData = Icons.grid_view_rounded;
               } else {
-                final code = int.tryParse(cat.icon);
-                if (code != null) {
+                int? code = int.tryParse(cat.icon);
+                if (code == null && cat.icon.startsWith('0x')) {
+                  code = int.tryParse(cat.icon.substring(2), radix: 16);
+                }
+                if (code != null && code > 0) {
                   iconData = IconData(code, fontFamily: 'MaterialIcons');
+                } else {
+                  final nameLower = cat.name.toLowerCase();
+                  if (nameLower.contains('سير') || nameLower.contains('ذات')) {
+                    iconData = Icons.person_pin_rounded;
+                  } else if (nameLower.contains('قصص') || nameLower.contains('رواي') || nameLower.contains('خيال')) {
+                    iconData = Icons.auto_stories_rounded;
+                  } else if (nameLower.contains('سياس') || nameLower.contains('دول')) {
+                    iconData = Icons.account_balance_rounded;
+                  } else if (nameLower.contains('تاريخ')) {
+                    iconData = Icons.history_edu_rounded;
+                  } else if (nameLower.contains('دين') || nameLower.contains('إسلام')) {
+                    iconData = Icons.menu_book_rounded;
+                  } else {
+                    iconData = Icons.category_rounded;
+                  }
                 }
               }
 
@@ -687,7 +712,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               fit: BoxFit.scaleDown,
                               alignment: lang == 'ar' ? Alignment.centerRight : Alignment.centerLeft,
                               child: Text(
-                                formatCurrency(product.price), 
+                                product.secondaryPrice != null && product.secondaryPrice! > 0
+                                    ? '${formatCurrency(product.price)} / ${product.secondaryPrice! % 1 == 0 ? product.secondaryPrice!.toInt() : product.secondaryPrice!} ${product.secondaryCurrency ?? '\$'}'
+                                    : formatCurrency(product.price), 
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   color: hasSpecialBorder ? Colors.deepOrange : Theme.of(context).colorScheme.primary,
@@ -944,8 +971,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            formatCurrency(product.price, unitOverride: currencyUnit),
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Theme.of(context).primaryColor),
+                            product.secondaryPrice != null && product.secondaryPrice! > 0
+                                ? '${formatCurrency(product.price, unitOverride: currencyUnit)} / ${product.secondaryPrice! % 1 == 0 ? product.secondaryPrice!.toInt() : product.secondaryPrice!} ${product.secondaryCurrency ?? '\$'}'
+                                : formatCurrency(product.price, unitOverride: currencyUnit),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Theme.of(context).primaryColor),
                           ),
                           Container(
                             padding: const EdgeInsets.all(6),

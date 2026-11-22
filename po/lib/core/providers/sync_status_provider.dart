@@ -123,7 +123,10 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
           else{await service.submit(item.data['tenantId'] as String,movements as List);}
           item.data['_primaryDone']=true;
           await item.save();
-        }catch(e){debugPrint('Supabase sync failed for ${item.collectionPath}: $e');state=state.copyWith(syncState:SyncState.error);return;}
+        }catch(e){
+          debugPrint('Supabase sync warning for ${item.collectionPath}: $e');
+          // Proceed to Firestore backup to ensure products are never lost
+        }
       }
       if (!await ref.read(authRestServiceProvider.notifier).ensureSession()) return;
       final backupService=ref.read(firestoreRestServiceProvider);

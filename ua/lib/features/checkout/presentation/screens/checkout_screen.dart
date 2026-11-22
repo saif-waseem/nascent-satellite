@@ -76,26 +76,50 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     final savedPhone = prefs.getString('user_phone');
     final savedAddress = prefs.getString('user_address');
+    final savedCountryCode = prefs.getString('user_country_code');
+    final savedCountryName = prefs.getString('user_country_name');
+    final savedGov = prefs.getString('user_governorate');
+    final savedLoc = prefs.getString('user_location');
     final savedLandmark = prefs.getString('user_landmark');
     final savedPayment = prefs.getString('last_payment_method');
+
+    final user = ref.read(userProvider).value;
+    final effectiveAddress = savedAddress ?? user?.address;
 
     setState(() {
       if (savedPhone != null && savedPhone.isNotEmpty) {
         _phoneController.text = savedPhone.contains('_') ? savedPhone.split('_').last : savedPhone;
       }
-      if (savedLandmark != null) _landmarkController.text = savedLandmark;
+      if (savedLandmark != null && savedLandmark.isNotEmpty) {
+        _landmarkController.text = savedLandmark;
+      } else if (user?.landmark != null && user!.landmark!.isNotEmpty) {
+        _landmarkController.text = user.landmark!;
+      }
       if (savedPayment != null) _selectedPayment = savedPayment;
       
-      if (savedAddress != null) {
-        _address = savedAddress;
-        final parts = savedAddress.split(' - ');
+      if (savedCountryName != null && savedCountryName.isNotEmpty) {
+        _selectedCountryName = savedCountryName;
+        _selectedCountry = savedCountryCode ?? 'iq';
+        if (savedGov != null) _governorateController.text = savedGov;
+        if (savedLoc != null) _locationController.text = savedLoc;
+        _isPredefinedCountry = _countryData.containsKey(_selectedCountry);
+      } else if (effectiveAddress != null && effectiveAddress.isNotEmpty) {
+        _address = effectiveAddress;
+        final parts = effectiveAddress.split(' - ');
         if (parts.length >= 3) {
           _selectedCountryName = parts[0];
-          // Try to map name to code if possible, default to IQ
           final nameToCode = {
-            'Iraq': 'iq', 'Saudi Arabia': 'sa', 'United Arab Emirates': 'ae',
-            'Kuwait': 'kw', 'Qatar': 'qa', 'Oman': 'om', 'Bahrain': 'bh',
-            'Egypt': 'eg', 'Jordan': 'jo', 'Turkey': 'tr', 'United Kingdom': 'gb'
+            'Iraq': 'iq', 'العراق': 'iq',
+            'Saudi Arabia': 'sa', 'المملكة العربية السعودية': 'sa', 'السعودية': 'sa',
+            'United Arab Emirates': 'ae', 'الإمارات': 'ae',
+            'Kuwait': 'kw', 'الكويت': 'kw',
+            'Qatar': 'qa', 'قطر': 'qa',
+            'Oman': 'om', 'عمان': 'om',
+            'Bahrain': 'bh', 'البحرين': 'bh',
+            'Egypt': 'eg', 'مصر': 'eg',
+            'Jordan': 'jo', 'الأردن': 'jo',
+            'Turkey': 'tr', 'تركيا': 'tr',
+            'United Kingdom': 'gb', 'المملكة المتحدة': 'gb'
           };
           _selectedCountry = nameToCode[parts[0]] ?? 'iq';
           _governorateController.text = parts[1];
@@ -105,26 +129,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           _governorateController.text = parts[0];
           _locationController.text = parts[1];
         } else {
-          // Legacy format: Just a location, maybe?
-          // Don't auto-fill governorate if we can't be sure
-          _locationController.text = savedAddress;
-          _governorateController.clear();
+          _locationController.text = effectiveAddress;
+        }
+      }
+
+      if (user != null) {
+        final purePhone = user.id.contains('_') ? user.id.split('_').last : user.id;
+        if (_phoneController.text.isEmpty && purePhone.isNotEmpty) {
+          _phoneController.text = purePhone;
         }
       }
     });
-
-    // Profile data takes precedence if logged in
-    final user = ref.read(userProvider).value;
-    if (user != null) {
-      setState(() {
-        final purePhone = user.id.contains('_') ? user.id.split('_').last : user.id;
-        if (purePhone.isNotEmpty) _phoneController.text = purePhone;
-        if (user.landmark != null && user.landmark!.isNotEmpty) {
-          _landmarkController.text = user.landmark!;
-        }
-        // If profile address exists, it might override parts of the loaded address
-      });
-    }
   }
   int _pointsToRedeem = 0;
   double _discountAmount = 0;
@@ -656,7 +671,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       
       // Save address, phone and landmark for next time
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_address', _address);
+      await prefs.setString('user_address', fullAddress);
+      await prefs.setString('user_country_code', _selectedCountry);
+      await prefs.setString('user_country_name', _selectedCountryName);
+      await prefs.setString('user_governorate', _governorateController.text.trim());
+      await prefs.setString('user_location', _locationController.text.trim());
       await prefs.setString('user_phone', purePhone);
       await prefs.setString('user_landmark', _landmarkController.text.trim());
       await prefs.setString('last_payment_method', _selectedPayment);
@@ -664,7 +683,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // Update user profile in Firestore
       if (user != null) {
         await ref.read(userActionsProvider).updateUserProfile(
-          address: _address,
+          address: fullAddress,
           landmark: _landmarkController.text.trim(),
         );
       }

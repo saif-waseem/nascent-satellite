@@ -38,6 +38,8 @@ firebase-debug.log
 ui-debug.log
 
 # Large Files & Backups
+*.apk
+build_apks/
 *.zip
 *.rar
 *.7z

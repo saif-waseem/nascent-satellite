@@ -62,6 +62,10 @@ class ProductModel extends Equatable {
   final String? unit;
   @HiveField(28)
   final bool isArchived;
+  @HiveField(29)
+  final double? secondaryPrice;
+  @HiveField(30)
+  final String? secondaryCurrency;
 
   const ProductModel({
     required this.id,
@@ -92,7 +96,19 @@ class ProductModel extends Equatable {
     this.minStockLevel,
     this.unit,
     this.isArchived = false,
+    this.secondaryPrice,
+    this.secondaryCurrency,
   });
+
+  String formatPrices([String primaryUnit = 'د.ع']) {
+    final primary = '${price.toStringAsFixed(price.truncateToDouble() == price ? 0 : 2)} $primaryUnit';
+    if (secondaryPrice != null && secondaryPrice! > 0) {
+      final secUnit = secondaryCurrency ?? '\$';
+      final sec = '${secondaryPrice!.toStringAsFixed(secondaryPrice!.truncateToDouble() == secondaryPrice ? 0 : 2)} $secUnit';
+      return '$primary ($sec)';
+    }
+    return primary;
+  }
 
   String? get imageUrl => images.isNotEmpty ? images.first : null;
 
@@ -126,6 +142,8 @@ class ProductModel extends Equatable {
         minStockLevel,
         unit,
         isArchived,
+        secondaryPrice,
+        secondaryCurrency,
       ];
 
   Map<String, dynamic> toJson() {
@@ -158,6 +176,8 @@ class ProductModel extends Equatable {
       'minStockLevel': minStockLevel,
       'unit': unit,
       'isArchived': isArchived,
+      'secondaryPrice': secondaryPrice,
+      'secondaryCurrency': secondaryCurrency,
     };
   }
 
@@ -196,6 +216,8 @@ class ProductModel extends Equatable {
       minStockLevel: (json['minStockLevel'] as num?)?.toInt(),
       unit: json['unit'] as String?,
       isArchived: json['isArchived'] as bool? ?? false,
+      secondaryPrice: (json['secondaryPrice'] as num?)?.toDouble() ?? (json['secondary_price'] as num?)?.toDouble(),
+      secondaryCurrency: json['secondaryCurrency'] as String? ?? json['secondary_currency'] as String?,
     );
   }
 
@@ -228,6 +250,8 @@ class ProductModel extends Equatable {
     int? minStockLevel,
     String? unit,
     bool? isArchived,
+    double? secondaryPrice,
+    String? secondaryCurrency,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -258,6 +282,8 @@ class ProductModel extends Equatable {
       minStockLevel: minStockLevel ?? this.minStockLevel,
       unit: unit ?? this.unit,
       isArchived: isArchived ?? this.isArchived,
+      secondaryPrice: secondaryPrice ?? this.secondaryPrice,
+      secondaryCurrency: secondaryCurrency ?? this.secondaryCurrency,
     );
   }
 }

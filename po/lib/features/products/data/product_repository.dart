@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/cashier_stock_service.dart';
@@ -214,7 +215,7 @@ class ProductRepository {
     _notifyStockChanged();
 
     if (tenantId == 'local_default') return;
-
+    unawaited(_ref.read(syncStatusProvider.notifier).syncPending());
   }
 
   Future<void> _queueCatalog(String tenant,String id,ProductModel? before,ProductModel? after,{Map<String,dynamic>? undoExpected}) async {
@@ -266,7 +267,7 @@ class ProductRepository {
     _notifyStockChanged();
 
     if (tenantId == 'local_default') return;
-
+    unawaited(_ref.read(syncStatusProvider.notifier).syncPending());
   }
 
   Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {

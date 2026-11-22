@@ -1,3 +1,4 @@
+import '../../../../core/providers/permissions_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -151,6 +152,10 @@ class ProductListScreen extends HookConsumerWidget {
           ],
         ),
         actions: [
+              if(ref.hasPermission(PosPermission.manageProducts)) IconButton(tooltip:'التراجع عن آخر تعديل', icon:const Icon(Icons.undo),onPressed:(){
+                final repo=ref.read(productRepositoryProvider), tenant=ref.read(tenantIdProvider);
+                repo.undo.show(context,tenant,(entry)=>repo.undoEntry(tenant,entry));
+              }),
           IconButton(
             icon: const Icon(Icons.table_view_rounded, color: Colors.green),
             onPressed: () => showDialog(

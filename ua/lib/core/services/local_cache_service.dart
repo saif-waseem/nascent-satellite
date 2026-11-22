@@ -83,6 +83,11 @@ class LocalCacheService {
     await _userBox?.put('current_$tenantId', user);
   }
 
+  Future<void> clearBuyer(String tenantId) async {
+    await _userBox?.delete('current_$tenantId');
+    await _ordersBox?.clear();
+  }
+
   UserModel? getCachedUser(String tenantId) {
     return _userBox?.get('current_$tenantId');
   }

@@ -27,7 +27,7 @@ class _StockRecordState extends State<StockRecordScreen> {
       reason = TextEditingController();
   List<dynamic> history = [];
   late int expected = widget.product.stockQuantity;
-  String? message;
+  String? message, variantFilter;
   bool busy = false, loaded = false, changed = false;
   String operation = const Uuid().v4();
 
@@ -174,16 +174,56 @@ class _StockRecordState extends State<StockRecordScreen> {
           ],
           const Divider(),
           const Text('آخر 100 حركة'),
+          if (history.any((row) => (row['variants'] as List? ?? []).isNotEmpty))
+            DropdownButton<String>(
+              isExpanded: true,
+              value: variantFilter,
+              hint: const Text('كل الأصناف والأحجام'),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('كل الأصناف والأحجام'),
+                ),
+                for (final option in {
+                  for (final row in history)
+                    for (final line in row['variants'] ?? [])
+                      jsonEncode([line['color'], line['size']]),
+                })
+                  DropdownMenuItem<String>(
+                    value: option,
+                    child: Text((jsonDecode(option) as List).join(' / ')),
+                  ),
+              ],
+              onChanged: (v) => setState(() => variantFilter = v),
+            ),
           if (history.isEmpty) const Text('لا توجد حركات مسجلة لهذا الصنف'),
-          for (final row in history)
+          for (final row in history.where(
+            (r) =>
+                variantFilter == null ||
+                (r['variants'] as List? ?? []).any(
+                  (v) => jsonEncode([v['color'], v['size']]) == variantFilter,
+                ),
+          ))
             ListTile(
               title: Text(row['note'] as String),
-              subtitle: Text(
-                DateTime.parse(
-                  row['recorded_at'],
-                ).toLocal().toString().split('.').first,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    DateTime.parse(
+                      row['recorded_at'],
+                    ).toLocal().toString().split('.').first,
+                  ),
+                  Text(
+                    'قبل: ${row['opening'] ?? (row['balance'] - row['delta'])}  •  بعد: ${row['balance']}',
+                  ),
+                  for (final line in row['variants'] ?? [])
+                    Text(
+                      "${line['color']} / ${line['size']}  •  ${line['opening']} ← ${line['balance']}",
+                    ),
+                ],
               ),
-              trailing: Text("${row['delta']} ← ${row['balance']}"),
+              trailing: Text("${row['delta'] > 0 ? '+' : ''}${row['delta']}"),
             ),
         ],
       ],

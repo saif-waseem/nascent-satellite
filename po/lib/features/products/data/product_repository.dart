@@ -186,7 +186,14 @@ class ProductRepository {
     );
   }
 
-  Future<void> saveProduct(String tenantId, ProductModel product) async {
+  final undo = const CatalogUndo('cashier');
+  Future<void> undoEntry(String tenant,Map<String,dynamic> entry) async {
+    final current=_box.get(entry['id']);
+    if(current==null || current.tenantId!=tenant) throw StateError('الصنف غير متاح');
+    final row=CatalogUndo.restore(ProductCatalog.encode(current),entry);
+    await saveProduct(tenant,ProductCatalog.decode(row),recordUndo:false,undoExpected:Map<String,dynamic>.from(entry['expected'] as Map));
+  }
+  Future<void> saveProduct(String tenantId, ProductModel product,{String? batchId,bool recordUndo=true,Map<String,dynamic>? undoExpected}) async {
     final productId = product.id.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : product.id;
     
     // Force integrity before saving
@@ -198,9 +205,10 @@ class ProductRepository {
     );
     
     final previous = _box.get(productId);
-    if(tenantId!='local_default') await _queueCatalog(tenantId,productId,previous,updatedProduct);
+    if(tenantId!='local_default') await _queueCatalog(tenantId,productId,previous,updatedProduct,undoExpected:undoExpected);
     // Always save to local first
     await _box.put(productId, updatedProduct);
+    if(recordUndo) await undo.record(tenantId,previous,updatedProduct,batchId);
 
     // Notify UI of local update
     _notifyStockChanged();
@@ -209,7 +217,7 @@ class ProductRepository {
 
   }
 
-  Future<void> _queueCatalog(String tenant,String id,ProductModel? before,ProductModel? after) async {
+  Future<void> _queueCatalog(String tenant,String id,ProductModel? before,ProductModel? after,{Map<String,dynamic>? undoExpected}) async {
     final previous=before==null?<String,dynamic>{}:ProductCatalog.encode(before);
     final next=after==null?<String,dynamic>{}:ProductCatalog.encode(after);
     final patch={for(final e in next.entries)
@@ -217,7 +225,7 @@ class ProductRepository {
     if(after!=null && before!=null && patch.isEmpty)return;
     await LocalDbService.addToSyncQueue(collectionPath:'catalog/$id',action:SyncAction.update,data:{
       'id':id,'tenantId':tenant,'operation':const Uuid().v4(),'action':after==null?'delete':before==null?'create':'patch',
-      'patch':patch,'before':{if(before!=null)for(final key in patch.keys)key:previous[key]},
+      'patch':patch,'before':{...?undoExpected,if(before!=null)for(final key in patch.keys)key:previous[key]},
       'backup':after?.toJson(),
     });
   }

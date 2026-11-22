@@ -1,3 +1,4 @@
+import '../../../products/presentation/screens/inventory_management_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -68,6 +69,7 @@ class ReportsScreen extends HookConsumerWidget {
       appBar: AppBar(
         title: const Text('التقارير والإحصائيات'),
         actions: [
+          if(ref.hasPermission(PosPermission.viewProductStock)) IconButton(tooltip: 'تقرير حركة الصنف والتنويعة',icon:const Icon(Icons.inventory_2_outlined),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const InventoryManagementScreen(showRecords:true)))),
           reportAsync.when(
             data: (report) => IconButton(
               icon: const Icon(Icons.print),

@@ -46,7 +46,12 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated() && !request.resource.data.keys().hasAny(['identityUid','accountState','deleteAfter']);
+      allow update: if isAuthenticated()
+        && resource.data.get('accountState','') != 'pendingDeletion'
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['identityUid','accountState','deleteAfter'])
+        && (!resource.data.keys().hasAny(['identityUid']) ||
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['password','email','id','tenantId','phone']));
       
       match /daily_stats/{date} {
         allow read, write: if isAuthenticated();

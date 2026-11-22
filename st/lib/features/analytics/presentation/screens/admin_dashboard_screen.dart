@@ -1,3 +1,4 @@
+import '../../../settings/presentation/screens/warehouses_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -64,6 +65,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(tooltip: 'تقرير حركة الصنف والتنويعة',icon:const Icon(Icons.inventory_2_outlined),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const WarehousesScreen(showRecords:true)))),
           _buildLiveIndicator(lang),
           const SizedBox(width: 8),
           _buildTimeFilterButton(lang),

@@ -1,3 +1,4 @@
+import '../widgets/buyer_account_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   late final _referralController = TextEditingController(text: widget.referral);
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _governorateController = TextEditingController();
   final _locationController = TextEditingController();
@@ -27,7 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _landmarkController = TextEditingController(); 
   @override
   void dispose() {
-    for (final controller in [_referralController, _phoneController, _nameController,
+    for (final controller in [_emailController,_referralController, _phoneController, _nameController,
       _passwordController, _governorateController, _locationController, _landmarkController]) {
       controller.dispose();
     }
@@ -155,6 +157,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               decoration: InputDecoration(labelText: AppStrings.get('location_details', lang), hintText: 'Street, Neighborhood, etc.', prefixIcon: const Icon(Icons.location_on), border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
+            TextField(controller:_emailController,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'البريد الإلكتروني للتحقق واستعادة الحساب')),
             TextField(
               controller: _passwordController,
               decoration: InputDecoration(labelText: AppStrings.get('password', lang), prefixIcon: const Icon(Icons.lock_outline), border: const OutlineInputBorder()),
@@ -205,7 +208,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                 final fullAddress = '$displayCountry - $displayGov - $loc';
                 
-                try { await ref.read(userActionsProvider).register(
+                try { final email=_emailController.text.trim(); await verifiedBuyer(email,password,create:true);
+                  if(!mounted)return;
+                  await ref.read(userActionsProvider).register(email:email,
                   name: name,
                   phone: phone,
                   address: fullAddress,

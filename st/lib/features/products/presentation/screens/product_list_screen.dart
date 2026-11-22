@@ -60,6 +60,10 @@ class ProductListScreen extends HookConsumerWidget {
               ),
             ]
           : [
+              IconButton(tooltip:'التراجع عن آخر تعديل', icon:const Icon(Icons.undo),onPressed:(){
+                final repo=ref.read(adminSupabaseServiceProvider), tenant=ref.read(currentTenantIdProvider);
+                repo.undo.show(context,tenant,(entry)=>repo.undoEntry(tenant,entry));
+              }),
               IconButton(
                 onPressed: () => context.push('/settings'),
                 icon: const Icon(Icons.settings_outlined),
@@ -272,8 +276,9 @@ class ProductListScreen extends HookConsumerWidget {
               final newPrice = double.tryParse(controller.text);
               if (newPrice != null) {
                 final tenantId = ref.read(currentTenantIdProvider);
+                final batch=CatalogUndo.batch();
                 for (var id in ids) {
-                   await ref.read(adminSupabaseServiceProvider).updateProductPrice(id, newPrice, tenantId);
+                   await ref.read(adminSupabaseServiceProvider).updateProductPrice(id, newPrice, tenantId,batchId:batch);
                 }
                 mode.value = false;
                 Navigator.pop(ctx);

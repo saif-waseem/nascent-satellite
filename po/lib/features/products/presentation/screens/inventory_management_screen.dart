@@ -25,11 +25,12 @@ enum InventoryFilter { all, lowStock, nearExpiry, slowMoving, overstocked }
 
 class InventoryManagementScreen extends HookConsumerWidget {
   final InventoryFilter initialFilter;
-  const InventoryManagementScreen({super.key, this.initialFilter = InventoryFilter.all});
+  final bool showRecords;
+  const InventoryManagementScreen({super.key,this.showRecords=false, this.initialFilter = InventoryFilter.all});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final advanced = useState(false);
+    final advanced = useState(showRecords);
     final canViewSuppliers = ref.hasPermission(PosPermission.viewSuppliers);
     final canManageSuppliers = ref.hasPermission(PosPermission.manageSuppliers);
     final canCount = ref.hasPermission(PosPermission.manageProducts);

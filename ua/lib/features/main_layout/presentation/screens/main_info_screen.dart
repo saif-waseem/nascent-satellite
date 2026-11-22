@@ -1,3 +1,4 @@
+import '../../../auth/presentation/widgets/buyer_account_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -61,7 +62,10 @@ class MainInfoScreen extends ConsumerWidget {
                    ref.read(appSettingsProvider.notifier).setLocale(nextLang);
                 },
               ),
-               ListTile(
+               if(ref.watch(userPhoneProvider)!=null) ListTile(
+                  leading:const Icon(Icons.person_remove_outlined),title:const Text('حذف حسابي'),
+                  onTap:()=>showDialog(context:context,builder:(_)=>BuyerAccountDialog(phone:ref.read(userPhoneProvider)))),
+                ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: Text(AppStrings.get('sign_out', lang), style: const TextStyle(color: Colors.red)),
                 onTap: () {

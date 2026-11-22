@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:user_app/core/config/app_config.dart';
@@ -62,6 +63,7 @@ final userProvider = StreamProvider<UserModel?>((ref) {
       .map((doc) {
     if (!doc.exists) return null;
     final data = doc.data()!;
+    if(data['accountState']=='pendingDeletion' || (data['identityUid']!=null && data['identityUid']!=FirebaseAuth.instance.currentUser?.uid))return null;
     data['id'] = doc.id;
     return UserModel.fromJson(data);
   });
@@ -83,34 +85,27 @@ class UserActions {
       cleanPhone = cleanPhone.substring(1);
     }
     
-    final compositeId = '${tenantId}_$cleanPhone';
-    final user = await ref.read(firestoreServiceProvider).getUser(compositeId);
-    
-    if (user == null) {
-      // Fallback: Check if it was stored WITH the leading zero (older data)
-      final legacyId = '${tenantId}_0$cleanPhone';
-      final legacyUser = await ref.read(firestoreServiceProvider).getUser(legacyId);
-      if (legacyUser == null) throw Exception('ACCOUNT_NOT_FOUND');
-      
-      if (legacyUser.password != password) throw Exception('WRONG_PASSWORD');
-      if (rememberMe) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_phone', '0$cleanPhone');
-      }
-      ref.read(userPhoneProvider.notifier).setPhone('0$cleanPhone');
-      return;
+    final users=FirebaseFirestore.instance.collection('users');
+    String storedPhone=cleanPhone;
+    var profile=await users.doc('${tenantId}_$storedPhone').get();
+    if(!profile.exists){
+      storedPhone='0$cleanPhone';
+      profile=await users.doc('${tenantId}_$storedPhone').get();
     }
-
-    if (user.password != password) throw Exception('WRONG_PASSWORD');
-    
-    if (rememberMe) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_phone', cleanPhone);
-    }
-    ref.read(userPhoneProvider.notifier).setPhone(cleanPhone);
+    final fields=profile.data();
+    if(fields==null)throw Exception('ACCOUNT_NOT_FOUND');
+    if(fields['accountState']=='pendingDeletion')throw StateError('الحساب معلّق. اختر استعادة حسابي خلال المهلة.');
+    if(fields['identityUid']!=null){
+      final identity=await FirebaseAuth.instance.signInWithEmailAndPassword(email:fields['email'],password:password);
+      if(identity.user?.emailVerified!=true || identity.user?.uid!=fields['identityUid'])throw StateError('تعذر تأكيد هوية الحساب');
+    }else if(fields['password'] != password){throw Exception('WRONG_PASSWORD');}
+    final prefs=await SharedPreferences.getInstance();
+    if(rememberMe){await prefs.setString('user_phone',storedPhone);}else{await prefs.remove('user_phone');}
+    ref.read(userPhoneProvider.notifier).setPhone(storedPhone);
   }
 
   Future<void> register({
+    required String email,
     required String name, 
     required String phone, 
     required String address, 
@@ -127,64 +122,9 @@ class UserActions {
       cleanPhone = cleanPhone.substring(1);
     }
     
-    final compositeId = '${resolvedId}_$cleanPhone';
-    
-    final users = FirebaseFirestore.instance.collection('users');
-    final referralCode = users.doc().id;
-
-    var newUser = UserModel(
-      id: compositeId,
-      email: '$phone@$resolvedId.com',
-      name: name,
-      tenantId: resolvedId,
-      loyaltyPoints: 50,
-      password: password,
-      address: address,
-      landmark: landmark,
-      phone: phone,
-      createdAt: DateTime.now(),
-      referralCode: referralCode,
-      referredBy: referredByCode,
-    );
-    
-    // Fetch default points from Tenant settings
-    try {
-      final tenantDoc = await FirebaseFirestore.instance.collection('tenants').doc(resolvedId).get();
-      if (tenantDoc.exists) {
-        final data = tenantDoc.data();
-        if (data != null) {
-          final points = data['registrationPoints'] as int? ?? AppConfig.defaultRegistrationPoints ?? 50;
-          newUser = newUser.copyWith(loyaltyPoints: points);
-        }
-      }
-    } catch (e) {
-      // Ignore and use default 50
-    }
-
-    final code = referredByCode?.trim() ?? '';
-    DocumentReference<Map<String, dynamic>>? sponsor;
-    if (code.isNotEmpty) {
-      final matches = await users.where('tenantId', isEqualTo: resolvedId)
-          .where('referralCode', isEqualTo: code).limit(2).get();
-      if (matches.docs.length != 1 || matches.docs.single.id == compositeId) {
-        throw StateError('رمز الدعوة غير صالح لهذا المتجر');
-      }
-      sponsor = matches.docs.single.reference;
-    }
-    final account = users.doc(compositeId);
-    await FirebaseFirestore.instance.runTransaction((tx) async {
-      if ((await tx.get(account)).exists) throw StateError('رقم الهاتف مسجل بالفعل');
-      final target = sponsor;
-      if (target != null) {
-        final data = (await tx.get(target)).data();
-        if (data?['tenantId'] != resolvedId || data?['referralCode'] != code) {
-          throw StateError('رمز الدعوة غير صالح');
-        }
-        tx.update(target, {'loyaltyPoints': FieldValue.increment(50),
-          'referralCount': FieldValue.increment(1)});
-      }
-      tx.set(account, newUser.toJson());
-    });
+    final u=FirebaseAuth.instance.currentUser;
+    if(u==null || !u.emailVerified || u.email?.toLowerCase()!=email.toLowerCase())throw StateError('أكد بريدك الإلكتروني');
+    await BuyerAccountApi.call((await u.getIdToken())!,'register',resolvedId,{'phone':cleanPhone,'name':name,'address':address,'landmark':landmark,'referral':referredByCode});
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_phone', cleanPhone);
     await prefs.setString('user_address', address);
@@ -206,9 +146,14 @@ class UserActions {
     });
   }
   Future<void> logout() async {
+    await ref.read(localCacheServiceProvider).clearBuyer(ref.read(currentTenantIdProvider));
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_phone');
+    await prefs.remove('user_address');
+    await prefs.remove('user_landmark');
     ref.read(userPhoneProvider.notifier).setPhone(null);
+    final auth=FirebaseAuth.instance;
+    if(auth.currentUser!=null && !auth.currentUser!.isAnonymous){await auth.signOut();await auth.signInAnonymously();}
   }
 
   Future<void> updateUserProfile({String? name, String? password, String? address, String? landmark}) async {
@@ -220,7 +165,14 @@ class UserActions {
     
     final data = <String, dynamic>{};
     if (name != null) data['name'] = name;
-    if (password != null) data['password'] = password;
+    if (password != null) {
+      final profile=await FirebaseFirestore.instance.collection('users').doc(compositeId).get();
+      if(profile.data()?['identityUid']!=null){
+        final current=FirebaseAuth.instance.currentUser;
+        if(current==null || current.uid!=profile.data()!['identityUid'])throw StateError('سجّل الدخول مجددًا');
+        await current.updatePassword(password);
+      }else{data['password']=password;}
+    }
     if (address != null) data['address'] = address;
     if (landmark != null) data['landmark'] = landmark;
     

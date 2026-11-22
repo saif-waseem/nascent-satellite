@@ -1,3 +1,6 @@
 [functions.confirm-order-stock]
 # The handler verifies access against Firestore using the Firebase ID token.
 verify_jwt = false
+
+[functions.buyer-account]
+verify_jwt = false

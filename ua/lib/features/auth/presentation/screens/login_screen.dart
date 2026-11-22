@@ -1,3 +1,4 @@
+import '../widgets/buyer_account_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -114,6 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Text(AppStrings.get('login', lang)),
               ),
               const SizedBox(height: 16),
+              TextButton(onPressed:()=>showDialog(context:context,builder:(_)=>const BuyerAccountDialog(restore:true)),child:const Text('استعادة حسابي المحذوف')),
               TextButton(
                 onPressed: () => context.push('/register'),
                 child: Text(AppStrings.get('new_user_register', lang)),

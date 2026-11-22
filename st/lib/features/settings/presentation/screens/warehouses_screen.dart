@@ -9,13 +9,14 @@ import 'package:store_admin/core/localization/resources/app_strings.dart';
 import 'package:store_admin/core/localization/app_settings_controller.dart';
 
 class WarehousesScreen extends HookConsumerWidget {
-  const WarehousesScreen({super.key});
+  final bool showRecords;
+  const WarehousesScreen({super.key,this.showRecords=false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lang = ref.watch(appSettingsProvider).locale.languageCode;
     final tenantId = ref.watch(currentTenantIdProvider);
-    final advanced = useState(false);
+    final advanced = useState(showRecords);
     final controller = useTextEditingController();
 
     return Scaffold(

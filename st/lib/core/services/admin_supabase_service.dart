@@ -81,18 +81,28 @@ class AdminSupabaseService {
     }
   }
 
-  Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock}) async {
+  final undo = const CatalogUndo('admin');
+  Future<void> undoEntry(String tenant,Map<String,dynamic> entry) async {
+    await client.rpc('undo_product_edit', params:{'p_tenant':tenant,'p_id':entry['id'],'p_expected':entry['expected'],'p_restore':entry['restore']});
+    await _markBackup(tenant,entry['id'] as String);
+    unawaited(_flushBackup());
+  }
+
+  Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock,String? batchId}) async {
     final row = _mapProductToRow(product, tenantId);
     if (previousStock == null) {
-      await client.from('products').insert(row);
+      final created=await client.from('products').insert(row).select().single();
+      await undo.record(tenantId,null,_mapRowToProduct(created),batchId);
       await _markBackup(tenantId,product.id);unawaited(_flushBackup());return;
     }
+    final before=await client.from('products').select().eq('tenant_id',tenantId).eq('id',product.id).single();
     final updated = await client.from('products').update(row)
         .eq('id', product.id).eq('tenant_id', tenantId)
-        .eq('stock_quantity', previousStock).select('id').maybeSingle();
+        .eq('stock_quantity', previousStock).eq('updated_at',before['updated_at']).select().maybeSingle();
     if (updated == null) {
       throw StateError('تغيّر رصيد الصنف أو لم يعد موجوداً. أعد فتحه ثم احفظ التعديل.');
     }
+    await undo.record(tenantId,_mapRowToProduct(before),_mapRowToProduct(updated),batchId);
     await _markBackup(tenantId,product.id);unawaited(_flushBackup());
   }
 
@@ -100,8 +110,10 @@ class AdminSupabaseService {
     await saveProduct(product, tenantId);
   }
 
-  Future<void> updateProductPrice(String productId,double price,String tenantId) async {
-    await client.from('products').update({'price':price,'old_price':null}).eq('tenant_id',tenantId).eq('id',productId);
+  Future<void> updateProductPrice(String productId,double price,String tenantId,{String? batchId}) async {
+    final before=await client.from('products').select().eq('tenant_id',tenantId).eq('id',productId).single();
+    final after=await client.from('products').update({'price':price,'old_price':null}).eq('tenant_id',tenantId).eq('id',productId).eq('updated_at',before['updated_at']).select().single();
+    await undo.record(tenantId,_mapRowToProduct(before),_mapRowToProduct(after),batchId);
     await _markBackup(tenantId,productId);unawaited(_flushBackup());
   }
 

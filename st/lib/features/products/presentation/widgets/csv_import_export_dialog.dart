@@ -147,8 +147,9 @@ class CsvImportExportDialog extends HookConsumerWidget {
       }
       final proceed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('مراجعة الاستيراد'),content:Text('إضافة ${changes.length-updates} منتج وتحديث $updates. دون تغيير: $unchanged. هل تريد الحفظ؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
       if(proceed!=true || !context.mounted)return;
+      final batch=CatalogUndo.batch();
       for(final product in changes){
-        await repo.saveProduct(product,tenant,previousStock:existingIds[product.id]?.stockQuantity);
+        await repo.saveProduct(product,tenant,previousStock:existingIds[product.id]?.stockQuantity,batchId:batch);
 
         saved++;
       }

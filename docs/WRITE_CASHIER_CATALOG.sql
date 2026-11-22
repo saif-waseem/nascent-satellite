@@ -37,6 +37,10 @@ begin
     if old_row.id is not null then raise exception 'Product ID already exists'; end if;
     insert into public.products(id,tenant_id,name) values(p_id,p_tenant,p_patch->>'name');
   elsif old_row.id is null then raise exception 'Product no longer exists'; end if;
+  if p_action='patch' and exists (
+    select from jsonb_each(p_before) e where not (p_patch ? e.key)
+      and to_jsonb(old_row)->e.key is distinct from to_jsonb(jsonb_populate_record(null::public.products,p_before))->e.key
+  ) then raise exception 'تغير الصنف بعد الحفظ' using errcode='40001'; end if;
   for k in select jsonb_object_keys(p_patch) loop
     if not(k=any(allowed)) then raise exception 'Unsupported catalog field'; end if;
     if p_action='patch' and p_before ? k and to_jsonb(old_row)->k is distinct from p_before->k and to_jsonb(old_row)->k is distinct from p_patch->k then

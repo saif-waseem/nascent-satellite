@@ -38,20 +38,17 @@ jobs:
           flutter config --enable-macos-desktop
           flutter config --no-enable-swift-package-manager
 
-      - name: Pub get shared packages
-        run: |
-          cd pa/shared_models && flutter pub get
-          cd ../shared_ui && flutter pub get
-
-      - name: Build macOS App
+      - name: Build and package macOS app
         working-directory: ${{ matrix.dir }}
         run: |
           set -euo pipefail
+          flutter clean
           flutter pub get
-          flutter build macos --release --no-codesign --no-tree-shake-icons
+          flutter build macos --release --no-tree-shake-icons
           apps=(build/macos/Build/Products/Release/*.app)
           test "${#apps[@]}" = 1
           test -d "${apps[0]}"
+          codesign --verify --deep "${apps[0]}" || true
           ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "${{ matrix.name }}-macos.zip"
 
       - name: Upload macOS Artifact
@@ -86,16 +83,10 @@ jobs:
       - name: Configure Flutter Windows
         run: flutter config --enable-windows-desktop
 
-      - name: Pub get shared packages
-        shell: pwsh
-        run: |
-          cd pa/shared_models; flutter pub get
-          cd ../shared_ui; flutter pub get
-
       - name: Build Windows App
-        shell: pwsh
         working-directory: ${{ matrix.dir }}
         run: |
+          flutter clean
           flutter pub get
           flutter build windows --release --no-tree-shake-icons
 

@@ -1,0 +1,127 @@
+name: Build Desktop Apps (macOS & Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - astra-updates
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: macOS - ${{ matrix.title }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {dir: po, name: cashier, title: "Cashier POS"}
+          - {dir: ua, name: store, title: "Customer Store"}
+          - {dir: st, name: admin, title: "Store Admin"}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+          cache: true
+
+      - name: Configure Flutter macOS
+        run: |
+          flutter config --enable-macos-desktop
+          flutter config --no-enable-swift-package-manager
+
+      - name: Pub get shared packages
+        run: |
+          cd pa/shared_models && flutter pub get
+          cd ../shared_ui && flutter pub get
+
+      - name: Build macOS App
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter build macos --release --no-codesign --no-tree-shake-icons
+          apps=(build/macos/Build/Products/Release/*.app)
+          test "${#apps[@]}" = 1
+          test -d "${apps[0]}"
+          ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "${{ matrix.name }}-macos.zip"
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-macos
+          path: ${{ matrix.dir }}/${{ matrix.name }}-macos.zip
+          retention-days: 30
+
+  build-windows:
+    name: Windows - ${{ matrix.title }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {dir: po, name: cashier, title: "Cashier POS"}
+          - {dir: ua, name: store, title: "Customer Store"}
+          - {dir: st, name: admin, title: "Store Admin"}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+          cache: true
+
+      - name: Configure Flutter Windows
+        run: flutter config --enable-windows-desktop
+
+      - name: Pub get shared packages
+        shell: pwsh
+        run: |
+          cd pa/shared_models; flutter pub get
+          cd ../shared_ui; flutter pub get
+
+      - name: Build Windows App
+        shell: pwsh
+        working-directory: ${{ matrix.dir }}
+        run: |
+          flutter pub get
+          flutter build windows --release --no-tree-shake-icons
+
+      - name: Package Windows Zip
+        shell: pwsh
+        working-directory: ${{ matrix.dir }}
+        run: |
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if ($found) {
+            Write-Host "Packaging from: $found"
+            Compress-Archive -Path "$found\*" -DestinationPath "${{ matrix.name }}-windows.zip" -Force
+          } else {
+            Write-Error "Could not find build output directory!"
+            exit 1
+          }
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-windows
+          path: ${{ matrix.dir }}/${{ matrix.name }}-windows.zip
+          retention-days: 30

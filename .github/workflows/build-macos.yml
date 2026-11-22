@@ -7,13 +7,13 @@ on:
         type: string
         required: false
   push:
-    branches: [main]
+    branches: [main, astra-updates]
 permissions:
   contents: read
 jobs:
   build:
     if: inputs.verify_run == ''
-    runs-on: macos-26
+    runs-on: macos-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -48,7 +48,7 @@ jobs:
           if-no-files-found: error
   verify-packages:
     if: inputs.verify_run != ''
-    runs-on: macos-26
+    runs-on: macos-latest
     permissions:
       actions: read
       contents: read

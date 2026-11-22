@@ -412,13 +412,13 @@ class ProductFormScreen extends HookConsumerWidget {
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
-                            value: ['د.ع', '$', 'ر.س', 'د.إ', 'د.ك', 'ج.م', '€', '£', 'TL', 'ر.ق', 'ر.ع', 'د.ب', 'د.أ'].contains(productCurrency.value)
+                            value: ['د.ع', '\$', 'ر.س', 'د.إ', 'د.ك', 'ج.م', '€', '£', 'TL', 'ر.ق', 'ر.ع', 'د.ب', 'د.أ'].contains(productCurrency.value)
                                 ? productCurrency.value
                                 : 'د.ع',
                             decoration: _inputDecoration('عملة تسعير المنتج'),
                             items: const [
                               DropdownMenuItem(value: 'د.ع', child: Text('د.ع - دينار عراقي')),
-                              DropdownMenuItem(value: '$', child: Text('$ - دولار أمريكي')),
+                              DropdownMenuItem(value: '\$', child: Text('\$ - دولار أمريكي')),
                               DropdownMenuItem(value: 'ر.س', child: Text('ر.س - ريال سعودي')),
                               DropdownMenuItem(value: 'د.إ', child: Text('د.إ - درهم إماراتي')),
                               DropdownMenuItem(value: 'د.ك', child: Text('د.ك - دينار كويتي')),
@@ -437,9 +437,6 @@ class ProductFormScreen extends HookConsumerWidget {
                                 unitController.text = val;
                               }
                             },
-                          )
-                              ),
-                            ],
                           ),
                         ],
                         if(advanced.value)...[

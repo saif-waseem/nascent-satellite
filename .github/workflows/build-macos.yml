@@ -12,7 +12,6 @@ permissions:
   contents: read
 jobs:
   build:
-    if: inputs.verify_run == ''
     runs-on: macos-latest
     timeout-minutes: 60
     strategy:
@@ -39,6 +38,7 @@ jobs:
           apps=(build/macos/Build/Products/Release/*.app)
           test "${#apps[@]}" = 1
           test -d "${apps[0]}"
+          codesign --force --deep -s - "${apps[0]}"
           codesign --verify --deep "${apps[0]}"
           ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "${{ matrix.package }}-macos.zip"
       - uses: actions/upload-artifact@v4
@@ -47,17 +47,15 @@ jobs:
           path: ${{ matrix.dir }}/${{ matrix.package }}-macos.zip
           if-no-files-found: error
   verify-packages:
-    if: inputs.verify_run != ''
+    needs: build
     runs-on: macos-latest
     permissions:
       actions: read
       contents: read
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v4
         with:
-          run-id: ${{ inputs.verify_run }}
-          github-token: ${{ github.token }}
           pattern: '*-macos'
           path: packages
       - name: Launch all three packaged apps on macOS

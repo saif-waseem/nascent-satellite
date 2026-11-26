@@ -8,28 +8,34 @@ import '../services/local_db_service.dart';
 import '../services/firestore_rest_service.dart';
 import '../models/sync_queue_item.dart';
 import '../services/firebase_rest_auth_service.dart';
+import 'tenant_provider.dart';
+import '../../features/common/data/app_settings_repository.dart';
 
-enum SyncState { synced, syncing, offline, error }
+enum SyncState { synced, syncing, offline, localOnly, error }
 
 class SyncStatus {
   final SyncState syncState;
   final bool isOnline;
+  final bool isCloudAllowed;
   final int pendingWritesCount;
 
   SyncStatus({
     required this.syncState,
     required this.isOnline,
+    this.isCloudAllowed = false,
     this.pendingWritesCount = 0,
   });
 
   SyncStatus copyWith({
     SyncState? syncState,
     bool? isOnline,
+    bool? isCloudAllowed,
     int? pendingWritesCount,
   }) {
     return SyncStatus(
       syncState: syncState ?? this.syncState,
       isOnline: isOnline ?? this.isOnline,
+      isCloudAllowed: isCloudAllowed ?? this.isCloudAllowed,
       pendingWritesCount: pendingWritesCount ?? this.pendingWritesCount,
     );
   }
@@ -42,6 +48,14 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
   bool _needsAnotherPass = false;
   Timer? _retry;
 
+  bool get _canCloudSync {
+    final tenant = ref.read(tenantProvider).value;
+    final settings = ref.read(appSettingsProvider).value;
+    if (tenant == null || !tenant.isPosCloudAllowed) return false;
+    if (settings != null && !settings.isCloudSyncEnabled) return false;
+    return true;
+  }
+
   @override
   SyncStatus build() {
     this.ref.onDispose(() {
@@ -50,14 +64,22 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
       _retry?.cancel();
     });
 
+    final tenant = ref.watch(tenantProvider).value;
+    final settings = ref.watch(appSettingsProvider).value;
+    final cloudAllowed = tenant?.isPosCloudAllowed ?? false;
+    final canSync = cloudAllowed && (settings?.isCloudSyncEnabled ?? true);
+
     ref.listen(firestoreRestServiceProvider, (_, service) {
-      if (service.authToken != null) scheduleMicrotask(syncPending);
+      if (service.authToken != null && _canCloudSync) {
+        scheduleMicrotask(syncPending);
+      }
     });
     _init();
 
     return SyncStatus(
-      syncState: SyncState.synced,
+      syncState: canSync ? SyncState.synced : SyncState.localOnly,
       isOnline: true,
+      isCloudAllowed: cloudAllowed,
       pendingWritesCount: LocalDbService.getBox<SyncQueueItem>(
         'sync_queue',
       ).length,
@@ -70,7 +92,7 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
     // Watch queue changes
     _queueSub = box.watch().listen((_) {
       state = state.copyWith(pendingWritesCount: box.length);
-      if (state.isOnline) {
+      if (state.isOnline && _canCloudSync) {
         syncPending();
       }
       _updateSyncState();
@@ -83,7 +105,7 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
           results.contains(ConnectivityResult.wifi) ||
           results.contains(ConnectivityResult.ethernet);
       state = state.copyWith(isOnline: isOnline);
-      if (isOnline) {
+      if (isOnline && _canCloudSync) {
         syncPending();
       }
       _updateSyncState();
@@ -91,16 +113,29 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
   }
 
   void _updateSyncState() {
+    final tenant = ref.read(tenantProvider).value;
+    final cloudAllowed = tenant?.isPosCloudAllowed ?? false;
+    if (!_canCloudSync) {
+      state = state.copyWith(
+        syncState: SyncState.localOnly,
+        isCloudAllowed: cloudAllowed,
+      );
+      return;
+    }
     if (!state.isOnline) {
-      state = state.copyWith(syncState: SyncState.offline);
+      state = state.copyWith(syncState: SyncState.offline, isCloudAllowed: true);
     } else if (state.pendingWritesCount > 0) {
-      state = state.copyWith(syncState: SyncState.syncing);
+      state = state.copyWith(syncState: SyncState.syncing, isCloudAllowed: true);
     } else {
-      state = state.copyWith(syncState: SyncState.synced);
+      state = state.copyWith(syncState: SyncState.synced, isCloudAllowed: true);
     }
   }
 
   Future<void> syncPending() async {
+    if (!_canCloudSync) {
+      _updateSyncState();
+      return;
+    }
     if (!state.isOnline || state.pendingWritesCount == 0) return;
     if (_running) {
       _needsAnotherPass = true;
@@ -173,6 +208,7 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
       _running = false;
       _retry?.cancel();
       if (ref.mounted &&
+          _canCloudSync &&
           LocalDbService.getBox<SyncQueueItem>('sync_queue').isNotEmpty) {
         _retry = Timer(const Duration(seconds: 15), syncPending);
       }

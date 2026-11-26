@@ -435,6 +435,16 @@ class WarehousesScreen extends HookConsumerWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           ),
                           onPressed: () async {
+                            final multiAllowed = tenant?.isPosMultiBranchAllowed ?? false;
+                            if (!multiAllowed && data.isNotEmpty) {
+                              showTierLockedMessage(
+                                context,
+                                tenant: tenant,
+                                featureName: 'تعدد الفروع والمخازن',
+                                minimumTier: 'D',
+                              );
+                              return;
+                            }
                             if (controller.text.trim().isNotEmpty) {
                               await ref.read(adminFirestoreServiceProvider).addWarehouse(
                                 tenantId,
@@ -445,7 +455,11 @@ class WarehousesScreen extends HookConsumerWidget {
                               controller.clear();
                             }
                           },
-                          icon: const Icon(Icons.add),
+                          icon: Icon(
+                            ((tenant?.isPosMultiBranchAllowed ?? false) || data.isEmpty)
+                                ? Icons.add
+                                : Icons.lock_outline,
+                          ),
                           label: Text(lang == 'ar' ? 'إضافة' : 'Add'),
                         ),
                       ],

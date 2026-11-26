@@ -138,6 +138,8 @@ class DashboardScreen extends HookConsumerWidget {
                   'ID: $tenantId',
                   style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
                 ),
+                const SizedBox(height: 8),
+                TierBadgeWidget(tenant: tenant, compact: true),
               ],
             ),
             loading: () => const CircularProgressIndicator(),
@@ -248,9 +250,11 @@ class DashboardScreen extends HookConsumerWidget {
             ],
           ),
           const Spacer(),
+          TierBadgeWidget(tenant: tenantAsync.value, compact: true),
           if (!isMobile) ...[
+            const SizedBox(width: 8),
             _SyncStatusBadge(syncStatus: syncStatus),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
           ],
           _NotificationBell(),
         ],
@@ -384,12 +388,31 @@ class DashboardScreen extends HookConsumerWidget {
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsScreen())),
               ),
             if (ref.hasPermission(PosPermission.manageOnlineOrders))
-              _DashboardCard(
-                title: 'طلبات الأونلاين',
-                subtitle: 'إدارة طلبات المتجر الإلكتروني',
-                icon: Icons.shopping_bag_rounded,
-                color: Colors.green,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OnlineOrdersScreen())),
+              Builder(
+                builder: (context) {
+                  final tenant = ref.watch(tenantProvider).value;
+                  final cloudAllowed = tenant?.isPosCloudAllowed ?? false;
+                  return _DashboardCard(
+                    title: 'طلبات الأونلاين',
+                    subtitle: cloudAllowed
+                        ? 'إدارة طلبات المتجر الإلكتروني'
+                        : '🔒 متاح في الباقة C فأعلى',
+                    icon: cloudAllowed ? Icons.shopping_bag_rounded : Icons.lock_outline,
+                    color: cloudAllowed ? Colors.green : Colors.grey,
+                    onTap: () {
+                      if (!cloudAllowed) {
+                        showTierLockedMessage(
+                          context,
+                          tenant: tenant,
+                          featureName: 'طلبات الأونلاين والمزامنة السحابية',
+                          minimumTier: 'C',
+                        );
+                        return;
+                      }
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const OnlineOrdersScreen()));
+                    },
+                  );
+                },
               ),
             if (ref.hasPermission(PosPermission.viewDebts))
               _DashboardCard(
@@ -628,11 +651,31 @@ class _SyncStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!syncStatus.isCloudAllowed || syncStatus.syncState == SyncState.localOnly) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.storage_rounded, color: Colors.blueGrey, size: 16),
+            SizedBox(width: 6),
+            Text(
+              'تخزين محلي فقط',
+              style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
     final isSynced = syncStatus.syncState == SyncState.synced;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: (isSynced ? Colors.green : Colors.orange).withOpacity(0.1),
+        color: (isSynced ? Colors.green : Colors.orange).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -735,7 +778,8 @@ class _FinancialSummaryBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final valuationAsync = ref.watch(inventoryValuationProvider);
     final profitAsync = ref.watch(totalProfitPotentialProvider);
-    final fmt = intl.NumberFormat.currency(symbol: 'IQD', decimalDigits: 0);
+    final symbol = CurrencyDefaults.normalizeCurrency(ref.watch(tenantProvider).value?.currencyUnit);
+    final fmt = intl.NumberFormat.currency(symbol: '$symbol ', decimalDigits: 0);
 
     return Container(
       padding: const EdgeInsets.all(20),

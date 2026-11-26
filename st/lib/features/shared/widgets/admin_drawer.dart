@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:store_admin/core/localization/app_settings_controller.dart';
 import 'package:store_admin/core/localization/resources/app_strings.dart';
 import 'package:store_admin/features/shared/providers.dart';
@@ -29,7 +30,18 @@ class AdminDrawer extends ConsumerWidget {
                     : const Icon(Icons.store, size: 40),
               ),
               accountName: Text(tenant?.name ?? 'Store Admin'),
-              accountEmail: Text('ID: $tenantId'),
+              accountEmail: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'ID: $tenantId',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  TierBadgeWidget(tenant: tenant, compact: true),
+                ],
+              ),
               onDetailsPressed: () {
                 Navigator.pop(context);
                 context.push('/profile');

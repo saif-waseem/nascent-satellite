@@ -84,6 +84,60 @@ class TenantModel extends Equatable {
 
   String get effectiveCarsTier => carsTier.isNotEmpty ? carsTier : posTier;
   bool get isCarsExcelAllowed => carsExcelEnabled || posExcelEnabled || effectiveCarsTier == 'C' || effectiveCarsTier == 'D';
+
+  bool get isPosTrialValid =>
+      isTrialActive &&
+      (trialEndDate == null || DateTime.now().isBefore(trialEndDate!));
+
+  bool get isPosSubscriptionExpiredBeyondGrace {
+    if (isPosTrialValid) return false;
+    if (posExpiryDate == null) return false;
+    return DateTime.now().isAfter(posExpiryDate!.add(Duration(days: posGraceDays)));
+  }
+
+  /// Normalized POS subscription tier ('A', 'B', 'C', 'D').
+  /// Automatically downgrades to 'A' (local-only) when expired past grace days.
+  String get effectivePosTier {
+    if (isPosSubscriptionExpiredBeyondGrace) return 'A';
+    final normalized = posTier.trim().toUpperCase();
+    return const ['A', 'B', 'C', 'D'].contains(normalized) ? normalized : 'A';
+  }
+
+  int get effectivePosDeviceLimit {
+    final t = effectivePosTier;
+    if (t == 'A') return 1;
+    if (posDeviceLimit != 1) return posDeviceLimit;
+    return switch (t) {
+      'B' => 5,
+      'C' => 10,
+      'D' => -1,
+      _ => 1,
+    };
+  }
+
+  bool get isPosLanAllowed =>
+      effectivePosTier != 'A' &&
+      (posLanSyncEnabled || const ['B', 'C', 'D'].contains(effectivePosTier));
+
+  bool get isPosCloudAllowed =>
+      effectivePosTier != 'A' &&
+      (posCloudBackupEnabled || const ['C', 'D'].contains(effectivePosTier));
+
+  bool get isPosRemoteDashAllowed =>
+      effectivePosTier != 'A' &&
+      (posRemoteDashEnabled || const ['C', 'D'].contains(effectivePosTier));
+
+  bool get isPosExcelAllowed =>
+      effectivePosTier != 'A' &&
+      (posExcelEnabled || const ['C', 'D'].contains(effectivePosTier));
+
+  bool get isPosMultiBranchAllowed =>
+      effectivePosTier != 'A' &&
+      (posMultiBranchEnabled || effectivePosTier == 'D');
+
+  bool get isPosVideoGenAllowed =>
+      effectivePosTier != 'A' &&
+      (posVideoGenEnabled || const ['C', 'D'].contains(effectivePosTier));
   
   // Loyalty Settings
   @HiveField(14)

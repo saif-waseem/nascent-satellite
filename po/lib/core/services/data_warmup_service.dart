@@ -26,8 +26,20 @@ class DataWarmupNotifier extends Notifier<WarmupStatus> {
   Future<void> startWarmup() async {
     final tenantId = ref.read(tenantIdProvider);
     if (tenantId.isEmpty) return;
-    
+
     final restService = ref.read(firestoreRestServiceProvider);
+    final tenant = ref.read(tenantProvider).value;
+    if (tenant != null && !tenant.isPosCloudAllowed) {
+      try {
+        await restService.getDocument('tenants/$tenantId');
+      } catch (_) {}
+      _updateProgress(WarmupStatus(
+        stage: 'الوضع المحلي (باقة ${tenant.effectivePosTier})',
+        progress: 1.0,
+        isComplete: true,
+      ));
+      return;
+    }
 
     try {
       // PHASE 1: TEXT DATA (In REST, we just fetch to ensure connectivity and "warm up" the service)

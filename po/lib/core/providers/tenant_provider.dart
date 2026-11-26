@@ -74,11 +74,15 @@ final tenantProvider = FutureProvider<TenantModel?>((ref) async {
 
 Future<void> _updateTenantFromNetwork(Ref ref, String tenantId, Box<TenantModel> box) async {
   try {
+    final local = box.get(tenantId);
     final restService = ref.read(firestoreRestServiceProvider);
     final data = await restService.getDocument('tenants/$tenantId');
     if (data != null) {
       final t = TenantModel.fromJson(data);
       await box.put(t.id, t);
+      if (local != t && ref.mounted) {
+        ref.invalidate(tenantProvider);
+      }
     }
   } catch (e) {
     // Ignore offline errors

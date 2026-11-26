@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import '../../../../core/providers/tenant_provider.dart';
 
 class ConnectivityStatusBar extends HookConsumerWidget {
   const ConnectivityStatusBar({super.key});
@@ -10,6 +11,8 @@ class ConnectivityStatusBar extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (defaultTargetPlatform == TargetPlatform.windows) return const SizedBox.shrink();
+    final cloudAllowed = ref.watch(tenantProvider).value?.isPosCloudAllowed ?? false;
+    if (!cloudAllowed) return const SizedBox.shrink();
 
     final connectivity = useMemoized(() => Connectivity().onConnectivityChanged);
     final status = useStream(connectivity);

@@ -171,13 +171,35 @@ class ProductListScreen extends HookConsumerWidget {
                 },
               ),
             ),
-          IconButton(
-            icon: const Icon(Icons.table_view_rounded, color: Colors.green),
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => const PosExcelImportExportDialog(),
-            ),
-            tooltip: 'استيراد وتصدير إكسل / Excel Import-Export',
+          Builder(
+            builder: (context) {
+              final tenant = ref.watch(tenantProvider).value;
+              final excelAllowed = tenant?.isPosExcelAllowed ?? false;
+              return IconButton(
+                icon: Icon(
+                  excelAllowed ? Icons.table_view_rounded : Icons.lock_outline,
+                  color: excelAllowed ? Colors.green : Colors.orange,
+                ),
+                onPressed: () {
+                  if (!excelAllowed) {
+                    showTierLockedMessage(
+                      context,
+                      tenant: tenant,
+                      featureName: 'استيراد وتصدير إكسل',
+                      minimumTier: 'C',
+                    );
+                    return;
+                  }
+                  showDialog(
+                    context: context,
+                    builder: (_) => const PosExcelImportExportDialog(),
+                  );
+                },
+                tooltip: excelAllowed
+                    ? 'استيراد وتصدير إكسل / Excel Import-Export'
+                    : 'مقفول في الباقة الحالية (يتطلب الباقة C)',
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),

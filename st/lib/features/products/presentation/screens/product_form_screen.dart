@@ -605,10 +605,27 @@ class ProductFormScreen extends HookConsumerWidget {
                       },
               ),
               FilledButton.icon(
-                icon: const Icon(Icons.auto_awesome),
+                icon: Icon(
+                  (tenant?.isPosVideoGenAllowed ?? false)
+                      ? Icons.auto_awesome
+                      : Icons.lock_outline,
+                ),
                 label: const Text('إنشاء إعلان من صور المنتج'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
+                style: FilledButton.styleFrom(
+                  backgroundColor: (tenant?.isPosVideoGenAllowed ?? false)
+                      ? Colors.indigo
+                      : Colors.grey.shade600,
+                ),
                 onPressed: () {
+                  if (!(tenant?.isPosVideoGenAllowed ?? false)) {
+                    showTierLockedMessage(
+                      context,
+                      tenant: tenant,
+                      featureName: 'توليد إعلانات الفيديو بالذكاء الاصطناعي',
+                      minimumTier: 'C',
+                    );
+                    return;
+                  }
                   final dummyProduct = ProductModel(
                     id: '',
                     tenantId: tenantId,

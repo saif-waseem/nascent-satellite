@@ -355,6 +355,16 @@ class InventoryManagementScreen extends HookConsumerWidget {
             }
           },
           onOpenRecord: (p) async {
+            final tenant = ref.read(tenantProvider).value;
+            if (!(tenant?.isPosCloudAllowed ?? false)) {
+              showTierLockedMessage(
+                context,
+                tenant: tenant,
+                featureName: 'سجل المخزون السحابي',
+                minimumTier: 'C',
+              );
+              return;
+            }
             final service = ref.read(cashierStockProvider);
             await Navigator.push(context, MaterialPageRoute(builder: (_) => StockRecordScreen(
               product: p, url: service.url, publishableKey: service.publishableKey, allowCount: canCount,

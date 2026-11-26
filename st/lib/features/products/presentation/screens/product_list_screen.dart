@@ -81,10 +81,32 @@ class ProductListScreen extends HookConsumerWidget {
                 onPressed: () => context.push('/settings'),
                 icon: const Icon(Icons.settings_outlined),
               ),
-              IconButton(
-                onPressed: () => showDialog(context: context, builder: (_) => const CsvImportExportDialog()),
-                icon: const Icon(Icons.import_export),
-                tooltip: lang == 'ar' ? 'استيراد/تصدير' : 'Import/Export CSV',
+              Builder(
+                builder: (context) {
+                  final tenant = ref.watch(tenantProvider).value;
+                  final excelAllowed = tenant?.isPosExcelAllowed ?? false;
+                  return IconButton(
+                    onPressed: () {
+                      if (!excelAllowed) {
+                        showTierLockedMessage(
+                          context,
+                          tenant: tenant,
+                          featureName: 'استيراد وتصدير إكسل/CSV',
+                          minimumTier: 'C',
+                        );
+                        return;
+                      }
+                      showDialog(context: context, builder: (_) => const CsvImportExportDialog());
+                    },
+                    icon: Icon(
+                      excelAllowed ? Icons.import_export : Icons.lock_outline,
+                      color: excelAllowed ? null : Colors.orange,
+                    ),
+                    tooltip: excelAllowed
+                        ? (lang == 'ar' ? 'استيراد/تصدير' : 'Import/Export CSV')
+                        : 'مقفول في الباقة الحالية (يتطلب الباقة C)',
+                  );
+                },
               ),
               IconButton(
                 onPressed: () => context.push('/dashboard'),

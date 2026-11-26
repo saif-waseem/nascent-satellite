@@ -102,6 +102,13 @@ class SuperAdminSupabaseService {
     await client.from('tenants').update({
       'isTrialActive': false,
       'posTier': 'A', // Demote to Free Tier A
+      'posDeviceLimit': 1,
+      'posLanSyncEnabled': false,
+      'posCloudBackupEnabled': false,
+      'posRemoteDashEnabled': false,
+      'posExcelEnabled': false,
+      'posMultiBranchEnabled': false,
+      'posVideoGenEnabled': false,
     }).eq('id', tenantId);
   }
 

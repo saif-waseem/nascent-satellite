@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:shared_models/shared_models.dart';
 import '../../data/app_settings_repository.dart';
 import '../../../products/presentation/providers/product_settings_provider.dart';
+import '../../../../core/providers/tenant_provider.dart';
 
 class CustomizationTab extends HookConsumerWidget {
   const CustomizationTab({super.key});
@@ -10,6 +12,8 @@ class CustomizationTab extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settingsAsync = ref.watch(appSettingsProvider);
+    final tenant = ref.watch(tenantProvider).value;
+    final isCloudAllowed = tenant?.isPosCloudAllowed ?? false;
     
     // Using hooks for controllers to avoid re-initializing
     final headerController = useTextEditingController();
@@ -34,7 +38,7 @@ class CustomizationTab extends HookConsumerWidget {
         barcodeTemplate: barcodeTemplate.value,
         receiptHeader: headerController.text,
         receiptFooter: footerController.text,
-        isCloudSyncEnabled: isSyncEnabled.value,
+        isCloudSyncEnabled: isCloudAllowed ? isSyncEnabled.value : false,
       );
       await repo.saveSettings(newSettings);
       ref.invalidate(appSettingsProvider);
@@ -79,10 +83,25 @@ class CustomizationTab extends HookConsumerWidget {
 
               _buildSectionTitle('مزامنة البيانات'),
               SwitchListTile(
+                secondary: Icon(
+                  isCloudAllowed ? Icons.cloud_sync_outlined : Icons.lock_outline,
+                  color: isCloudAllowed ? Colors.blue : Colors.orange,
+                ),
                 title: const Text('مزامنة السحاب (Cloud Sync)'),
-                subtitle: const Text('عند الإيقاف، سيتم الحفظ محلياً فقط (للطوارئ)'),
-                value: isSyncEnabled.value,
-                onChanged: (val) => isSyncEnabled.value = val,
+                subtitle: Text(
+                  isCloudAllowed
+                      ? 'عند الإيقاف، سيتم الحفظ محلياً فقط (للطوارئ)'
+                      : 'غير متاح في الباقة ${tenant?.effectivePosTier ?? "A"} — يتطلب الباقة C أو التفعيل من السوبر أدمن',
+                ),
+                value: isCloudAllowed ? isSyncEnabled.value : false,
+                onChanged: isCloudAllowed
+                    ? (val) => isSyncEnabled.value = val
+                    : (_) => showTierLockedMessage(
+                          context,
+                          tenant: tenant,
+                          featureName: 'الخزن والمزامنة السحابية',
+                          minimumTier: 'C',
+                        ),
               ),
               const SizedBox(height: 24),
               _buildArchivalToggle(ref),

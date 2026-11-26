@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/sales_repository.dart';
 import '../../../products/data/product_repository.dart';
 import '../../../../../core/providers/tenant_provider.dart';
+import '../../../../../core/services/firestore_rest_service.dart';
 
 class SalesSessionState {
   final List<SalesInvoiceModel> sessions;
@@ -33,25 +34,57 @@ class SelectedWarehouse extends Notifier<String?> {
   void set(String? val) => state = val;
 }
 
+final warehousesMetaProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final tenantId = ref.watch(tenantIdProvider);
+  if (tenantId == 'local_default' || tenantId.isEmpty) return const [];
+  try {
+    return await ref
+        .read(firestoreRestServiceProvider)
+        .getCollection('tenants/$tenantId/warehouses');
+  } catch (_) {
+    return const [];
+  }
+});
+
+/// Single currency per warehouse, configured exclusively by Admin.
 final activeBranchCurrencyProvider = NotifierProvider<ActiveBranchCurrency, String>(ActiveBranchCurrency.new);
 
 class ActiveBranchCurrency extends Notifier<String> {
   @override
   String build() {
     final tenant = ref.watch(tenantProvider).value;
-    return tenant?.currencyUnit ?? 'د.ع';
+    final selectedWarehouse = ref.watch(selectedWarehouseProvider);
+    final metaList = ref.watch(warehousesMetaProvider).asData?.value ?? const [];
+    if (selectedWarehouse != null && selectedWarehouse.isNotEmpty) {
+      final match = metaList
+          .where((w) => (w['name'] as String?) == selectedWarehouse)
+          .firstOrNull;
+      final whCurrency = match?['currency'] as String?;
+      if (whCurrency != null && whCurrency.trim().isNotEmpty) {
+        return CurrencyDefaults.normalizeCurrency(whCurrency);
+      }
+    }
+    return CurrencyDefaults.normalizeCurrency(
+      tenant?.currencyUnit ?? CurrencyDefaults.forCountry(tenant?.countryCode),
+    );
   }
-  void set(String val) => state = val;
 }
 
 final availableWarehousesProvider = FutureProvider<List<String>>((ref) async {
   final tenantId = ref.watch(tenantIdProvider);
-  final products = await ref.watch(productRepositoryProvider).getProducts(tenantId);
   final warehouses = <String>{};
+  final metaList = await ref.watch(warehousesMetaProvider.future);
+  for (final w in metaList) {
+    final name = (w['name'] as String? ?? '').trim();
+    if (name.isNotEmpty) warehouses.add(name);
+  }
+  final products = await ref.watch(productRepositoryProvider).getProducts(tenantId);
   for (var product in products) {
     for (var variant in product.variants) {
       for (var loc in variant.storageLocations) {
-        warehouses.add(loc.warehouseName);
+        if (loc.warehouseName.trim().isNotEmpty) {
+          warehouses.add(loc.warehouseName);
+        }
       }
     }
   }
@@ -171,6 +204,8 @@ class SalesSessionManager extends Notifier<SalesSessionState> {
       warehouseName: warehouse,
       shelf: item.shelf,
       box: item.box,
+      batchNumber: item.batchNumber,
+      expiryDate: item.expiryDate,
     ) : item;
     
     List<SalesItem> newItems;
@@ -187,8 +222,10 @@ class SalesSessionManager extends Notifier<SalesSessionState> {
         variantColor: existing.variantColor,
         variantSize: existing.variantSize,
         warehouseName: existing.warehouseName,
-        shelf: existing.shelf,
-        box: existing.box,
+        shelf: item.shelf ?? existing.shelf,
+        box: item.box ?? existing.box,
+        batchNumber: item.batchNumber ?? existing.batchNumber,
+        expiryDate: item.expiryDate ?? existing.expiryDate,
       );
     } else {
       newItems = [...invoice.items, itemWithWarehouse];

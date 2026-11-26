@@ -90,30 +90,40 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
         final stock = _getStockFor(_selectedColor!, _selectedSize!, item.variants);
         _quantity = stock > 0 ? 1 : 0;
       } else {
-        _quantity = item.stockQuantity > 0 ? 1 : 0;
+        _quantity = BatchInventoryHelper.sellableStock(item) > 0 ? 1 : 0;
       }
     });
   }
 
-
+  int _variantSellableStock(ProductVariant v) {
+    if (v.storageLocations.isEmpty) {
+      return BatchInventoryHelper.isDateExpired(widget.product?.expiryDate) ? 0 : v.stock;
+    }
+    return v.storageLocations
+        .where((l) => !BatchInventoryHelper.isLocationExpired(l))
+        .fold<int>(0, (s, l) => s + l.quantity);
+  }
 
   // Inventory Helper
   int _getStockFor(String color, String size, List<ProductVariant> variants) {
-    if (variants.isEmpty) return widget.product?.stockQuantity ?? 0;
+    final fallbackSellable = widget.product == null
+        ? 0
+        : BatchInventoryHelper.sellableStock(widget.product!);
+    if (variants.isEmpty) return fallbackSellable;
     try {
       // Try exact match first
-      return variants.firstWhere((v) => v.color == color && v.size == size).stock;
+      return _variantSellableStock(variants.firstWhere((v) => v.color == color && v.size == size));
     } catch (_) {
       try {
         // Try matching with 'Default' if exact match fails
-        return variants.firstWhere((v) => 
+        return _variantSellableStock(variants.firstWhere((v) => 
           (v.color == color || v.color == 'Default') && 
           (v.size == size || v.size == 'Default')
-        ).stock;
+        ));
       } catch (_) {
         // Fallback to main stock if searching for Default and not found in variants
         if (color == 'Default' && size == 'Default') {
-          return widget.product?.stockQuantity ?? 0;
+          return fallbackSellable;
         }
         return 0;
       }
@@ -121,19 +131,22 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   }
 
   bool _isVariantAvailable(String color, String size, List<ProductVariant> variants) {
-    if (variants.isEmpty) return (widget.product?.stockQuantity ?? 0) > 0;
+    final fallbackSellable = widget.product == null
+        ? 0
+        : BatchInventoryHelper.sellableStock(widget.product!);
+    if (variants.isEmpty) return fallbackSellable > 0;
     
-    // Check if this specific combo OR its 'Default' fallbacks have stock
+    // Check if this specific combo OR its 'Default' fallbacks have sellable stock
     final v = variants.where((v) => 
       (v.color == color || v.color == 'Default' || color == 'Default') && 
       (v.size == size || v.size == 'Default' || size == 'Default')
     );
     
     if (v.isEmpty && color == 'Default' && size == 'Default') {
-      return (widget.product?.stockQuantity ?? 0) > 0;
+      return fallbackSellable > 0;
     }
     
-    return v.isNotEmpty && v.any((v) => v.stock > 0);
+    return v.isNotEmpty && v.any((v) => _variantSellableStock(v) > 0);
   }
 
   double _getRating(String productId, double staticRating, WidgetRef ref) {
@@ -524,7 +537,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         builder: (context) {
                           final stock = (_selectedColor != null && _selectedSize != null)
                             ? _getStockFor(_selectedColor!, _selectedSize!, item.variants)
-                            : item.stockQuantity;
+                            : BatchInventoryHelper.sellableStock(item);
                           return Text(
                             '($stock ${AppStrings.get('qty', lang)})',
                             style: TextStyle(
@@ -545,7 +558,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         onPressed: () {
                           final max = (_selectedColor != null && _selectedSize != null) 
                               ? _getStockFor(_selectedColor!, _selectedSize!, item.variants) 
-                              : item.stockQuantity;
+                              : BatchInventoryHelper.sellableStock(item);
                           if (_quantity < max) {
                             setState(() => _quantity++);
                           } else if (max > 0 && _quantity > max) {
@@ -695,7 +708,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
           builder: (btnContext) {
             final currentStock = (_selectedColor != null && _selectedSize != null)
                 ? _getStockFor(_selectedColor!, _selectedSize!, item.variants)
-                : item.stockQuantity;
+                : BatchInventoryHelper.sellableStock(item);
             final isAvailable = currentStock > 0;
 
             return FilledButton.icon(

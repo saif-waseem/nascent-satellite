@@ -72,6 +72,9 @@ class PrintingService {
   }) async {
     final settings = await _repo.getSettings();
     final arabicFont = await _loadArabicFont();
+    final displayCurrency = (invoice.currency != null && invoice.currency!.trim().isNotEmpty)
+        ? invoice.currency!
+        : shopInfo.currencyUnit;
     
     PdfPageFormat pageFormat;
     bool isA4 = false;
@@ -233,7 +236,7 @@ class PrintingService {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     pw.Text('المجموع:', style: pw.TextStyle(fontSize: isA4 ? 12 : 10)),
-                    pw.Text('${_formatPrice(invoice.totalAmount + invoice.discountAmount)} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontSize: isA4 ? 12 : 10)),
+                    pw.Text('${_formatPrice(invoice.totalAmount + invoice.discountAmount)} $displayCurrency', style: pw.TextStyle(fontSize: isA4 ? 12 : 10)),
                   ],
                 ),
                 if (invoice.discountAmount > 0)
@@ -243,7 +246,7 @@ class PrintingService {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
                         pw.Text('الخصم:', style: pw.TextStyle(fontSize: isA4 ? 12 : 11, color: PdfColors.red)),
-                        pw.Text('-${_formatPrice(invoice.discountAmount)} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontSize: isA4 ? 12 : 11, color: PdfColors.red)),
+                        pw.Text('-${_formatPrice(invoice.discountAmount)} $displayCurrency', style: pw.TextStyle(fontSize: isA4 ? 12 : 11, color: PdfColors.red)),
                       ],
                     ),
                   ),
@@ -252,7 +255,7 @@ class PrintingService {
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
                     pw.Text('المجموع الكلي:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 15 : 12)),
-                    pw.Text('${_formatPrice(invoice.totalAmount)} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 15 : 12)),
+                    pw.Text('${_formatPrice(invoice.totalAmount)} $displayCurrency', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 15 : 12)),
                   ],
                 ),
                 if (customerBalance != null) ...[
@@ -262,21 +265,21 @@ class PrintingService {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('الديون السابقة:', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
-                      pw.Text('${_formatPrice(customerBalance - (invoice.totalAmount - invoice.paidAmount))} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
+                      pw.Text('${_formatPrice(customerBalance - (invoice.totalAmount - invoice.paidAmount))} $displayCurrency', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
                     ],
                   ),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('المتبقي من هذه الفاتورة:', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
-                      pw.Text('${_formatPrice(invoice.totalAmount - invoice.paidAmount)} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
+                      pw.Text('${_formatPrice(invoice.totalAmount - invoice.paidAmount)} $displayCurrency', style: pw.TextStyle(fontSize: isA4 ? 11 : 9)),
                     ],
                   ),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('إجمالي الديون (Balance):', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 13 : 11)),
-                      pw.Text('${_formatPrice(customerBalance)} ${shopInfo.currencyUnit}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 13 : 11)),
+                      pw.Text('${_formatPrice(customerBalance)} $displayCurrency', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: isA4 ? 13 : 11)),
                     ],
                   ),
                 ],

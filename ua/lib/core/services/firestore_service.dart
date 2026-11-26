@@ -89,17 +89,33 @@ class FirestoreService {
           var total = product.stockQuantity;
           for (final change in entry.value.entries.where((e)=>e.value!=0)) {
             total -= change.value;
-            if (variants.isEmpty) continue;
+            if (variants.isEmpty) {
+              if (change.value > 0 && BatchInventoryHelper.isDateExpired(product.expiryDate)) {
+                throw StateError('EXPIRED_BATCH');
+              }
+              continue;
+            }
             final index = variants.indexWhere((v)=>v.color == change.key.$1 && v.size == change.key.$2);
             if(index<0) throw StateError('VARIANT_NOT_FOUND');
-            final quantity=variants[index].stock-change.value;
-            if(quantity<0) throw StateError('OUT_OF_STOCK');
-            variants[index]=variants[index].copyWith(stock:quantity);
+            final v = variants[index];
+            if (v.storageLocations.isNotEmpty && change.value > 0) {
+              final sellableV = BatchInventoryHelper.sellableStock(product, color: v.color, size: v.size);
+              if (sellableV < change.value) throw StateError('OUT_OF_STOCK');
+              final updatedLocs = BatchInventoryHelper.deductFefo(v.storageLocations, change.value);
+              final newStock = updatedLocs.fold<int>(0, (s, l) => s + l.quantity);
+              variants[index] = v.copyWith(stock: newStock, storageLocations: updatedLocs);
+            } else {
+              final quantity = v.stock - change.value;
+              if (quantity < 0) throw StateError('OUT_OF_STOCK');
+              variants[index] = v.copyWith(stock: quantity);
+            }
           }
           if(total<0) throw StateError('OUT_OF_STOCK');
+          final nextExpiry = BatchInventoryHelper.earliestValidExpiry(product.copyWith(variants: variants));
           updates[productRef]={
             'stockQuantity':total, 'inStock':total>0,
             if(variants.isNotEmpty) 'variants':variants.map((v)=>v.toJson()).toList(),
+            if(nextExpiry != null) 'expiryDate': nextExpiry.toIso8601String(),
             'salesCount':FieldValue.increment(product.stockQuantity-total),
           };
         }
@@ -392,11 +408,16 @@ class FirestoreService {
       final data = snapshot.data()!;
       final product = ProductModel.fromJson({...data, 'id': productId});
       
-      // Find and update the matching variant
+      // Find and update the matching variant using FEFO batches when present
       final updatedVariants = product.variants.map((variant) {
         if (variant.color == color && variant.size == size) {
+          if (variant.storageLocations.isNotEmpty) {
+            final updatedLocs = BatchInventoryHelper.deductFefo(variant.storageLocations, quantityToDeduct);
+            final newStock = updatedLocs.fold<int>(0, (s, l) => s + l.quantity);
+            return variant.copyWith(stock: newStock, storageLocations: updatedLocs);
+          }
           final newStock = (variant.stock - quantityToDeduct).clamp(0, 999999);
-          return ProductVariant(color: variant.color, size: variant.size, stock: newStock);
+          return variant.copyWith(stock: newStock);
         }
         return variant;
       }).toList();

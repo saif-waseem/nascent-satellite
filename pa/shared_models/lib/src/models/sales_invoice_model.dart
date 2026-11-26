@@ -47,6 +47,8 @@ class SalesInvoiceModel extends Equatable {
   final String? addedById;
   @HiveField(16)
   final String? shiftId;
+  @HiveField(17)
+  final String? currency;
 
   const SalesInvoiceModel({
     required this.id,
@@ -66,6 +68,7 @@ class SalesInvoiceModel extends Equatable {
     this.addedBy,
     this.addedById,
     this.shiftId,
+    this.currency,
   });
 
   @override
@@ -86,6 +89,8 @@ class SalesInvoiceModel extends Equatable {
         paidAmount,
         addedBy,
         addedById,
+        shiftId,
+        currency,
       ];
 
   SalesInvoiceModel copyWith({
@@ -106,6 +111,7 @@ class SalesInvoiceModel extends Equatable {
     String? addedBy,
     String? addedById,
     String? shiftId,
+    String? currency,
   }) {
     return SalesInvoiceModel(
       id: id ?? this.id,
@@ -125,6 +131,7 @@ class SalesInvoiceModel extends Equatable {
       addedBy: addedBy ?? this.addedBy,
       addedById: addedById ?? this.addedById,
       shiftId: shiftId ?? this.shiftId,
+      currency: currency ?? this.currency,
     );
   }
 
@@ -147,6 +154,7 @@ class SalesInvoiceModel extends Equatable {
       'addedBy': addedBy,
       'addedById': addedById,
       'shiftId': shiftId,
+      if (currency != null) 'currency': currency,
     };
   }
 
@@ -175,6 +183,7 @@ class SalesInvoiceModel extends Equatable {
       addedBy: json['addedBy'] as String?,
       addedById: json['addedById'] as String?,
       shiftId: json['shiftId'] as String?,
+      currency: json['currency'] as String?,
     );
   }
 
@@ -209,6 +218,10 @@ class SalesItem extends Equatable {
   final String? shelf;
   @HiveField(10)
   final String? box;
+  @HiveField(11)
+  final String? batchNumber;
+  @HiveField(12)
+  final DateTime? expiryDate;
 
   const SalesItem({
     required this.productId,
@@ -222,13 +235,28 @@ class SalesItem extends Equatable {
     this.warehouseName,
     this.shelf,
     this.box,
+    this.batchNumber,
+    this.expiryDate,
   });
 
   double get totalPrice => (quantity * unitPrice) - discount;
 
   @override
-  List<Object?> get props =>
-      [productId, productName, quantity, unitPrice, discount, category, variantColor, variantSize, warehouseName, shelf, box];
+  List<Object?> get props => [
+        productId,
+        productName,
+        quantity,
+        unitPrice,
+        discount,
+        category,
+        variantColor,
+        variantSize,
+        warehouseName,
+        shelf,
+        box,
+        batchNumber,
+        expiryDate,
+      ];
 
   Map<String, dynamic> toJson() {
     return {
@@ -243,6 +271,8 @@ class SalesItem extends Equatable {
       'warehouseName': warehouseName,
       'shelf': shelf,
       'box': box,
+      if (batchNumber != null) 'batchNumber': batchNumber,
+      if (expiryDate != null) 'expiryDate': expiryDate!.toIso8601String(),
     };
   }
 
@@ -259,6 +289,8 @@ class SalesItem extends Equatable {
       warehouseName: json['warehouseName'] as String?,
       shelf: json['shelf'] as String?,
       box: json['box'] as String?,
+      batchNumber: json['batchNumber'] as String?,
+      expiryDate: json['expiryDate'] != null ? DateTime.tryParse(json['expiryDate'].toString()) : null,
     );
   }
 }

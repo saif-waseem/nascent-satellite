@@ -388,7 +388,12 @@ class AdminFirestoreService {
     });
   }
 
-  Future<void> addWarehouse(String tenantId, String name, {String currency = 'د.ع'}) async {
+  Future<void> addWarehouse(
+    String tenantId,
+    String name, {
+    String currency = 'د.ع',
+    String countryCode = 'iq',
+  }) async {
     await _db
         .collection('tenants')
         .doc(tenantId)
@@ -396,6 +401,7 @@ class AdminFirestoreService {
         .add({
       'name': name,
       'currency': currency,
+      'countryCode': countryCode,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

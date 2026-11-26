@@ -37,6 +37,7 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       sharesRewardPoints: (fields[17] as num).toInt(),
       reviewRewardPoints: (fields[18] as num).toInt(),
       currencyUnit: fields[19] as String,
+      countryCode: fields[52] as String? ?? 'iq',
       shippingCost: (fields[20] as num).toDouble(),
       oneSignalAppId: fields[21] as String?,
       oneSignalRestKey: fields[22] as String?,
@@ -75,7 +76,7 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
   @override
   void write(BinaryWriter writer, TenantModel obj) {
     writer
-      ..writeByte(52)
+      ..writeByte(53)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -179,7 +180,9 @@ class TenantModelAdapter extends TypeAdapter<TenantModel> {
       ..writeByte(50)
       ..write(obj.carsTier)
       ..writeByte(51)
-      ..write(obj.carsExcelEnabled);
+      ..write(obj.carsExcelEnabled)
+      ..writeByte(52)
+      ..write(obj.countryCode);
   }
 
   @override

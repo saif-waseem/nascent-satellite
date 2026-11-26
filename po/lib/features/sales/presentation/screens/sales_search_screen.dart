@@ -113,7 +113,7 @@ class SalesSearchScreen extends HookConsumerWidget {
                             child: ListTile(
                               title: Text('وصل رقم: ${invoice.receiptNumber}'),
                               subtitle: Text('${invoice.date.toString().substring(0, 16)} | ${invoice.customerName ?? 'نقدي'}'),
-                              trailing: Text('${invoice.totalAmount} IQD', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                              trailing: Text('${invoice.totalAmount} ${invoice.currency ?? 'د.ع'}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                               onTap: () => searchResult.value = invoice,
                             ),
                           );
@@ -194,7 +194,7 @@ class _SalesInvoiceDetailView extends HookConsumerWidget {
               children: [
                 const Text('الإجمالي النهائي:',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                Text('${invoice.totalAmount} IQD',
+                Text('${invoice.totalAmount} ${invoice.currency ?? 'د.ع'}',
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,

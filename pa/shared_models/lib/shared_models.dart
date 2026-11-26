@@ -31,3 +31,5 @@ export 'src/services/product_workbook.dart';
 export 'src/services/order_stock_sync.dart';
 export 'src/services/catalog_undo.dart';
 export 'src/services/buyer_account_api.dart';
+export 'src/utils/currency_defaults.dart';
+export 'src/utils/batch_inventory_helper.dart';

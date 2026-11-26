@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:uuid/uuid.dart';
 import '../../features/common/data/app_settings_repository.dart';
 import '../../features/common/data/notification_repository.dart';
@@ -37,23 +38,43 @@ class StockAlertListener extends ConsumerWidget {
              .where((n) => !n.isRead && n.category == NotificationCategory.stock)
              .map((n) => n.relatedId)
              .toSet();
+         final notifiedExpiryIds = currentNotifications
+             .where((n) => !n.isRead && n.category == NotificationCategory.expiry)
+             .map((n) => n.relatedId)
+             .toSet();
 
          for (final insight in insights) {
            final p = insight.product;
            final minLevel = p.minStockLevel ?? 5;
+           final sellable = BatchInventoryHelper.sellableStock(p);
            
-           if (p.stockQuantity <= minLevel && !notifiedProductIds.contains(p.id)) {
+           if (sellable <= minLevel && !notifiedProductIds.contains(p.id)) {
               final notification = NotificationModel(
                 id: const Uuid().v4(),
                 tenantId: tenantId,
                 title: 'نقص في المخزون: ${p.name}',
-                message: 'الكمية المتوفرة حالياً هي ${p.stockQuantity} فقط. الحد الأدنى: $minLevel',
-                type: p.stockQuantity <= 0 ? NotificationType.error : NotificationType.warning,
+                message: 'الكمية الصالحة المتوفرة حالياً هي $sellable فقط. الحد الأدنى: $minLevel',
+                type: sellable <= 0 ? NotificationType.error : NotificationType.warning,
                 category: NotificationCategory.stock,
                 createdAt: DateTime.now(),
                 relatedId: p.id,
               );
               await repo.addNotification(notification);
+           }
+
+           final batchAlerts = BatchInventoryHelper.inspectBatches(p);
+           if (batchAlerts.isNotEmpty && !notifiedExpiryIds.contains(p.id)) {
+             final first = batchAlerts.first;
+             await repo.addNotification(NotificationModel(
+               id: const Uuid().v4(),
+               tenantId: tenantId,
+               title: first.isExpired ? 'صلاحية منتهية: ${p.name}' : 'تنبيه قرب انتهاء الصلاحية: ${p.name}',
+               message: first.message,
+               type: first.isExpired ? NotificationType.error : NotificationType.warning,
+               category: NotificationCategory.expiry,
+               createdAt: DateTime.now(),
+               relatedId: p.id,
+             ));
            }
          }
        } catch (e) {

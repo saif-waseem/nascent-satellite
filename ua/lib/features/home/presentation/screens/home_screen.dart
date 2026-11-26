@@ -617,7 +617,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ),
                       ),
-                      if (product.stockQuantity <= 0)
+                      if (BatchInventoryHelper.sellableStock(product) <= 0)
                         Positioned.fill(
                           child: Container(
                             decoration: BoxDecoration(

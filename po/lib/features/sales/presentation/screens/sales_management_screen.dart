@@ -280,21 +280,20 @@ class POSCheckoutView extends HookConsumerWidget {
           ),
           Consumer(builder: (context, ref, _) {
             final activeCurrency = ref.watch(activeBranchCurrencyProvider);
-            return DropdownButton<String>(
-              value: ['د.ع', '\$', 'ر.س', 'AED', 'EUR'].contains(activeCurrency) ? activeCurrency : 'د.ع',
-              dropdownColor: Colors.blueGrey[900],
-              underline: const SizedBox(),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              items: const [
-                DropdownMenuItem(value: 'د.ع', child: Text('د.ع', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: '\$', child: Text('\$', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'ر.س', child: Text('ر.س', style: TextStyle(fontSize: 12))),
-                DropdownMenuItem(value: 'AED', child: Text('AED', style: TextStyle(fontSize: 12))),
-              ],
-              onChanged: (val) {
-                if (val != null) ref.read(activeBranchCurrencyProvider.notifier).set(val);
-              },
+            return Tooltip(
+              message: 'يحدد الأدمن عملة المخزن من الإعدادات',
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Text(
+                  activeCurrency,
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
             );
           }),
           const SizedBox(width: 8),
@@ -482,34 +481,14 @@ class _ProductSelectionPanel extends HookConsumerWidget {
           if (matches.length == 1 && matches.first.barcode == query) {
             final product = matches.first;
             final currentPrice = isWholesale.value ? (product.wholesalePrice ?? product.price) : product.getPriceForCurrency(activeCurrency);
-
-            if (product.variants.isNotEmpty) {
-              if (context.mounted) {
-                final variant = await showDialog<sm.ProductVariant>(
-                  context: context,
-                  builder: (ctx) => VariantPickerDialog(product: product),
-                );
-                if (variant != null) {
-                  ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                    productId: product.id,
-                    productName: product.name,
-                    quantity: 1,
-                    unitPrice: variant.price ?? currentPrice,
-                    category: product.category,
-                    variantColor: variant.color,
-                    variantSize: variant.size,
-                  ));
-                }
-              }
-            } else {
-              ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                productId: product.id,
-                productName: product.name,
-                quantity: 1,
-                unitPrice: currentPrice,
-                category: product.category,
-              ));
-            }
+            final selectedWarehouse = ref.read(selectedWarehouseProvider);
+            await addProductWithFefo(
+              context: context,
+              ref: ref,
+              product: product,
+              basePrice: currentPrice,
+              selectedWarehouse: selectedWarehouse,
+            );
             searchController.clear();
             loadProducts(reset: true);
           }
@@ -658,10 +637,20 @@ class _ProductSelectionPanel extends HookConsumerWidget {
                               loading: () => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
                               error: (_, __) => Text('القسم: ${product.category}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
                             ),
-                            Text('السعر: ${product.formatPriceForCurrency(activeCurrency, defaultUnit: tenant?.currencyUnit ?? 'د.ع')} | المتوفر: ${product.stockQuantity}', style: TextStyle(fontSize: isMobile ? 12 : 10)),
+                            Builder(
+                              builder: (_) {
+                                final wh = ref.watch(selectedWarehouseProvider);
+                                final sellable = sm.BatchInventoryHelper.sellableStock(product, warehouseName: wh);
+                                final expiredQty = (product.stockQuantity - sm.BatchInventoryHelper.sellableStock(product)).clamp(0, 999999);
+                                return Text(
+                                  'السعر: ${product.formatPriceForCurrency(activeCurrency, defaultUnit: activeCurrency)} | الصالح للبيع: $sellable${expiredQty > 0 ? " (منتهي: $expiredQty)" : ""}',
+                                  style: TextStyle(fontSize: isMobile ? 12 : 10),
+                                );
+                              },
+                            ),
                             if (profit != null && marginPct != null) 
                               Text(
-                                'الربح: ${profit.toStringAsFixed(0)} IQD (${marginPct.toStringAsFixed(1)}%)', 
+                                'الربح: ${profit.toStringAsFixed(0)} $activeCurrency (${marginPct.toStringAsFixed(1)}%)', 
                                 style: TextStyle(
                                   color: marginPct > 15 ? Colors.green[700] : (marginPct > 5 ? Colors.orange[700] : Colors.red[700]), 
                                   fontSize: 9, 
@@ -673,38 +662,13 @@ class _ProductSelectionPanel extends HookConsumerWidget {
                         trailing: const Icon(Icons.add_shopping_cart, color: Colors.green, size: 18),
                         onTap: () async {
                           final selectedWarehouse = ref.read(selectedWarehouseProvider);
-                          if (product.variants.isNotEmpty) {
-                            final variant = await showDialog<sm.ProductVariant>(
-                              context: context,
-                              builder: (ctx) => VariantPickerDialog(product: product, selectedWarehouse: selectedWarehouse),
-                            );
-                            if (variant == null) return;
-                            
-                            final loc = variant.storageLocations.where((l) => l.warehouseName == selectedWarehouse).firstOrNull ?? 
-                                        (variant.storageLocations.isNotEmpty ? variant.storageLocations.first : null);
-
-                            ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                              productId: product.id,
-                              productName: product.name,
-                              quantity: 1,
-                              unitPrice: loc?.priceOverride ?? variant.price ?? currentPrice,
-                              category: product.category,
-                              variantColor: variant.color,
-                              variantSize: variant.size,
-                              warehouseName: loc?.warehouseName ?? selectedWarehouse,
-                              shelf: loc?.shelf,
-                              box: loc?.box,
-                            ));
-                          } else {
-                            ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                              productId: product.id,
-                              productName: product.name,
-                              quantity: 1,
-                              unitPrice: currentPrice,
-                              category: product.category,
-                              warehouseName: selectedWarehouse,
-                            ));
-                          }
+                          await addProductWithFefo(
+                            context: context,
+                            ref: ref,
+                            product: product,
+                            basePrice: currentPrice,
+                            selectedWarehouse: selectedWarehouse,
+                          );
                         },
                       ),
                     );
@@ -726,33 +690,16 @@ class _ProductSelectionPanel extends HookConsumerWidget {
       
       if (product != null) {
         if (context.mounted) {
-          if (product.variants.isNotEmpty) {
-             final variant = await showDialog<sm.ProductVariant>(
-               context: context,
-               builder: (ctx) => VariantPickerDialog(product: product),
-             );
-             if (variant != null) {
-               ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-                 productId: product.id,
-                 productName: product.name,
-                 quantity: 1,
-                 unitPrice: variant.price ?? product.price,
-                 category: product.category,
-                 variantColor: variant.color,
-                 variantSize: variant.size,
-               ));
-             } else {
-               return; // Canceled variant selection
-             }
-          } else {
-             ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
-               productId: product.id,
-               productName: product.name,
-               quantity: 1,
-               unitPrice: product.price,
-               category: product.category,
-             ));
-          }
+          final activeCurrency = ref.read(activeBranchCurrencyProvider);
+          final selectedWarehouse = ref.read(selectedWarehouseProvider);
+          final added = await addProductWithFefo(
+            context: context,
+            ref: ref,
+            product: product,
+            basePrice: product.getPriceForCurrency(activeCurrency),
+            selectedWarehouse: selectedWarehouse,
+          );
+          if (!added) return;
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('تمت إضافة: ${product.name}'), duration: const Duration(seconds: 1)),
@@ -766,6 +713,114 @@ class _ProductSelectionPanel extends HookConsumerWidget {
       }
     }
   }
+}
+
+Future<bool> addProductWithFefo({
+  required BuildContext context,
+  required WidgetRef ref,
+  required sm.ProductModel product,
+  required double basePrice,
+  required String? selectedWarehouse,
+}) async {
+  final sellable = sm.BatchInventoryHelper.sellableStock(
+    product,
+    warehouseName: selectedWarehouse,
+  );
+  final allSellable = sm.BatchInventoryHelper.sellableStock(product);
+  final alerts = sm.BatchInventoryHelper.inspectBatches(product);
+  final hasExpired = alerts.any((a) => a.isExpired);
+
+  if (sellable <= 0 &&
+      (hasExpired || product.variants.any((v) => v.storageLocations.isNotEmpty))) {
+    if (context.mounted) {
+      final msg = (allSellable > 0 && selectedWarehouse != null)
+          ? 'لا توجد كمية صالحة للبيع من "${product.name}" في مخزن "$selectedWarehouse".'
+          : '⛔ تعذّر البيع: الدفعة المتبقية من "${product.name}" منتهية الصلاحية!';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+      );
+    }
+    return false;
+  }
+
+  sm.ProductVariant? variant;
+  if (product.variants.isNotEmpty) {
+    variant = await showDialog<sm.ProductVariant>(
+      context: context,
+      builder: (ctx) => VariantPickerDialog(
+        product: product,
+        selectedWarehouse: selectedWarehouse,
+      ),
+    );
+    if (variant == null) return false;
+    final variantSellable = sm.BatchInventoryHelper.sellableStock(
+      product,
+      warehouseName: selectedWarehouse,
+      color: variant.color,
+      size: variant.size,
+    );
+    if (variantSellable <= 0 &&
+        (variant.storageLocations.isNotEmpty || hasExpired)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⛔ جميع دفعات "${product.name} (${variant.color})" في هذا المخزن منتهية الصلاحية أو نافدة.',
+            ),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  final fefoLoc = sm.BatchInventoryHelper.nextSellableBatch(
+        product,
+        warehouseName: selectedWarehouse,
+        color: variant?.color,
+        size: variant?.size,
+      ) ??
+      sm.BatchInventoryHelper.nextSellableBatch(
+        product,
+        color: variant?.color,
+        size: variant?.size,
+      );
+
+  final effectivePrice = fefoLoc?.priceOverride ?? variant?.price ?? basePrice;
+  final effectiveExpiry = fefoLoc?.expiryDate ?? product.expiryDate;
+
+  ref.read(salesSessionProvider.notifier).addItemToActive(sm.SalesItem(
+    productId: product.id,
+    productName: product.name,
+    quantity: 1,
+    unitPrice: effectivePrice,
+    category: product.category,
+    variantColor: variant?.color,
+    variantSize: variant?.size,
+    warehouseName: fefoLoc?.warehouseName ?? selectedWarehouse,
+    shelf: fefoLoc?.shelf,
+    box: fefoLoc?.box,
+    batchNumber: fefoLoc?.batchNumber,
+    expiryDate: effectiveExpiry,
+  ));
+
+  if (context.mounted && fefoLoc?.expiryDate != null) {
+    final d = fefoLoc!.expiryDate!;
+    final dateStr =
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final lotStr =
+        (fefoLoc.batchNumber != null && fefoLoc.batchNumber!.isNotEmpty)
+            ? ' (${fefoLoc.batchNumber})'
+            : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('صرف FEFO: دفعة$lotStr تنتهي في $dateStr'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  return true;
 }
 
 class _POSCartPanel extends ConsumerWidget {
@@ -805,8 +860,13 @@ class _POSCartPanel extends ConsumerWidget {
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 subtitle: Text(
-                  'السعر: ${item.unitPrice}${item.warehouseName != null ? " | المخزن: ${item.warehouseName}" : ""}${item.shelf != null ? " | رف: ${item.shelf}" : ""}${item.box != null ? " | صندوق: ${item.box}" : ""}', 
-                  style: const TextStyle(fontSize: 11)
+                  'السعر: ${item.unitPrice}'
+                  '${item.warehouseName != null ? " | المخزن: ${item.warehouseName}" : ""}'
+                  '${item.batchNumber != null && item.batchNumber!.isNotEmpty ? " | دفعة: ${item.batchNumber}" : ""}'
+                  '${item.expiryDate != null ? " | انتهاء: ${item.expiryDate!.year}-${item.expiryDate!.month.toString().padLeft(2, '0')}-${item.expiryDate!.day.toString().padLeft(2, '0')}" : ""}'
+                  '${item.shelf != null ? " | رف: ${item.shelf}" : ""}'
+                  '${item.box != null ? " | صندوق: ${item.box}" : ""}',
+                  style: const TextStyle(fontSize: 11),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -824,6 +884,11 @@ class _POSCartPanel extends ConsumerWidget {
                               unitPrice: item.unitPrice,
                               variantColor: item.variantColor,
                               variantSize: item.variantSize,
+                              warehouseName: item.warehouseName,
+                              shelf: item.shelf,
+                              box: item.box,
+                              batchNumber: item.batchNumber,
+                              expiryDate: item.expiryDate,
                             ));
                          }
                       },
@@ -853,6 +918,11 @@ class _POSCartPanel extends ConsumerWidget {
                           unitPrice: item.unitPrice,
                           variantColor: item.variantColor,
                           variantSize: item.variantSize,
+                          warehouseName: item.warehouseName,
+                          shelf: item.shelf,
+                          box: item.box,
+                          batchNumber: item.batchNumber,
+                          expiryDate: item.expiryDate,
                         ));
                       },
                     ),
@@ -965,6 +1035,11 @@ class _POSCartPanel extends ConsumerWidget {
                   unitPrice: item.unitPrice,
                   variantColor: item.variantColor,
                   variantSize: item.variantSize,
+                  warehouseName: item.warehouseName,
+                  shelf: item.shelf,
+                  box: item.box,
+                  batchNumber: item.batchNumber,
+                  expiryDate: item.expiryDate,
                 ));
               }
               Navigator.pop(ctx);
@@ -1175,6 +1250,7 @@ class _CartFooter extends HookConsumerWidget {
       final ptsValue = tenant?.pointsToCurrencyRatio ?? 1.0;
       final netTotal = activeInvoice.totalAmount - activeInvoice.discountAmount - (activeInvoice.pointsRedeemed * ptsValue);
 
+      final activeCurrency = ref.read(activeBranchCurrencyProvider);
       final invoiceToSave = activeInvoice.copyWith(
         status: sm.SalesInvoiceStatus.finalized,
         receiptNumber: receiptNumber,
@@ -1182,6 +1258,7 @@ class _CartFooter extends HookConsumerWidget {
         addedById: currentStaff?.id,
         paidAmount: netTotal,
         shiftId: shiftId,
+        currency: activeCurrency,
       );
 
       final tenantId = ref.read(tenantIdProvider);

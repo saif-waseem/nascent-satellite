@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:shared_models/shared_models.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:store_admin/features/shared/widgets/admin_drawer.dart';
 import 'package:store_admin/features/shared/providers.dart';
@@ -29,6 +30,8 @@ class AdminSettingsScreen extends HookConsumerWidget {
     final ratioController = useTextEditingController();
     final logoUrl = useState('');
     final isUploading = useState(false);
+    final selectedCountry = useState('iq');
+    final selectedCurrency = useState('د.ع');
 
     useEffect(() {
       if (tenant != null) {
@@ -36,7 +39,11 @@ class AdminSettingsScreen extends HookConsumerWidget {
         descriptionController.text = tenant.description;
         whatsappController.text = tenant.whatsappNumber;
         logoController.text = tenant.logoUrl ?? '';
-        currencyController.text = tenant.currencyUnit;
+        selectedCountry.value = CurrencyDefaults.countries.any((c) => c.code == tenant.countryCode)
+            ? tenant.countryCode
+            : 'iq';
+        selectedCurrency.value = CurrencyDefaults.normalizeCurrency(tenant.currencyUnit);
+        currencyController.text = selectedCurrency.value;
         shippingController.text = tenant.shippingCost.toString();
         regPointsController.text = tenant.registrationPoints.toString();
         purchasePointsController.text = (tenant.purchasePointsPercent * 100).toString();
@@ -158,19 +165,70 @@ class AdminSettingsScreen extends HookConsumerWidget {
             ),
           ],
           const SizedBox(height: 16),
-          _buildSectionHeader(AppStrings.get('currency_unit_label', lang)),
+          _buildSectionHeader(lang == 'ar' ? 'الدولة والعملة الافتراضية للمتجر' : 'Store Country & Default Currency'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: selectedCountry.value,
+                  decoration: InputDecoration(
+                    labelText: lang == 'ar' ? 'الدولة' : 'Country',
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: CurrencyDefaults.countries
+                      .map((c) => DropdownMenuItem(value: c.code, child: Text('${c.nameAr} (${c.currency})')))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      selectedCountry.value = val;
+                      final defCurr = CurrencyDefaults.forCountry(val);
+                      selectedCurrency.value = defCurr;
+                      currencyController.text = defCurr;
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: CurrencyDefaults.currencies.any((c) => c.code == selectedCurrency.value)
+                      ? selectedCurrency.value
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.get('currency_unit_label', lang),
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: CurrencyDefaults.currencies
+                      .map((c) => DropdownMenuItem(value: c.code, child: Text(c.label)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      selectedCurrency.value = val;
+                      currencyController.text = val;
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           TextField(
             controller: currencyController,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'IQD, \$, ...',
+            decoration: InputDecoration(
+              labelText: lang == 'ar' ? 'رمز العملة المعتمد' : 'Currency Symbol',
+              border: const OutlineInputBorder(),
+              hintText: 'د.ع, \$, ...',
             ),
+            onChanged: (v) => selectedCurrency.value = CurrencyDefaults.normalizeCurrency(v),
           ),
           const SizedBox(height: 16),
           _buildSectionHeader(AppStrings.get('shipping_cost', lang)),
           TextField(
             controller: shippingController,
-            decoration: InputDecoration(border: const OutlineInputBorder(), suffixText: tenant?.currencyUnit ?? 'IQD'),
+            decoration: InputDecoration(border: const OutlineInputBorder(), suffixText: selectedCurrency.value),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
@@ -230,7 +288,8 @@ class AdminSettingsScreen extends HookConsumerWidget {
                   logoUrl: logoUrl.value,
                   description: descriptionController.text,
                   whatsappNumber: whatsappController.text,
-                  currencyUnit: currencyController.text,
+                  countryCode: selectedCountry.value,
+                  currencyUnit: CurrencyDefaults.normalizeCurrency(currencyController.text),
                   shippingCost: double.tryParse(shippingController.text) ?? 5000.0,
                   registrationPoints: int.tryParse(regPointsController.text) ?? 50,
                   purchasePointsPercent: (double.tryParse(purchasePointsController.text) ?? 5.0) / 100,

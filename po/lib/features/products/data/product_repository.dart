@@ -337,16 +337,33 @@ class ProductRepository {
           if (updatedLocs.isEmpty) {
             updatedLocs.add(ProductStorageLocation(
               warehouseName: warehouseName ?? 'المخزن الرئيسي', 
-              quantity: adjustment,
+              quantity: adjustment.clamp(0, 999999),
               priceOverride: priceOverride,
+              receivedAt: adjustment > 0 ? DateTime.now() : null,
             ));
+          } else if (adjustment < 0) {
+            final hasWhValid = warehouseName != null &&
+                updatedLocs.any((l) =>
+                    l.warehouseName == warehouseName &&
+                    l.quantity > 0 &&
+                    !BatchInventoryHelper.isLocationExpired(l));
+            updatedLocs = BatchInventoryHelper.deductFefo(
+              updatedLocs,
+              -adjustment,
+              warehouseName: hasWhValid ? warehouseName : null,
+              priceOverride: priceOverride,
+            );
           } else {
             // Find specific warehouse if provided
             int locIdx = 0;
             if (warehouseName != null) {
               locIdx = updatedLocs.indexWhere((l) => l.warehouseName == warehouseName);
               if (locIdx == -1) {
-                updatedLocs.add(ProductStorageLocation(warehouseName: warehouseName, quantity: 0));
+                updatedLocs.add(ProductStorageLocation(
+                  warehouseName: warehouseName,
+                  quantity: 0,
+                  receivedAt: DateTime.now(),
+                ));
                 locIdx = updatedLocs.length - 1;
               }
             }
@@ -386,33 +403,59 @@ class ProductRepository {
     } else if (!variantFound && updatedVariants.isNotEmpty) {
         final v = updatedVariants[0];
         List<ProductStorageLocation> updatedLocs = List.from(v.storageLocations);
-        int locIdx = 0;
-        if (warehouseName != null) {
-          locIdx = updatedLocs.indexWhere((l) => l.warehouseName == warehouseName);
-          if (locIdx == -1) {
-            updatedLocs.add(ProductStorageLocation(warehouseName: warehouseName, quantity: 0));
-            locIdx = updatedLocs.length - 1;
+        if (updatedLocs.isEmpty) {
+           updatedLocs.add(ProductStorageLocation(
+             warehouseName: warehouseName ?? 'المخزن الرئيسي',
+             quantity: adjustment.clamp(0, 999999),
+             priceOverride: priceOverride,
+             receivedAt: adjustment > 0 ? DateTime.now() : null,
+           ));
+        } else if (adjustment < 0) {
+          final hasWhValid = warehouseName != null &&
+              updatedLocs.any((l) =>
+                  l.warehouseName == warehouseName &&
+                  l.quantity > 0 &&
+                  !BatchInventoryHelper.isLocationExpired(l));
+          updatedLocs = BatchInventoryHelper.deductFefo(
+            updatedLocs,
+            -adjustment,
+            warehouseName: hasWhValid ? warehouseName : null,
+            priceOverride: priceOverride,
+          );
+        } else {
+          int locIdx = 0;
+          if (warehouseName != null) {
+            locIdx = updatedLocs.indexWhere((l) => l.warehouseName == warehouseName);
+            if (locIdx == -1) {
+              updatedLocs.add(ProductStorageLocation(
+                warehouseName: warehouseName,
+                quantity: 0,
+                receivedAt: DateTime.now(),
+              ));
+              locIdx = updatedLocs.length - 1;
+            }
           }
-        } else if (updatedLocs.isEmpty) {
-           updatedLocs.add(ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: 0));
-        }
 
-        final target = updatedLocs[locIdx];
-        updatedLocs[locIdx] = target.copyWith(
-          quantity: (target.quantity + adjustment).clamp(0, 999999),
-          priceOverride: priceOverride ?? target.priceOverride,
-        );
+          final target = updatedLocs[locIdx];
+          updatedLocs[locIdx] = target.copyWith(
+            quantity: (target.quantity + adjustment).clamp(0, 999999),
+            priceOverride: priceOverride ?? target.priceOverride,
+          );
+        }
         
         final newVStock = updatedLocs.fold(0, (sum, loc) => sum + loc.quantity);
         updatedVariants[0] = v.copyWith(stock: newVStock, storageLocations: updatedLocs);
     }
 
     final newTotalStock = updatedVariants.isEmpty ? (product.stockQuantity + adjustment).clamp(0, 999999).toInt() : updatedVariants.fold(0, (sum, v) => sum + v.stock);
-
-    final updatedProduct = product.copyWith(
+    final draftProduct = product.copyWith(
       stockQuantity: newTotalStock,
       inStock: newTotalStock > 0,
       variants: updatedVariants,
+    );
+
+    final updatedProduct = draftProduct.copyWith(
+      expiryDate: BatchInventoryHelper.earliestValidExpiry(draftProduct) ?? product.expiryDate,
     );
     
     if(tenantId!='local_default' && (!invoiceMovement || product.variants.isNotEmpty)){

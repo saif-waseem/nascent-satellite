@@ -34,13 +34,14 @@ class SalesInvoiceModelAdapter extends TypeAdapter<SalesInvoiceModel> {
       addedBy: fields[14] as String?,
       addedById: fields[15] as String?,
       shiftId: fields[16] as String?,
+      currency: fields[17] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SalesInvoiceModel obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -74,7 +75,9 @@ class SalesInvoiceModelAdapter extends TypeAdapter<SalesInvoiceModel> {
       ..writeByte(15)
       ..write(obj.addedById)
       ..writeByte(16)
-      ..write(obj.shiftId);
+      ..write(obj.shiftId)
+      ..writeByte(17)
+      ..write(obj.currency);
   }
 
   @override
@@ -110,13 +113,15 @@ class SalesItemAdapter extends TypeAdapter<SalesItem> {
       warehouseName: fields[8] as String?,
       shelf: fields[9] as String?,
       box: fields[10] as String?,
+      batchNumber: fields[11] as String?,
+      expiryDate: fields[12] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SalesItem obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.productId)
       ..writeByte(1)
@@ -138,7 +143,11 @@ class SalesItemAdapter extends TypeAdapter<SalesItem> {
       ..writeByte(9)
       ..write(obj.shelf)
       ..writeByte(10)
-      ..write(obj.box);
+      ..write(obj.box)
+      ..writeByte(11)
+      ..write(obj.batchNumber)
+      ..writeByte(12)
+      ..write(obj.expiryDate);
   }
 
   @override

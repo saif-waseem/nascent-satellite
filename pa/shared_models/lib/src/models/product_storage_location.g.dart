@@ -23,13 +23,16 @@ class ProductStorageLocationAdapter
       box: fields[2] as String?,
       quantity: (fields[3] as num).toInt(),
       priceOverride: (fields[4] as num?)?.toDouble(),
+      batchNumber: fields[5] as String?,
+      receivedAt: fields[6] as DateTime?,
+      expiryDate: fields[7] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ProductStorageLocation obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.warehouseName)
       ..writeByte(1)
@@ -39,7 +42,13 @@ class ProductStorageLocationAdapter
       ..writeByte(3)
       ..write(obj.quantity)
       ..writeByte(4)
-      ..write(obj.priceOverride);
+      ..write(obj.priceOverride)
+      ..writeByte(5)
+      ..write(obj.batchNumber)
+      ..writeByte(6)
+      ..write(obj.receivedAt)
+      ..writeByte(7)
+      ..write(obj.expiryDate);
   }
 
   @override

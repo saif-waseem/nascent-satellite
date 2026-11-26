@@ -12,9 +12,12 @@ class SalesInvoiceDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final formatCurrency = NumberFormat.currency(symbol: 'IQD', decimalDigits: 0);
-    final isReturn = invoice.isReturned;
     final shopInfo = ref.watch(tenantProvider).value;
+    final symbol = (invoice.currency != null && invoice.currency!.trim().isNotEmpty)
+        ? invoice.currency!
+        : (shopInfo?.currencyUnit ?? 'د.ع');
+    final formatCurrency = NumberFormat.currency(symbol: '$symbol ', decimalDigits: 0);
+    final isReturn = invoice.isReturned;
 
     return Scaffold(
       appBar: AppBar(

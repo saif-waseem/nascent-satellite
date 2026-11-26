@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/product_variant.dart';
 import '../models/product_storage_location.dart';
+import '../utils/batch_inventory_helper.dart';
+
+String _formatShortDate(DateTime? dt) => dt == null
+    ? '—'
+    : '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
 class ProductEntryMode extends StatelessWidget {
   final bool advanced;
@@ -137,6 +142,9 @@ class EntryInventoryTable extends StatelessWidget {
           'الرف',
           'الصندوق',
           'الرصيد',
+          'التشغيلة',
+          'الاستلام',
+          'الانتهاء',
           'إجراءات',
         ])
           DataColumn(label: Text(title)),
@@ -146,6 +154,13 @@ class EntryInventoryTable extends StatelessWidget {
           for (final loc
               in v.storageLocations.isEmpty ? [null] : v.storageLocations)
             DataRow(
+              color: loc == null
+                  ? null
+                  : BatchInventoryHelper.isLocationExpired(loc)
+                  ? WidgetStatePropertyAll(Colors.red.withValues(alpha: 0.08))
+                  : BatchInventoryHelper.isLocationExpiringSoon(loc)
+                  ? WidgetStatePropertyAll(Colors.orange.withValues(alpha: 0.08))
+                  : null,
               cells: [
                 DataCell(Text(v.color == 'Default' ? '—' : v.color)),
                 DataCell(Text(v.size == 'Default' ? '—' : v.size)),
@@ -164,10 +179,41 @@ class EntryInventoryTable extends StatelessWidget {
                   onTap: () => onEdit(index),
                 ),
                 DataCell(
+                  Text(
+                    (loc?.batchNumber != null && loc!.batchNumber!.isNotEmpty)
+                        ? loc.batchNumber!
+                        : '—',
+                  ),
+                ),
+                DataCell(Text(_formatShortDate(loc?.receivedAt))),
+                DataCell(
+                  Text(
+                    _formatShortDate(loc?.expiryDate),
+                    style: loc == null || loc.expiryDate == null
+                        ? null
+                        : TextStyle(
+                            color: BatchInventoryHelper.isLocationExpired(loc)
+                                ? Colors.red.shade700
+                                : BatchInventoryHelper.isLocationExpiringSoon(
+                                    loc,
+                                  )
+                                ? Colors.orange.shade800
+                                : null,
+                            fontWeight:
+                                (BatchInventoryHelper.isLocationExpired(loc) ||
+                                        BatchInventoryHelper.isLocationExpiringSoon(
+                                          loc,
+                                        ))
+                                    ? FontWeight.bold
+                                    : null,
+                          ),
+                  ),
+                ),
+                DataCell(
                   Row(
                     children: [
                       IconButton(
-                        tooltip: 'تعديل مواقع التخزين',
+                        tooltip: 'تعديل مواقع التخزين والدفعات',
                         icon: const Icon(Icons.edit_outlined),
                         onPressed: () => onEdit(index),
                       ),
@@ -308,9 +354,9 @@ Future<void> editEntryLocations(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, update) => AlertDialog(
-        title: const Text('توزيع المخزون'),
+        title: const Text('توزيع المخزون والدفعات'),
         content: SizedBox(
-          width: 650,
+          width: 820,
           child: SingleChildScrollView(
             child: Form(
               key: form,
@@ -329,6 +375,9 @@ Future<void> editEntryLocations(
                           'الصندوق',
                           'الكمية',
                           'السعر الخاص',
+                          'التشغيلة',
+                          'الاستلام',
+                          'الانتهاء',
                           '',
                         ])
                           DataColumn(label: Text(title)),
@@ -411,6 +460,85 @@ Future<void> editEntryLocations(
                                 ),
                               ),
                               DataCell(
+                                SizedBox(
+                                  width: 85,
+                                  child: TextFormField(
+                                    initialValue: row.batchNumber ?? '',
+                                    decoration: const InputDecoration(
+                                      hintText: 'اختياري',
+                                    ),
+                                    onChanged: (v) => rows[i] = rows[i].copyWith(
+                                      batchNumber: v.trim().isEmpty
+                                          ? null
+                                          : v.trim(),
+                                      clearBatchNumber: v.trim().isEmpty,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                TextButton(
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: ctx,
+                                      initialDate:
+                                          row.receivedAt ?? DateTime.now(),
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      update(
+                                        () => rows[i] = rows[i].copyWith(
+                                          receivedAt: picked,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: Text(_formatShortDate(row.receivedAt)),
+                                ),
+                              ),
+                              DataCell(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () async {
+                                        final picked = await showDatePicker(
+                                          context: ctx,
+                                          initialDate:
+                                              row.expiryDate ??
+                                              DateTime.now().add(
+                                                const Duration(days: 180),
+                                              ),
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime(2100),
+                                        );
+                                        if (picked != null) {
+                                          update(
+                                            () => rows[i] = rows[i].copyWith(
+                                              expiryDate: picked,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: Text(
+                                        _formatShortDate(row.expiryDate),
+                                      ),
+                                    ),
+                                    if (row.expiryDate != null)
+                                      IconButton(
+                                        tooltip: 'مسح الانتهاء',
+                                        icon: const Icon(Icons.close, size: 16),
+                                        onPressed: () => update(
+                                          () => rows[i] = rows[i].copyWith(
+                                            clearExpiryDate: true,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              DataCell(
                                 IconButton(
                                   tooltip: 'حذف الموقع',
                                   icon: const Icon(Icons.remove_circle_outline),
@@ -428,15 +556,16 @@ Future<void> editEntryLocations(
                   TextButton.icon(
                     onPressed: () => update(() {
                       rows.add(
-                        const ProductStorageLocation(
+                        ProductStorageLocation(
                           warehouseName: '',
                           quantity: 0,
+                          receivedAt: DateTime.now(),
                         ),
                       );
                       keys.add(UniqueKey());
                     }),
                     icon: const Icon(Icons.add),
-                    label: const Text('إضافة موقع'),
+                    label: const Text('إضافة دفعة / موقع'),
                   ),
                 ],
               ),
@@ -533,159 +662,254 @@ Future<void> showAddWarehouseRowDialog(
   required bool useSizes,
   required ValueNotifier<List<String>> colors,
   required ValueNotifier<List<String>> sizes,
+  List<String> warehouseSuggestions = const [],
+  String title = 'استلام دفعة / إضافة للمخزون',
 }) async {
   final colorController = TextEditingController();
   final sizeController = TextEditingController();
-  final warehouseController = TextEditingController(text: 'المخزن الرئيسي');
+  final defaultWarehouse = warehouseSuggestions.isNotEmpty
+      ? warehouseSuggestions.first
+      : 'المخزن الرئيسي';
+  final warehouseController = TextEditingController(text: defaultWarehouse);
   final shelfController = TextEditingController();
   final boxController = TextEditingController();
   final quantityController = TextEditingController(text: '0');
+  final batchNumberController = TextEditingController();
+  DateTime receivedAt = DateTime.now();
+  DateTime? expiryDate;
 
   await showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('إضافة إلى المخزون'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (useColors)
-              TextField(
-                controller: colorController,
-                decoration: const InputDecoration(labelText: 'الصنف / اللون'),
-              ),
-            if (useSizes)
-              TextField(
-                controller: sizeController,
-                decoration: const InputDecoration(labelText: 'الحجم'),
-              ),
-            TextField(
-              controller: warehouseController,
-              decoration: const InputDecoration(labelText: 'المخزن'),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: shelfController,
-                    decoration: const InputDecoration(labelText: 'الرف (اختياري)'),
-                  ),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (useColors)
+                TextField(
+                  controller: colorController,
+                  decoration: const InputDecoration(labelText: 'الصنف / اللون'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: boxController,
-                    decoration: const InputDecoration(labelText: 'الصندوق (اختياري)'),
-                  ),
+              if (useSizes)
+                TextField(
+                  controller: sizeController,
+                  decoration: const InputDecoration(labelText: 'الحجم'),
                 ),
+              if (warehouseSuggestions.isNotEmpty) ...[
+                DropdownButtonFormField<String>(
+                  initialValue: warehouseSuggestions.contains(warehouseController.text)
+                      ? warehouseController.text
+                      : warehouseSuggestions.first,
+                  decoration: const InputDecoration(labelText: 'اختيار المخزن'),
+                  items: [
+                    for (final w in warehouseSuggestions.toSet())
+                      DropdownMenuItem(value: w, child: Text(w)),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setDialogState(() => warehouseController.text = v);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
               ],
-            ),
-            TextField(
-              controller: quantityController,
-              decoration: const InputDecoration(labelText: 'الكمية'),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('إلغاء'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final qty = int.tryParse(quantityController.text.trim());
-            final rawColor = colorController.text.trim();
-            final rawSize = sizeController.text.trim();
-            final warehouse = warehouseController.text.trim().isEmpty
-                ? 'المخزن الرئيسي'
-                : warehouseController.text.trim();
-            final shelf = shelfController.text.trim().isEmpty
-                ? null
-                : shelfController.text.trim();
-            final box = boxController.text.trim().isEmpty
-                ? null
-                : boxController.text.trim();
-
-            if (qty == null ||
-                qty < 0 ||
-                (useColors && rawColor.isEmpty) ||
-                (useSizes && rawSize.isEmpty)) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('يرجى إدخال كمية صحيحة وإكمال الحقول المطلوبة.'),
-                ),
-              );
-              return;
-            }
-
-            final targetColor = useColors && rawColor.isNotEmpty ? rawColor : 'Default';
-            final targetSize = useSizes && rawSize.isNotEmpty ? rawSize : 'Default';
-            if (useColors && rawColor.isNotEmpty) {
-              colors.value = entryValues([...colors.value, rawColor]);
-            }
-            if (useSizes && rawSize.isNotEmpty) {
-              sizes.value = entryValues([...sizes.value, rawSize]);
-            }
-
-            final list = List<ProductVariant>.from(variants.value);
-            final existingIdx = list.indexWhere(
-              (v) => v.color == targetColor && v.size == targetSize,
-            );
-
-            final newLoc = ProductStorageLocation(
-              warehouseName: warehouse,
-              shelf: shelf,
-              box: box,
-              quantity: qty,
-            );
-
-            if (existingIdx >= 0) {
-              final existing = list[existingIdx];
-              final locs = existing.storageLocations.isEmpty && existing.stock > 0
-                  ? [
-                      ProductStorageLocation(
-                        warehouseName: 'المخزن الرئيسي',
-                        quantity: existing.stock,
+              TextField(
+                controller: warehouseController,
+                decoration: const InputDecoration(labelText: 'اسم المخزن'),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: shelfController,
+                      decoration: const InputDecoration(
+                        labelText: 'الرف (اختياري)',
                       ),
-                    ]
-                  : List<ProductStorageLocation>.from(existing.storageLocations);
-              final sameLocIdx = locs.indexWhere(
-                (l) =>
-                    l.warehouseName == warehouse &&
-                    l.shelf == shelf &&
-                    l.box == box,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: boxController,
+                      decoration: const InputDecoration(
+                        labelText: 'الصندوق (اختياري)',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              TextField(
+                controller: quantityController,
+                decoration: const InputDecoration(labelText: 'الكمية المستلمة'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: batchNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'رقم التشغيلة / الدفعة (اختياري)',
+                ),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: receivedAt,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setDialogState(() => receivedAt = picked);
+                  }
+                },
+                icon: const Icon(Icons.event_available, size: 18),
+                label: Text('تاريخ الاستلام: ${_formatShortDate(receivedAt)}'),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate:
+                              expiryDate ??
+                              DateTime.now().add(const Duration(days: 180)),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => expiryDate = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.event_busy, size: 18),
+                      label: Text(
+                        expiryDate == null
+                            ? 'تاريخ الصلاحية (اختياري)'
+                            : 'الانتهاء: ${_formatShortDate(expiryDate)}',
+                      ),
+                    ),
+                  ),
+                  if (expiryDate != null)
+                    IconButton(
+                      tooltip: 'مسح تاريخ الصلاحية',
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => setDialogState(() => expiryDate = null),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final qty = int.tryParse(quantityController.text.trim());
+              final rawColor = colorController.text.trim();
+              final rawSize = sizeController.text.trim();
+              final warehouse = warehouseController.text.trim().isEmpty
+                  ? 'المخزن الرئيسي'
+                  : warehouseController.text.trim();
+              final shelf = shelfController.text.trim().isEmpty
+                  ? null
+                  : shelfController.text.trim();
+              final box = boxController.text.trim().isEmpty
+                  ? null
+                  : boxController.text.trim();
+              final batchNum = batchNumberController.text.trim().isEmpty
+                  ? null
+                  : batchNumberController.text.trim();
+
+              if (qty == null ||
+                  qty < 0 ||
+                  (useColors && rawColor.isEmpty) ||
+                  (useSizes && rawSize.isEmpty)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('يرجى إدخال كمية صحيحة وإكمال الحقول المطلوبة.'),
+                  ),
+                );
+                return;
+              }
+
+              final targetColor =
+                  useColors && rawColor.isNotEmpty ? rawColor : 'Default';
+              final targetSize =
+                  useSizes && rawSize.isNotEmpty ? rawSize : 'Default';
+              if (useColors && rawColor.isNotEmpty) {
+                colors.value = entryValues([...colors.value, rawColor]);
+              }
+              if (useSizes && rawSize.isNotEmpty) {
+                sizes.value = entryValues([...sizes.value, rawSize]);
+              }
+
+              final list = List<ProductVariant>.from(variants.value);
+              final existingIdx = list.indexWhere(
+                (v) => v.color == targetColor && v.size == targetSize,
               );
-              if (sameLocIdx >= 0) {
-                locs[sameLocIdx] = locs[sameLocIdx].copyWith(
-                  quantity: locs[sameLocIdx].quantity + qty,
+
+              final newLoc = ProductStorageLocation(
+                warehouseName: warehouse,
+                shelf: shelf,
+                box: box,
+                quantity: qty,
+                batchNumber: batchNum,
+                receivedAt: receivedAt,
+                expiryDate: expiryDate,
+              );
+
+              if (existingIdx >= 0) {
+                final existing = list[existingIdx];
+                final locs =
+                    existing.storageLocations.isEmpty && existing.stock > 0
+                    ? [
+                        ProductStorageLocation(
+                          warehouseName: 'المخزن الرئيسي',
+                          quantity: existing.stock,
+                        ),
+                      ]
+                    : List<ProductStorageLocation>.from(
+                        existing.storageLocations,
+                      );
+                final sameLocIdx = locs.indexWhere((l) => l.sameLot(newLoc));
+                if (sameLocIdx >= 0) {
+                  locs[sameLocIdx] = locs[sameLocIdx].copyWith(
+                    quantity: locs[sameLocIdx].quantity + qty,
+                  );
+                } else {
+                  locs.add(newLoc);
+                }
+                final updatedStock = locs.fold<int>(0, (s, l) => s + l.quantity);
+                list[existingIdx] = existing.copyWith(
+                  stock: updatedStock,
+                  storageLocations: locs,
                 );
               } else {
-                locs.add(newLoc);
+                list.add(
+                  ProductVariant(
+                    color: targetColor,
+                    size: targetSize,
+                    stock: qty,
+                    storageLocations: [newLoc],
+                  ),
+                );
               }
-              final updatedStock = locs.fold<int>(0, (s, l) => s + l.quantity);
-              list[existingIdx] = existing.copyWith(
-                stock: updatedStock,
-                storageLocations: locs,
-              );
-            } else {
-              list.add(
-                ProductVariant(
-                  color: targetColor,
-                  size: targetSize,
-                  stock: qty,
-                  storageLocations: [newLoc],
-                ),
-              );
-            }
 
-            variants.value = list;
-            Navigator.pop(ctx);
-          },
-          child: const Text('إضافة'),
-        ),
-      ],
+              variants.value = list;
+              Navigator.pop(ctx);
+            },
+            child: const Text('استلام الدفعة'),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -696,6 +920,7 @@ Future<void> showAddWarehouseRowDialog(
     shelfController,
     boxController,
     quantityController,
+    batchNumberController,
   ]) {
     c.dispose();
   }

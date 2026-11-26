@@ -20,6 +20,7 @@ import '../../../suppliers/presentation/screens/supplier_list_screen.dart';
 import '../../../suppliers/presentation/screens/purchase_invoice_screen.dart';
 import '../../../suppliers/presentation/screens/purchase_history_screen.dart';
 import '../providers/category_provider.dart';
+import '../../../sales/presentation/providers/sales_pos_provider.dart';
 
 enum InventoryFilter { all, lowStock, nearExpiry, slowMoving, overstocked }
 
@@ -73,6 +74,7 @@ class InventoryManagementScreen extends HookConsumerWidget {
       }).toList();
     } else if (activeFilter.value == InventoryFilter.nearExpiry) {
       filtered = filtered.where((p) {
+        if (BatchInventoryHelper.inspectBatches(p).isNotEmpty) return true;
         if (p.expiryDate == null) return false;
         return p.expiryDate!.isBefore(thirtyDaysLater);
       }).toList();
@@ -157,13 +159,209 @@ class InventoryManagementScreen extends HookConsumerWidget {
           if (canManageSuppliers) TextButton(onPressed: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const PurchaseInvoiceScreen())), child: const Text('فاتورة شراء')),
         ]),
-        Expanded(child: InventoryBalanceList(products: filtered, showCost: canViewCost, onOpenRecord: (p) async {
-          final service = ref.read(cashierStockProvider);
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => StockRecordScreen(
-            product: p, url: service.url, publishableKey: service.publishableKey, allowCount: canCount,
-            readDeviceKey: () => service.deviceKey(tenantId))));
-          if(context.mounted) ref.invalidate(pagedInventoryProductsProvider);
-        })),
+        Expanded(child: InventoryBalanceList(
+          products: filtered,
+          showCost: canViewCost,
+          onReceiveBatch: (p) async {
+            final whList = ref.read(availableWarehousesProvider).asData?.value ?? const <String>[];
+            final whOptions = <String>{'المخزن الرئيسي', ...whList}.toList();
+            final qtyCtrl = TextEditingController(text: '10');
+            final batchCtrl = TextEditingController();
+            final shelfCtrl = TextEditingController();
+            final boxCtrl = TextEditingController();
+            String selectedWh = whOptions.first;
+            int selectedVariantIdx = 0;
+            DateTime receivedAt = DateTime.now();
+            DateTime? expiryDate;
+
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => StatefulBuilder(
+                builder: (ctx, setDlg) => AlertDialog(
+                  title: Text('استلام دفعة - ${p.name}'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (p.variants.isNotEmpty)
+                          DropdownButtonFormField<int>(
+                            isExpanded: true,
+                            value: selectedVariantIdx,
+                            decoration: const InputDecoration(labelText: 'الصنف / الحجم'),
+                            items: [
+                              for (int i = 0; i < p.variants.length; i++)
+                                DropdownMenuItem(
+                                  value: i,
+                                  child: Text(
+                                    '${p.variants[i].color == 'Default' ? 'الافتراضي' : p.variants[i].color} / ${p.variants[i].size == 'Default' ? 'الافتراضي' : p.variants[i].size}',
+                                  ),
+                                ),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setDlg(() => selectedVariantIdx = v);
+                            },
+                          ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          value: selectedWh,
+                          decoration: const InputDecoration(labelText: 'المخزن المستلم'),
+                          items: whOptions.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
+                          onChanged: (v) {
+                            if (v != null) setDlg(() => selectedWh = v);
+                          },
+                        ),
+                        TextField(
+                          controller: qtyCtrl,
+                          decoration: const InputDecoration(labelText: 'الكمية المستلمة'),
+                          keyboardType: TextInputType.number,
+                        ),
+                        TextField(
+                          controller: batchCtrl,
+                          decoration: const InputDecoration(labelText: 'رقم التشغيلة (اختياري)'),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: shelfCtrl,
+                                decoration: const InputDecoration(labelText: 'الرف (اختياري)'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: boxCtrl,
+                                decoration: const InputDecoration(labelText: 'الصندوق (اختياري)'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: receivedAt,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setDlg(() => receivedAt = picked);
+                          },
+                          icon: const Icon(Icons.event_available, size: 18),
+                          label: Text(
+                            'تاريخ الاستلام: ${receivedAt.year}-${receivedAt.month.toString().padLeft(2, '0')}-${receivedAt.day.toString().padLeft(2, '0')}',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: expiryDate ?? DateTime.now().add(const Duration(days: 180)),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setDlg(() => expiryDate = picked);
+                          },
+                          icon: const Icon(Icons.event_busy, size: 18),
+                          label: Text(
+                            expiryDate == null
+                                ? 'تاريخ الصلاحية (اختياري)'
+                                : 'الانتهاء: ${expiryDate!.year}-${expiryDate!.month.toString().padLeft(2, '0')}-${expiryDate!.day.toString().padLeft(2, '0')}',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+                    FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اعتماد الاستلام')),
+                  ],
+                ),
+              ),
+            );
+
+            final qty = int.tryParse(qtyCtrl.text.trim()) ?? 0;
+            final batchNum = batchCtrl.text.trim().isEmpty ? null : batchCtrl.text.trim();
+            final shelf = shelfCtrl.text.trim().isEmpty ? null : shelfCtrl.text.trim();
+            final box = boxCtrl.text.trim().isEmpty ? null : boxCtrl.text.trim();
+            qtyCtrl.dispose();
+            batchCtrl.dispose();
+            shelfCtrl.dispose();
+            boxCtrl.dispose();
+
+            if (confirmed != true || qty <= 0) return;
+
+            final newLoc = ProductStorageLocation(
+              warehouseName: selectedWh,
+              shelf: shelf,
+              box: box,
+              quantity: qty,
+              batchNumber: batchNum,
+              receivedAt: receivedAt,
+              expiryDate: expiryDate,
+            );
+            final updatedVariants = List<ProductVariant>.from(p.variants);
+            if (updatedVariants.isEmpty) {
+              final locs = <ProductStorageLocation>[
+                if (p.stockQuantity > 0)
+                  ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: p.stockQuantity),
+                newLoc,
+              ];
+              updatedVariants.add(
+                ProductVariant(
+                  color: 'Default',
+                  size: 'Default',
+                  stock: locs.fold<int>(0, (s, l) => s + l.quantity),
+                  storageLocations: locs,
+                ),
+              );
+            } else {
+              final v = updatedVariants[selectedVariantIdx];
+              final locs = v.storageLocations.isEmpty && v.stock > 0
+                  ? [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: v.stock)]
+                  : List<ProductStorageLocation>.from(v.storageLocations);
+              final sameIdx = locs.indexWhere((l) => l.sameLot(newLoc));
+              if (sameIdx >= 0) {
+                locs[sameIdx] = locs[sameIdx].copyWith(quantity: locs[sameIdx].quantity + qty);
+              } else {
+                locs.add(newLoc);
+              }
+              updatedVariants[selectedVariantIdx] = v.copyWith(
+                stock: locs.fold<int>(0, (s, l) => s + l.quantity),
+                storageLocations: locs,
+              );
+            }
+
+            final totalStock = updatedVariants.fold<int>(0, (s, v) => s + v.stock);
+            final draft = p.copyWith(
+              variants: updatedVariants,
+              stockQuantity: totalStock,
+              inStock: totalStock > 0,
+            );
+            final updatedProduct = draft.copyWith(
+              expiryDate: BatchInventoryHelper.earliestValidExpiry(draft) ?? draft.expiryDate,
+            );
+            await ref.read(productRepositoryProvider).saveProduct(tenantId, updatedProduct);
+            ref.read(pagedInventoryProductsProvider.notifier).updateProductInState(updatedProduct);
+            ref.read(pagedGeneralProductsProvider.notifier).updateProductInState(updatedProduct);
+            ref.invalidate(productsFutureProvider);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('تم استلام $qty قطعة في $selectedWh')),
+              );
+            }
+          },
+          onOpenRecord: (p) async {
+            final service = ref.read(cashierStockProvider);
+            await Navigator.push(context, MaterialPageRoute(builder: (_) => StockRecordScreen(
+              product: p, url: service.url, publishableKey: service.publishableKey, allowCount: canCount,
+              readDeviceKey: () => service.deviceKey(tenantId))));
+            if(context.mounted) ref.invalidate(pagedInventoryProductsProvider);
+          },
+        )),
         if (pagedState.hasMore) TextButton(onPressed: pagedState.isLoadingMore ? null :
           () => ref.read(pagedInventoryProductsProvider.notifier).loadMore(), child: const Text('عرض المزيد')),
       ]) : LayoutBuilder(

@@ -185,7 +185,7 @@ class ProductFormScreen extends HookConsumerWidget {
       }
       final totalStock = savedVariants.isEmpty ? int.tryParse(stockController.text) ?? 0
           : savedVariants.fold<int>(0,(sum,v)=>sum+v.stock);
-      final newProduct = (product ?? ProductModel(
+      final draftProduct = (product ?? ProductModel(
         id: '', tenantId: tenantId, name: '', category: '', description: '', price: 0.0,
       )).copyWith(
         name: nameController.text.trim(),
@@ -212,6 +212,9 @@ class ProductFormScreen extends HookConsumerWidget {
         isDailyStarred: isDailyStarred.value,
         lastSupplierId: supplierId.value,
         isArchived: false,
+      );
+      final newProduct = draftProduct.copyWith(
+        expiryDate: BatchInventoryHelper.earliestValidExpiry(draftProduct) ?? expiryDate.value,
       );
 
       try {

@@ -100,6 +100,8 @@ class TenantModel extends Equatable {
   // Shipping Settings
   @HiveField(19)
   final String currencyUnit;
+  @HiveField(52)
+  final String countryCode;
   @HiveField(20)
   final double shippingCost;
 
@@ -142,6 +144,7 @@ class TenantModel extends Equatable {
     this.sharesRewardPoints = 10,
     this.reviewRewardPoints = 5,
     this.currencyUnit = 'IQD',
+    this.countryCode = 'iq',
     this.shippingCost = 5000.0,
     this.oneSignalAppId,
     this.oneSignalRestKey,
@@ -198,6 +201,7 @@ class TenantModel extends Equatable {
         sharesRewardPoints,
         reviewRewardPoints,
         currencyUnit,
+        countryCode,
         shippingCost,
         oneSignalAppId,
         oneSignalRestKey,
@@ -254,6 +258,7 @@ class TenantModel extends Equatable {
       'sharesRewardPoints': sharesRewardPoints,
       'reviewRewardPoints': reviewRewardPoints,
       'currencyUnit': currencyUnit,
+      'countryCode': countryCode,
       'shippingCost': shippingCost,
       'oneSignalAppId': oneSignalAppId,
       'oneSignalRestKey': oneSignalRestKey,
@@ -318,6 +323,7 @@ class TenantModel extends Equatable {
       sharesRewardPoints: json['sharesRewardPoints'] as int? ?? 10,
       reviewRewardPoints: json['reviewRewardPoints'] as int? ?? 5,
       currencyUnit: json['currencyUnit'] as String? ?? 'IQD',
+      countryCode: json['countryCode'] as String? ?? 'iq',
       shippingCost: (json['shippingCost'] as num? ?? 5000.0).toDouble(),
       oneSignalAppId: json['oneSignalAppId'] as String?,
       oneSignalRestKey: json['oneSignalRestKey'] as String?,
@@ -374,6 +380,7 @@ class TenantModel extends Equatable {
     int? sharesRewardPoints,
     int? reviewRewardPoints,
     String? currencyUnit,
+    String? countryCode,
     double? shippingCost,
     String? oneSignalAppId,
     String? oneSignalRestKey,
@@ -428,6 +435,7 @@ class TenantModel extends Equatable {
       sharesRewardPoints: sharesRewardPoints ?? this.sharesRewardPoints,
       reviewRewardPoints: reviewRewardPoints ?? this.reviewRewardPoints,
       currencyUnit: currencyUnit ?? this.currencyUnit,
+      countryCode: countryCode ?? this.countryCode,
       shippingCost: shippingCost ?? this.shippingCost,
       oneSignalAppId: oneSignalAppId ?? this.oneSignalAppId,
       oneSignalRestKey: oneSignalRestKey ?? this.oneSignalRestKey,

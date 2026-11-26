@@ -513,6 +513,7 @@ class _AdjustStockDialog extends HookConsumerWidget {
     final priceOverrideController = useTextEditingController(
       text: selectedLocation.value?.priceOverride?.toString() ?? ''
     );
+    final customWarehouseController = useTextEditingController();
     final expiryDate = useState<DateTime?>(product.expiryDate);
     final minStockController = useTextEditingController(text: (product.minStockLevel ?? 5).toString());
 
@@ -527,6 +528,7 @@ class _AdjustStockDialog extends HookConsumerWidget {
               const Text('اختر المتغير (اللون/المقاس):', style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 8),
               DropdownButtonFormField<ProductVariant>(
+                isExpanded: true,
                 value: selectedVariant.value,
                 items: product.variants.map((v) => DropdownMenuItem(
                   value: v,
@@ -543,6 +545,7 @@ class _AdjustStockDialog extends HookConsumerWidget {
                const Text('اختر المخزن/الموقع:', style: TextStyle(fontSize: 12, color: Colors.grey)),
                const SizedBox(height: 8),
                DropdownButtonFormField<ProductStorageLocation>(
+                 isExpanded: true,
                  value: selectedVariant.value!.storageLocations.contains(selectedLocation.value) ? selectedLocation.value : selectedVariant.value!.storageLocations.first,
                  items: selectedVariant.value!.storageLocations.map((l) => DropdownMenuItem(
                    value: l,
@@ -550,6 +553,16 @@ class _AdjustStockDialog extends HookConsumerWidget {
                  )).toList(),
                  onChanged: (val) => selectedLocation.value = val,
                  decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+               ),
+               const SizedBox(height: 16),
+            ] else ...[
+               TextField(
+                 controller: customWarehouseController,
+                 decoration: const InputDecoration(
+                   labelText: 'اسم المخزن (اختياري - افتراضي: المخزن الرئيسي)',
+                   border: OutlineInputBorder(),
+                   isDense: true,
+                 ),
                ),
                const SizedBox(height: 16),
             ],
@@ -650,26 +663,30 @@ class _AdjustStockDialog extends HookConsumerWidget {
 
               if (valStr.isNotEmpty || mode.value == 2) {
                 final priceOverride = double.tryParse(priceOverrideController.text);
+                final targetWarehouse = selectedLocation.value?.warehouseName ??
+                    (customWarehouseController.text.trim().isEmpty
+                        ? null
+                        : customWarehouseController.text.trim());
                 if (mode.value == 0) {
                   await repo.updateStock(tenantId, product.id, val,
                       color: selectedVariant.value?.color, 
                       size: selectedVariant.value?.size,
-                      warehouseName: selectedLocation.value?.warehouseName,
+                      warehouseName: targetWarehouse,
                       priceOverride: priceOverride);
                 } else if (mode.value == 1) {
                   await repo.updateStock(tenantId, product.id, -val,
                       color: selectedVariant.value?.color, 
                       size: selectedVariant.value?.size,
-                      warehouseName: selectedLocation.value?.warehouseName,
+                      warehouseName: targetWarehouse,
                       priceOverride: priceOverride);
                 } else {
                   final currentStock = (selectedLocation.value?.quantity ?? (selectedVariant.value?.stock ?? (product.stockQuantity as num?)?.toInt())) ?? 0;
                   final adjustment = val - currentStock;
-                  if (adjustment != 0 || priceOverride != null) {
+                  if (adjustment != 0 || priceOverride != null || targetWarehouse != null) {
                     await repo.updateStock(tenantId, product.id, adjustment,
                         color: selectedVariant.value?.color, 
                         size: selectedVariant.value?.size,
-                        warehouseName: selectedLocation.value?.warehouseName,
+                        warehouseName: targetWarehouse,
                         priceOverride: priceOverride);
                   }
                 }

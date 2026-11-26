@@ -19,8 +19,24 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   late TextEditingController _governorateController;
   late TextEditingController _locationController;
   late TextEditingController _landmarkController;
+  String _countryPart = 'Iraq';
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+
+  static const _governorates = [
+    'Baghdad', 'Basra', 'Nineveh', 'Erbil', 'Anbar', 'Najaf', 'Karbala', 'Duhok', 'Kirkuk', 
+    'Maysan', 'Muthanna', 'Qadisiyah', 'Salah_al-Din', 'Sulaymaniyah', 'Wasit', 'Dhi_Qar', 'Babil', 'Diyala'
+  ];
+
+  String? _matchGovernorate(String raw, String lang) {
+    if (raw.isEmpty) return null;
+    for (final g in _governorates) {
+      if (g.toLowerCase() == raw.toLowerCase()) return g;
+      final key = 'gov_${g.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_')}';
+      if (AppStrings.get(key, lang) == raw) return g;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -32,8 +48,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final savedAddress = user?.address ?? '';
     if (savedAddress.contains(' - ')) {
       final parts = savedAddress.split(' - ');
-      _governorateController = TextEditingController(text: parts[0]);
-      _locationController = TextEditingController(text: parts.sublist(1).join(' - '));
+      if (parts.length >= 3) {
+        _countryPart = parts[0].trim();
+        _governorateController = TextEditingController(text: parts[1].trim());
+        _locationController = TextEditingController(text: parts.sublist(2).join(' - ').trim());
+      } else {
+        _governorateController = TextEditingController(text: parts[0].trim());
+        _locationController = TextEditingController(text: parts.sublist(1).join(' - ').trim());
+      }
     } else {
       _governorateController = TextEditingController();
       _locationController = TextEditingController(text: savedAddress);
@@ -56,10 +78,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final fullAddress = '${_governorateController.text} - ${_locationController.text}';
+      final fullAddress = '$_countryPart - ${_governorateController.text.trim()} - ${_locationController.text.trim()}';
       await ref.read(userActionsProvider).updateUserProfile(
         name: _nameController.text.trim(),
-        password: _passwordController.text.trim(),
+        password: _passwordController.text.trim().isEmpty ? null : _passwordController.text.trim(),
         address: fullAddress,
         landmark: _landmarkController.text.trim(),
       );
@@ -111,16 +133,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: AppStrings.get('governorate', lang),
                   prefixIcon: const Icon(Icons.map_outlined),
                   border: const OutlineInputBorder(),
                 ),
-                initialValue: _governorateController.text.isEmpty ? null : _governorateController.text,
-                items: [
-                  'Baghdad', 'Basra', 'Nineveh', 'Erbil', 'Anbar', 'Najaf', 'Karbala', 'Duhok', 'Kirkuk', 
-                  'Maysan', 'Muthanna', 'Qadisiyah', 'Salah_al-Din', 'Sulaymaniyah', 'Wasit', 'Dhi_Qar', 'Babil', 'Diyala'
-                ].map((g) {
+                initialValue: _matchGovernorate(_governorateController.text, lang),
+                items: _governorates.map((g) {
                   final key = 'gov_${g.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_')}';
                   return DropdownMenuItem(
                     value: g, 

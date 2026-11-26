@@ -175,6 +175,10 @@ class UserActions {
     await prefs.remove('user_phone');
     await prefs.remove('user_address');
     await prefs.remove('user_landmark');
+    await prefs.remove('user_country_code');
+    await prefs.remove('user_country_name');
+    await prefs.remove('user_governorate');
+    await prefs.remove('user_location');
     ref.read(userPhoneProvider.notifier).setPhone(null);
     final auth=FirebaseAuth.instance;
     if(auth.currentUser!=null && !auth.currentUser!.isAnonymous){await auth.signOut();await auth.signInAnonymously();}
@@ -200,8 +204,26 @@ class UserActions {
     if (address != null) data['address'] = address;
     if (landmark != null) data['landmark'] = landmark;
     
+    final prefs = await SharedPreferences.getInstance();
+    if (address != null) {
+      await prefs.setString('user_address', address);
+      final parts = address.split(' - ');
+      if (parts.length >= 3) {
+        await prefs.setString('user_country_name', parts[0].trim());
+        await prefs.setString('user_governorate', parts[1].trim());
+        await prefs.setString('user_location', parts.sublist(2).join(' - ').trim());
+      } else if (parts.length == 2) {
+        await prefs.setString('user_governorate', parts[0].trim());
+        await prefs.setString('user_location', parts[1].trim());
+      }
+    }
+    if (landmark != null) {
+      await prefs.setString('user_landmark', landmark);
+    }
+
     if (data.isNotEmpty) {
       await ref.read(firestoreServiceProvider).updateUser(compositeId, data);
+      ref.invalidate(userProvider);
     }
   }
 

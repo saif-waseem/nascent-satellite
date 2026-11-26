@@ -35,6 +35,18 @@ final tenantIdProvider = NotifierProvider<TenantIdNotifier, String>(TenantIdNoti
 final tenantProvider = FutureProvider<TenantModel?>((ref) async {
   final tenantId = ref.watch(tenantIdProvider);
   if (tenantId.isEmpty) return null;
+  if (tenantId == 'local_default') {
+    return TenantModel(
+      id: 'local_default',
+      name: 'العمل المحلي (بدون سيرفر)',
+      adminIds: const [],
+      description: 'وضع العمل المحلي',
+      createdAt: DateTime(2026),
+      isActive: true,
+      isPosEnabled: true,
+      isStoreEnabled: true,
+    );
+  }
 
   // Local first
   final box = LocalDbService.getBox<TenantModel>('tenants');

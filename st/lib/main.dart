@@ -164,11 +164,19 @@ class _StoreAdminAppState extends ConsumerState<StoreAdminApp> {
             Locale('en'),
             Locale('ar'),
           ],
-          builder: (context, child) => DesktopActionsWrapper(
-            child: LicenseCheckWrapper(
-              child: CheckUpdateWrapper(child: child!),
-            ),
-          ),
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
+              ),
+              child: DesktopActionsWrapper(
+                child: LicenseCheckWrapper(
+                  child: CheckUpdateWrapper(child: child!),
+                ),
+              ),
+            );
+          },
         );
       },
       loading: () => MaterialApp(
@@ -202,7 +210,13 @@ class _StoreAdminAppState extends ConsumerState<StoreAdminApp> {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => ref.refresh(tenantProvider),
-                    child: const Text('Retry'),
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () => ref.read(currentTenantAuthProvider.notifier).clearTenant(),
+                    icon: const Icon(Icons.arrow_back, color: Colors.red),
+                    label: const Text('العودة لصفحة التفعيل', style: TextStyle(color: Colors.red)),
                   ),
                 ],
               ),

@@ -513,8 +513,7 @@ void changeEntryOption(
         ((!colorValues.contains('Default') && v.color == 'Default') ||
             (!sizeValues.contains('Default') && v.size == 'Default')),
   );
-  if ((rows.isNotEmpty || baseStock == 0) &&
-      (colorValues.first != 'Default' || sizeValues.first != 'Default')) {
+  if (colorValues.first != 'Default' || sizeValues.first != 'Default') {
     for (final c in colorValues) {
       for (final s in sizeValues) {
         if (!rows.any((v) => v.color == c && v.size == s))
@@ -523,4 +522,181 @@ void changeEntryOption(
     }
   }
   variants.value = rows;
+}
+
+/// Adds a warehouse storage row (and variant if colors/sizes are enabled) cleanly,
+/// merging into an existing variant/location when matching instead of blocking edits.
+Future<void> showAddWarehouseRowDialog(
+  BuildContext context, {
+  required ValueNotifier<List<ProductVariant>> variants,
+  required bool useColors,
+  required bool useSizes,
+  required ValueNotifier<List<String>> colors,
+  required ValueNotifier<List<String>> sizes,
+}) async {
+  final colorController = TextEditingController();
+  final sizeController = TextEditingController();
+  final warehouseController = TextEditingController(text: 'المخزن الرئيسي');
+  final shelfController = TextEditingController();
+  final boxController = TextEditingController();
+  final quantityController = TextEditingController(text: '0');
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('إضافة إلى المخزون'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (useColors)
+              TextField(
+                controller: colorController,
+                decoration: const InputDecoration(labelText: 'الصنف / اللون'),
+              ),
+            if (useSizes)
+              TextField(
+                controller: sizeController,
+                decoration: const InputDecoration(labelText: 'الحجم'),
+              ),
+            TextField(
+              controller: warehouseController,
+              decoration: const InputDecoration(labelText: 'المخزن'),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: shelfController,
+                    decoration: const InputDecoration(labelText: 'الرف (اختياري)'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: boxController,
+                    decoration: const InputDecoration(labelText: 'الصندوق (اختياري)'),
+                  ),
+                ),
+              ],
+            ),
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(labelText: 'الكمية'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final qty = int.tryParse(quantityController.text.trim());
+            final rawColor = colorController.text.trim();
+            final rawSize = sizeController.text.trim();
+            final warehouse = warehouseController.text.trim().isEmpty
+                ? 'المخزن الرئيسي'
+                : warehouseController.text.trim();
+            final shelf = shelfController.text.trim().isEmpty
+                ? null
+                : shelfController.text.trim();
+            final box = boxController.text.trim().isEmpty
+                ? null
+                : boxController.text.trim();
+
+            if (qty == null ||
+                qty < 0 ||
+                (useColors && rawColor.isEmpty) ||
+                (useSizes && rawSize.isEmpty)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('يرجى إدخال كمية صحيحة وإكمال الحقول المطلوبة.'),
+                ),
+              );
+              return;
+            }
+
+            final targetColor = useColors && rawColor.isNotEmpty ? rawColor : 'Default';
+            final targetSize = useSizes && rawSize.isNotEmpty ? rawSize : 'Default';
+            if (useColors && rawColor.isNotEmpty) {
+              colors.value = entryValues([...colors.value, rawColor]);
+            }
+            if (useSizes && rawSize.isNotEmpty) {
+              sizes.value = entryValues([...sizes.value, rawSize]);
+            }
+
+            final list = List<ProductVariant>.from(variants.value);
+            final existingIdx = list.indexWhere(
+              (v) => v.color == targetColor && v.size == targetSize,
+            );
+
+            final newLoc = ProductStorageLocation(
+              warehouseName: warehouse,
+              shelf: shelf,
+              box: box,
+              quantity: qty,
+            );
+
+            if (existingIdx >= 0) {
+              final existing = list[existingIdx];
+              final locs = existing.storageLocations.isEmpty && existing.stock > 0
+                  ? [
+                      ProductStorageLocation(
+                        warehouseName: 'المخزن الرئيسي',
+                        quantity: existing.stock,
+                      ),
+                    ]
+                  : List<ProductStorageLocation>.from(existing.storageLocations);
+              final sameLocIdx = locs.indexWhere(
+                (l) =>
+                    l.warehouseName == warehouse &&
+                    l.shelf == shelf &&
+                    l.box == box,
+              );
+              if (sameLocIdx >= 0) {
+                locs[sameLocIdx] = locs[sameLocIdx].copyWith(
+                  quantity: locs[sameLocIdx].quantity + qty,
+                );
+              } else {
+                locs.add(newLoc);
+              }
+              final updatedStock = locs.fold<int>(0, (s, l) => s + l.quantity);
+              list[existingIdx] = existing.copyWith(
+                stock: updatedStock,
+                storageLocations: locs,
+              );
+            } else {
+              list.add(
+                ProductVariant(
+                  color: targetColor,
+                  size: targetSize,
+                  stock: qty,
+                  storageLocations: [newLoc],
+                ),
+              );
+            }
+
+            variants.value = list;
+            Navigator.pop(ctx);
+          },
+          child: const Text('إضافة'),
+        ),
+      ],
+    ),
+  );
+
+  for (final c in [
+    colorController,
+    sizeController,
+    warehouseController,
+    shelfController,
+    boxController,
+    quantityController,
+  ]) {
+    c.dispose();
+  }
 }

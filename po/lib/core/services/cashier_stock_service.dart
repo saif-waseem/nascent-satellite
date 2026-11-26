@@ -106,24 +106,34 @@ class CashierStockService {
         // Fall back to direct REST write
       }
     }
+    if (job['action'] == 'delete') {
+      final uri = Uri.parse('$_url/rest/v1/products').replace(queryParameters: {
+        'id': 'eq.$id',
+        'tenant_id': 'eq.$tenant',
+      });
+      final response = await http.delete(uri, headers: {'apikey': _publicKey}).timeout(const Duration(seconds: 15));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('تعذر حذف المنتج من السحابة (${response.statusCode}): ${response.body}');
+      }
+      return;
+    }
     // Direct REST upsert to Supabase
     final backup = job['backup'];
     if(backup != null && backup is Map) {
-      try {
-        final product = ProductModel.fromJson(Map<String, dynamic>.from(backup));
-        final row = ProductCatalog.encode(product);
-        row['tenant_id'] = tenant;
-        await http.post(
-          Uri.parse('$_url/rest/v1/products'),
-          headers: {
-            'apikey': _publicKey,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates',
-          },
-          body: jsonEncode(row),
-        ).timeout(const Duration(seconds: 15));
-      } catch (e) {
-        // Log and allow sync queue to proceed to Firestore
+      final product = ProductModel.fromJson(Map<String, dynamic>.from(backup));
+      final row = ProductCatalog.encode(product);
+      row['tenant_id'] = tenant;
+      final response = await http.post(
+        Uri.parse('$_url/rest/v1/products'),
+        headers: {
+          'apikey': _publicKey,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode(row),
+      ).timeout(const Duration(seconds: 15));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('تعذر حفظ المنتج في السحابة (${response.statusCode}): ${response.body}');
       }
     }
   }

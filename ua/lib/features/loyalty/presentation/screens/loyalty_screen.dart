@@ -25,10 +25,9 @@ class LoyaltyScreen extends ConsumerWidget {
     
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(AppStrings.get('my_profile_title', lang), style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
       ),
       body: userAsync.when(
@@ -90,7 +89,7 @@ class LoyaltyScreen extends ConsumerWidget {
     dynamic appSettingsController
   ) {
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 70, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       child: Column(
         children: [
           // Premium Profile Header Card
@@ -274,32 +273,45 @@ class LoyaltyScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(AppStrings.get('daily_check_in', lang), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.local_fire_department, color: Colors.orange, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        AppStrings.get('streak_label', lang).replaceFirst('{count}', user.checkInStreak.toString()),
-                        style: TextStyle(color: Colors.orange[800], fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.get('daily_check_in', lang),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.local_fire_department, color: Colors.orange, size: 16),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            AppStrings.get('streak_label', lang).replaceFirst('{count}', user.checkInStreak.toString()),
+                            style: TextStyle(color: Colors.orange[800], fontSize: 13, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               if (isCheckedInToday)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(12)),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
-                      const SizedBox(width: 8),
-                      Text(AppStrings.get('cat_all', lang).substring(0, 2), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)), // "Done" placeholder
+                      const SizedBox(width: 6),
+                      Text(lang == 'ar' ? 'تم' : 'Done', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 )
@@ -307,7 +319,7 @@ class LoyaltyScreen extends ConsumerWidget {
                 FilledButton(
                   onPressed: () => _performCheckIn(context, ref, user, lang),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(AppStrings.get('check_in_btn', lang)),

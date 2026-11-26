@@ -150,7 +150,7 @@ class _StockRecordState extends State<StockRecordScreen> {
         if (message != null) Text(message!),
         if (loaded) ...[
           Text('الرصيد المسجل: $expected'),
-          if (widget.allowCount && widget.product.variants.isEmpty) ...[
+          if (widget.allowCount && (widget.product.variants.isEmpty || widget.product.variants.every((v) => v.color == 'Default' && v.size == 'Default'))) ...[
             TextField(
               enabled: !busy,
               controller: quantity,

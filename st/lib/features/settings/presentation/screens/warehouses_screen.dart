@@ -61,6 +61,7 @@ class WarehousesScreen extends HookConsumerWidget {
                     Expanded(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: newCurrency.value,
                         decoration: InputDecoration(
                           labelText: lang == 'ar' ? 'العملة' : 'Currency',

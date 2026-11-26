@@ -156,6 +156,8 @@ class ProductFormScreen extends HookConsumerWidget {
       try {
         isLoading.value = true;
         await ref.read(adminSupabaseServiceProvider).saveProduct(newProduct, tenantId, previousStock: product?.stockQuantity);
+        await ref.read(localCacheServiceProvider).saveProducts([newProduct]);
+        ref.invalidate(adminProductsProvider);
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ بنجاح')));
@@ -289,6 +291,7 @@ class ProductFormScreen extends HookConsumerWidget {
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
+                            isExpanded: true,
                             value: ['د.ع', '\$', 'ر.س', 'د.إ', 'د.ك', 'ج.م', '€', '£', 'TL', 'ر.ق', 'ر.ع', 'د.ب', 'د.أ'].contains(productCurrency.value)
                                 ? productCurrency.value
                                 : 'د.ع',
@@ -442,42 +445,13 @@ class ProductFormScreen extends HookConsumerWidget {
 }
 
   void _showAddVariantDialog(BuildContext context, ValueNotifier<List<ProductVariant>> variants, bool useColors, bool useSizes, ValueNotifier<List<String>> colors, ValueNotifier<List<String>> sizes) {
-    final colorController = TextEditingController();
-    final sizeController = TextEditingController();
-    final quantityController = TextEditingController(text: '0');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إضافة نوع جديد'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if(useColors) TextField(controller: colorController, decoration: const InputDecoration(labelText: 'اللون')),
-            if(useSizes) TextField(controller: sizeController, decoration: const InputDecoration(labelText: 'الحجم')),
-            TextField(controller: quantityController, decoration: const InputDecoration(labelText: 'الكمية'), keyboardType: TextInputType.number),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(onPressed: () {
-            final qty = int.tryParse(quantityController.text.trim());
-              final color=colorController.text.trim(), size=sizeController.text.trim();
-              if(qty==null || qty<0 || (useColors && color.isEmpty) || (useSizes && size.isEmpty) ||
-                 variants.value.any((v)=>v.color==(color.isEmpty?'Default':color) && v.size==(size.isEmpty?'Default':size))) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل كمية صحيحة وتنويعة غير مكررة.')));return;
-              }
-              if(useColors) colors.value=entryValues([...colors.value,color]);
-              if(useSizes) sizes.value=entryValues([...sizes.value,size]);
-            variants.value = [...variants.value, ProductVariant(
-              color: colorController.text.isEmpty ? 'Default' : colorController.text.trim(),
-              size: sizeController.text.isEmpty ? 'Default' : sizeController.text.trim(),
-              stock: qty,
-              storageLocations: [ProductStorageLocation(warehouseName: 'المخزن الرئيسي', quantity: qty)],
-            )];
-            Navigator.pop(ctx);
-          }, child: const Text('إضافة')),
-        ],
-      ),
+    showAddWarehouseRowDialog(
+      context,
+      variants: variants,
+      useColors: useColors,
+      useSizes: useSizes,
+      colors: colors,
+      sizes: sizes,
     );
   }
 

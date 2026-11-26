@@ -215,7 +215,10 @@ class ProductRepository {
     _notifyStockChanged();
 
     if (tenantId == 'local_default') return;
-    unawaited(_ref.read(syncStatusProvider.notifier).syncPending());
+    await _ref.read(syncStatusProvider.notifier).syncPending().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {},
+    );
   }
 
   Future<void> _queueCatalog(String tenant,String id,ProductModel? before,ProductModel? after,{Map<String,dynamic>? undoExpected}) async {
@@ -267,7 +270,10 @@ class ProductRepository {
     _notifyStockChanged();
 
     if (tenantId == 'local_default') return;
-    unawaited(_ref.read(syncStatusProvider.notifier).syncPending());
+    await _ref.read(syncStatusProvider.notifier).syncPending().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {},
+    );
   }
 
   Future<ProductModel?> getProductByBarcode(String tenantId, String barcode) async {
@@ -363,7 +369,21 @@ class ProductRepository {
     }
 
     // If no specific variant found but adjustment is needed
-    if (!variantFound && updatedVariants.isNotEmpty) {
+    if (!variantFound && updatedVariants.isEmpty && warehouseName != null && warehouseName.trim().isNotEmpty) {
+      final newQty = (product.stockQuantity + adjustment).clamp(0, 999999);
+      updatedVariants.add(ProductVariant(
+        color: 'Default',
+        size: 'Default',
+        stock: newQty,
+        storageLocations: [
+          ProductStorageLocation(
+            warehouseName: warehouseName.trim(),
+            quantity: newQty,
+            priceOverride: priceOverride,
+          ),
+        ],
+      ));
+    } else if (!variantFound && updatedVariants.isNotEmpty) {
         final v = updatedVariants[0];
         List<ProductStorageLocation> updatedLocs = List.from(v.storageLocations);
         int locIdx = 0;
@@ -398,7 +418,12 @@ class ProductRepository {
     if(tenantId!='local_default' && (!invoiceMovement || product.variants.isNotEmpty)){
       await _queueCatalog(tenantId,productId,product,updatedProduct);
       await _box.put(productId,updatedProduct);
-      _notifyStockChanged();return;
+      _notifyStockChanged();
+      await _ref.read(syncStatusProvider.notifier).syncPending().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {},
+      );
+      return;
     }
     await _box.put(productId, updatedProduct);
     _notifyStockChanged();

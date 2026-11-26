@@ -250,7 +250,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: asyncTenant.when(
           data: (tenant) => Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
                CircleAvatar(
                  radius: 16,
@@ -258,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                  child: _buildImageOrIcon(tenant?.logoUrl, size: 20),
                ),
                const SizedBox(width: 8),
-               Flexible(
+               Expanded(
                  child: Text(
                    tenant?.name ?? AppStrings.get('store', lang),
                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -538,13 +537,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           crossAxisCount = 3;
         }
 
+        final scale = MediaQuery.textScalerOf(context).scale(1.0);
         return GridView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.72, // Slightly vertical for better text display
+            childAspectRatio: scale > 1.05 ? 0.62 : 0.72,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
           ),
@@ -826,6 +826,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final featuredProducts = allProducts.where((p) => p.isFeaturedDeal).toList();
     
     if (featuredProducts.isEmpty) return const SizedBox.shrink();
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -836,11 +837,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             children: [
               const Icon(Icons.flash_on, color: Colors.orange, size: 24),
               const SizedBox(width: 8),
-              Text(
-                AppStrings.get('featured_deals', lang),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              Expanded(
+                child: Text(
+                  AppStrings.get('featured_deals', lang),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
               TextButton(
                 onPressed: () => setState(() => _onlyOffers = true),
                 child: Text(AppStrings.get('view_all', lang)),
@@ -849,7 +853,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         SizedBox(
-          height: 350,
+          height: scale > 1.05 ? 385 : 350,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
@@ -971,10 +975,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            formatCurrency(product.price, unitOverride: product.unit ?? currencyUnit),
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: lang == 'ar' ? Alignment.centerRight : Alignment.centerLeft,
+                              child: Text(
+                                formatCurrency(product.price, unitOverride: product.unit ?? currencyUnit),
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(color: Theme.of(context).primaryColor, shape: BoxShape.circle),
@@ -1008,6 +1019,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final displayProducts = topRatedProducts.take(15).toList();
     
     if (displayProducts.isEmpty) return const SizedBox.shrink();
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1017,16 +1029,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                AppStrings.get('top_rated_products', lang),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+              Expanded(
+                child: Text(
+                  AppStrings.get('top_rated_products', lang),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               // Optional: 'See All' button could go here
             ],
           ),
         ),
         SizedBox(
-          height: 320, // Increased height from 300 to prevent overflow
+          height: scale > 1.05 ? 360 : 325, // Adaptive height for large fonts
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,

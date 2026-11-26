@@ -358,6 +358,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             const SizedBox(height: 12),
             if (_isPredefinedCountry)
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: AppStrings.get('governorate', lang),
                   prefixIcon: const Icon(Icons.map_outlined),

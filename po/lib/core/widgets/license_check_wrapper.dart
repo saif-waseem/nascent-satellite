@@ -63,11 +63,10 @@ class LicenseCheckWrapper extends ConsumerWidget {
                 style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
               const SizedBox(height: 24),
-              TextButton(
-                onPressed: () {
-                   // Force a rebuild or show current config
-                },
-                child: const Text('Tenant ID: landan'),
+              TextButton.icon(
+                onPressed: () => ref.read(tenantIdProvider.notifier).clearTenantId(),
+                icon: const Icon(Icons.arrow_back, color: Colors.red),
+                label: const Text('العودة لصفحة التفعيل', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
@@ -87,6 +86,12 @@ class LicenseCheckWrapper extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: () => ref.refresh(tenantProvider), 
                   child: const Text('إعادة المحاولة'),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => ref.read(tenantIdProvider.notifier).clearTenantId(),
+                  icon: const Icon(Icons.arrow_back, color: Colors.red),
+                  label: const Text('العودة لصفحة التفعيل', style: TextStyle(color: Colors.red)),
                 ),
               ],
             ),
@@ -109,70 +114,79 @@ class _ActivationScreen extends ConsumerStatefulWidget {
 class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
   final _codeController = TextEditingController();
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.blueGrey[900],
       body: Center(
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lock_outline, size: 64, color: Colors.blue),
-              const SizedBox(height: 24),
-              Text(
-                widget.isExpired ? 'انتهت صلاحية اشتراك المبيعات' : 'تفعيل نسخة المبيعات (POS)',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                widget.isExpired 
-                    ? 'يرجى تجديد الاشتراك للتمكن من استخدام النظام مجدداً'
-                    : 'يرجى إدخال كود التفعيل الخاص بك لنسخة المبيعات',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _codeController,
-                decoration: const InputDecoration(
-                  labelText: 'كود التفعيل',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.vpn_key),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline, size: 64, color: Colors.blue),
+                const SizedBox(height: 24),
+                Text(
+                  widget.isExpired ? 'انتهت صلاحية اشتراك المبيعات' : 'تفعيل نسخة المبيعات (POS)',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: FilledButton(
-                  onPressed: _isLoading ? null : _handleActivation,
-                  child: _isLoading 
-                      ? const CircularProgressIndicator(color: Colors.white) 
-                      : const Text('تفعيل الآن'),
+                const SizedBox(height: 8),
+                Text(
+                  widget.isExpired 
+                      ? 'يرجى تجديد الاشتراك للتمكن من استخدام النظام مجدداً'
+                      : 'يرجى إدخال كود التفعيل الخاص بك لنسخة المبيعات',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'سيتم تفعيل النظام تلقائياً بعد إدخال الكود الصحيح والتحقق منه.',
-                style: TextStyle(color: Colors.green, fontSize: 12),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () {
-                },
-                child: Text('Tenant ID: ${widget.tenantId}'),
-              ),
-            ],
+                const SizedBox(height: 32),
+                TextField(
+                  controller: _codeController,
+                  decoration: InputDecoration(
+                    labelText: 'كود التفعيل',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.vpn_key),
+                    errorText: _errorMessage,
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) {
+                    if (_errorMessage != null) setState(() => _errorMessage = null);
+                  },
+                  onSubmitted: (_) => _isLoading ? null : _handleActivation(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _handleActivation,
+                    child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white) 
+                        : const Text('تفعيل الآن'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'سيتم تفعيل النظام تلقائياً بعد إدخال الكود الصحيح والتحقق منه.',
+                  style: TextStyle(color: Colors.green, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => ref.read(tenantIdProvider.notifier).clearTenantId(),
+                  icon: const Icon(Icons.arrow_back, color: Colors.red),
+                  label: const Text('العودة لصفحة التفعيل / تغيير المتجر', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -181,16 +195,24 @@ class _ActivationScreenState extends ConsumerState<_ActivationScreen> {
 
   Future<void> _handleActivation() async {
     final code = _codeController.text.trim();
-    if (code.isEmpty) return;
+    if (code.isEmpty) {
+      setState(() => _errorMessage = 'يرجى إدخال كود التفعيل');
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      await activateCashier(ref,code,expectedTenant:widget.tenantId);
+      await activateCashier(ref, code, expectedTenant: widget.tenantId);
     } catch (e) {
+      final msg = e is FormatException ? e.message : 'تعذّر الاتصال لخدمة التفعيل';
       if (mounted) {
+        setState(() => _errorMessage = msg);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e is FormatException ? e.message : 'تعذّر الاتصال لخدمة التفعيل'), backgroundColor: Colors.red),
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
     } finally {

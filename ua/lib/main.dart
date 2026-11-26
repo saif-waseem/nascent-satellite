@@ -128,7 +128,15 @@ class UserApp extends ConsumerWidget {
             Locale('ku'),
           ],
           routerConfig: ref.watch(appRouterProvider),
-          builder: (context, child) => CheckUpdateWrapper(child: child!),
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
+              ),
+              child: CheckUpdateWrapper(child: child!),
+            );
+          },
           debugShowCheckedModeBanner: false,
         );
   }

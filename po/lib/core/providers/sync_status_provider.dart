@@ -39,6 +39,7 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
   StreamSubscription? _connectivitySub;
   StreamSubscription? _queueSub;
   bool _running = false;
+  bool _needsAnotherPass = false;
   Timer? _retry;
 
   @override
@@ -100,66 +101,72 @@ class SyncStatusNotifier extends Notifier<SyncStatus> {
   }
 
   Future<void> syncPending() async {
-    if (!state.isOnline || state.pendingWritesCount == 0 || _running) return;
+    if (!state.isOnline || state.pendingWritesCount == 0) return;
+    if (_running) {
+      _needsAnotherPass = true;
+      return;
+    }
 
     _running = true;
     try {
-      state = state.copyWith(syncState: SyncState.syncing);
-      final box = LocalDbService.getBox<SyncQueueItem>('sync_queue');
+      do {
+        _needsAnotherPass = false;
+        state = state.copyWith(syncState: SyncState.syncing);
+        final box = LocalDbService.getBox<SyncQueueItem>('sync_queue');
+        if (box.isEmpty) break;
 
+        final items = box.values.toList()
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-
-      final items = box.values.toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-      for(final item in items) {
-        if(item.data['_primaryDone']==true)continue;
-        final isCatalog=item.collectionPath.startsWith('catalog/');
-        final movements=item.data['_stockMovements'];
-        if(!isCatalog && !(movements is List && item.collectionPath.startsWith('sales_invoices/')))continue;
-        try{
-          final service=ref.read(cashierStockProvider);
-          if(isCatalog){await service.writeProduct(item.id,item.data);}
-          else{await service.submit(item.data['tenantId'] as String,movements as List);}
-          item.data['_primaryDone']=true;
-          await item.save();
-        }catch(e){
-          debugPrint('Supabase sync warning for ${item.collectionPath}: $e');
-          // Proceed to Firestore backup to ensure products are never lost
-        }
-      }
-      if (!await ref.read(authRestServiceProvider.notifier).ensureSession()) return;
-      final backupService=ref.read(firestoreRestServiceProvider);
-      for (final item in items) {
-        try {
-          if(item.collectionPath.startsWith('catalog/')){
-            final snapshot=item.data['backup'];
-            if(snapshot==null){await backupService.deleteDocument('products/${item.id}');}
-            else{await backupService.setDocument('products/${item.id}',Map<String,dynamic>.from(snapshot as Map),isUpdate:true);}
-            await box.delete(item.key);continue;
+        for(final item in items) {
+          if(item.data['_primaryDone']==true)continue;
+          final isCatalog=item.collectionPath.startsWith('catalog/');
+          final movements=item.data['_stockMovements'];
+          if(!isCatalog && !(movements is List && item.collectionPath.startsWith('sales_invoices/')))continue;
+          try{
+            final service=ref.read(cashierStockProvider);
+            if(isCatalog){await service.writeProduct(item.id,item.data);}
+            else{await service.submit(item.data['tenantId'] as String,movements as List);}
+            item.data['_primaryDone']=true;
+            await item.save();
+          }catch(e){
+            debugPrint('Supabase sync warning for ${item.collectionPath}: $e');
+            // Proceed to Firestore backup to ensure products are never lost
           }
-          if (item.action == SyncAction.create ||
-              item.action == SyncAction.update) {
-            final data = Map<String, dynamic>.from(item.data);
-            final movements = data.remove('_stockMovements');
-            data.remove('_primaryDone');
-            await backupService.setDocument(
-              item.collectionPath,
-              data,
-              isUpdate:
-                  movements != null || item.action == SyncAction.update ||
-                  item.collectionPath.startsWith('products/'),
-            );
-          } else if (item.action == SyncAction.delete) {
-            await backupService.deleteDocument(item.collectionPath);
-          }
-          await box.delete(item.key);
-        } catch (e) {
-          debugPrint('Sync failed for item ${item.id}: $e');
-          state = state.copyWith(syncState: SyncState.error);
-          return; // Stop sync on first error to preserve order
         }
-      }
+        if (!await ref.read(authRestServiceProvider.notifier).ensureSession()) return;
+        final backupService=ref.read(firestoreRestServiceProvider);
+        for (final item in items) {
+          try {
+            if(item.collectionPath.startsWith('catalog/')){
+              final snapshot=item.data['backup'];
+              if(snapshot==null){await backupService.deleteDocument('products/${item.id}');}
+              else{await backupService.setDocument('products/${item.id}',Map<String,dynamic>.from(snapshot as Map),isUpdate:true);}
+              await box.delete(item.key);continue;
+            }
+            if (item.action == SyncAction.create ||
+                item.action == SyncAction.update) {
+              final data = Map<String, dynamic>.from(item.data);
+              final movements = data.remove('_stockMovements');
+              data.remove('_primaryDone');
+              await backupService.setDocument(
+                item.collectionPath,
+                data,
+                isUpdate:
+                    movements != null || item.action == SyncAction.update ||
+                    item.collectionPath.startsWith('products/'),
+              );
+            } else if (item.action == SyncAction.delete) {
+              await backupService.deleteDocument(item.collectionPath);
+            }
+            await box.delete(item.key);
+          } catch (e) {
+            debugPrint('Sync failed for item ${item.id}: $e');
+            state = state.copyWith(syncState: SyncState.error);
+            return; // Stop sync on first error to preserve order
+          }
+        }
+      } while (_needsAnotherPass && state.isOnline);
 
       _updateSyncState();
     } finally {

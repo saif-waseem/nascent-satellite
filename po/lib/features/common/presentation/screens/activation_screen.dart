@@ -11,18 +11,25 @@ class ActivationScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final storeIdController = useTextEditingController();
     final isLoading = useState(false);
+    final errorMessage = useState<String?>(null);
 
     Future<void> _activate() async {
       final code = storeIdController.text.trim();
-      if (code.isEmpty) return;
+      if (code.isEmpty) {
+        errorMessage.value = 'يرجى إدخال كود الكاشير';
+        return;
+      }
       
       isLoading.value = true;
+      errorMessage.value = null;
       try {
-        await activateCashier(ref,code);
+        await activateCashier(ref, code);
       } catch (e) {
+        final msg = e is FormatException ? e.message : 'تعذّر التفعيل. تحقق من الاتصال وحاول مجددًا.';
         if (context.mounted) {
+          errorMessage.value = msg;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e is FormatException ? e.message : 'تعذّر التفعيل. تحقق من الاتصال وحاول مجددًا.')),
+            SnackBar(content: Text(msg), backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -76,8 +83,12 @@ class ActivationScreen extends HookConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     prefixIcon: const Icon(Icons.key),
+                    errorText: errorMessage.value,
                   ),
-                  onSubmitted: (_) => _activate(),
+                  onChanged: (_) {
+                    if (errorMessage.value != null) errorMessage.value = null;
+                  },
+                  onSubmitted: (_) => isLoading.value ? null : _activate(),
                 ),
                 const SizedBox(height: 32),
                 SizedBox(

@@ -148,6 +148,15 @@ class _MyAppState extends ConsumerState<MyApp> with WindowListener {
       title: 'نظام المبيعات الذكي',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'IQ'),
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       supportedLocales: const [
         Locale('ar', 'IQ'),
         Locale('en', 'US'),

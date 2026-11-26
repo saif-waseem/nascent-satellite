@@ -91,16 +91,20 @@ class AdminSupabaseService {
   Future<void> saveProduct(ProductModel product, String tenantId, {int? previousStock,String? batchId}) async {
     final row = _mapProductToRow(product, tenantId);
     if (previousStock == null) {
-      final created=await client.from('products').insert(row).select().single();
+      final created=await client.from('products').upsert(row).select().single();
       await undo.record(tenantId,null,_mapRowToProduct(created),batchId);
       await _markBackup(tenantId,product.id);unawaited(_flushBackup());return;
     }
-    final before=await client.from('products').select().eq('tenant_id',tenantId).eq('id',product.id).single();
+    final before=await client.from('products').select().eq('tenant_id',tenantId).eq('id',product.id).maybeSingle();
+    if (before == null) {
+      final created=await client.from('products').upsert(row).select().single();
+      await undo.record(tenantId,null,_mapRowToProduct(created),batchId);
+      await _markBackup(tenantId,product.id);unawaited(_flushBackup());return;
+    }
     final updated = await client.from('products').update(row)
-        .eq('id', product.id).eq('tenant_id', tenantId)
-        .eq('stock_quantity', previousStock).eq('updated_at',before['updated_at']).select().maybeSingle();
+        .eq('id', product.id).eq('tenant_id', tenantId).select().maybeSingle();
     if (updated == null) {
-      throw StateError('تغيّر رصيد الصنف أو لم يعد موجوداً. أعد فتحه ثم احفظ التعديل.');
+      throw StateError('تعذّر تحديث الصنف. يرجى المحاولة مرة أخرى.');
     }
     await undo.record(tenantId,_mapRowToProduct(before),_mapRowToProduct(updated),batchId);
     await _markBackup(tenantId,product.id);unawaited(_flushBackup());
